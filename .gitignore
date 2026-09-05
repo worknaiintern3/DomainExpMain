@@ -21,6 +21,7 @@ out/
 .turbo/
 .cache/
 .eslintcache
+*.tsbuildinfo
 
 # Testing & coverage
 coverage/
