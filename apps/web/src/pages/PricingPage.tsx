@@ -154,8 +154,8 @@ export const PricingPage: React.FC = () => {
       {/* 1. TOP REFERENCE DISCLAIMER BANNER */}
       <PricingDisclaimer />
 
-      {/* Domain Context Callout if query param is passed from Find Domain */}
-      {domainParam && (
+      {/* Domain Context Callout if query param is passed from Find Domain and in Registrars mode */}
+      {mode === 'registrars' && domainParam && (
         <div className="px-unit-base py-2 rounded-lg bg-secondary-container/40 flex items-center justify-between gap-unit-sm border border-secondary-container">
           <div className="flex items-center gap-unit-xs text-caption-xs font-caption-xs">
             <span className="material-symbols-outlined text-primary text-[18px]">travel_explore</span>
@@ -232,7 +232,7 @@ export const PricingPage: React.FC = () => {
           </div>
 
           {/* TRANSFER SAVINGS CALCULATOR (BOTTOM GRID) */}
-          <TransferSavingsCalculator />
+          <TransferSavingsCalculator registrars={baseRegistrars} tld={selectedTld} />
         </div>
       )}
 

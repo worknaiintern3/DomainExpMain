@@ -1,12 +1,36 @@
 import React, { useState } from 'react';
-import { calculateTransferSavings } from '../pricing.reference';
+import { RegistrarPricing } from '../pricing.types';
+import { calculateTransferSavings, COM_REGISTRAR_PRICING } from '../pricing.reference';
 
-export const TransferSavingsCalculator: React.FC = () => {
-  const [currentRate, setCurrentRate] = useState<number>(1499);
-  const [targetRate, setTargetRate] = useState<number>(899);
+interface TransferSavingsCalculatorProps {
+  registrars?: RegistrarPricing[];
+  tld?: string;
+}
+
+export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps> = ({
+  registrars = COM_REGISTRAR_PRICING,
+  tld = '.com',
+}) => {
+  const [currentRegId, setCurrentRegId] = useState<string>('godaddy');
+  const [targetRegId, setTargetRegId] = useState<string>('cloudflare');
   const [domainCount, setDomainCount] = useState<number>(12);
   const [guideModalOpen, setGuideModalOpen] = useState<boolean>(false);
   const [exportNotice, setExportNotice] = useState<boolean>(false);
+
+  // Derive active registrar objects from the passed active-TLD dataset
+  const currentReg =
+    registrars.find((r) => r.id === currentRegId) ||
+    registrars.find((r) => r.id === 'godaddy') ||
+    registrars[0];
+
+  const targetReg =
+    registrars.find((r) => r.id === targetRegId) ||
+    registrars.find((r) => r.id === 'cloudflare') ||
+    registrars[1] ||
+    registrars[0];
+
+  const currentRate = currentReg ? currentReg.renewalPrice : 1499;
+  const targetRate = targetReg ? targetReg.renewalPrice : 899;
 
   const calc = calculateTransferSavings(currentRate, targetRate, domainCount);
 
@@ -17,6 +41,9 @@ export const TransferSavingsCalculator: React.FC = () => {
     const csvContent =
       'data:text/csv;charset=utf-8,' +
       'Metric,Value\n' +
+      `Active TLD,${tld}\n` +
+      `Current Registrar,${currentReg?.registrarName || 'Current'}\n` +
+      `Target Registrar,${targetReg?.registrarName || 'Target'}\n` +
       `Number of Domains,${domainCount}\n` +
       `Current Annual Renewal Rate (INR),${currentRate}\n` +
       `Target Annual Renewal Rate (INR),${targetRate}\n` +
@@ -29,7 +56,7 @@ export const TransferSavingsCalculator: React.FC = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `domainpulse_transfer_savings_${domainCount}_domains.csv`);
+    link.setAttribute('download', `domainpulse_transfer_savings_${tld.replace('.', '')}_${domainCount}_domains.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -48,7 +75,7 @@ export const TransferSavingsCalculator: React.FC = () => {
               Transfer Savings Calculator
             </h3>
             <p className="font-caption-xs text-caption-xs text-secondary">
-              Estimate portfolio consolidation savings using reference renewal pricing.
+              Estimate portfolio consolidation savings using reference renewal pricing ({tld}).
             </p>
           </div>
         </div>
@@ -86,14 +113,15 @@ export const TransferSavingsCalculator: React.FC = () => {
               Current Registrar
             </label>
             <select
-              value={currentRate}
-              onChange={(e) => setCurrentRate(Number(e.target.value))}
-              className="h-9 px-unit-sm rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary border border-outline-variant/30 cursor-pointer"
+              value={currentReg?.id || currentRegId}
+              onChange={(e) => setCurrentRegId(e.target.value)}
+              className="h-9 px-unit-sm rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary border border-outline-variant/30 cursor-pointer truncate"
             >
-              <option value="1499">GoDaddy (₹1,499/yr)</option>
-              <option value="1650">Squarespace (₹1,650/yr)</option>
-              <option value="1299">Hostinger (₹1,299/yr)</option>
-              <option value="1099">Namecheap (₹1,099/yr)</option>
+              {registrars.map((reg) => (
+                <option key={reg.id} value={reg.id}>
+                  {reg.registrarName} ({reg.renewalFormatted}/yr)
+                </option>
+              ))}
             </select>
           </div>
 
@@ -102,7 +130,7 @@ export const TransferSavingsCalculator: React.FC = () => {
               Current Renewal Price
             </label>
             <div className="h-9 px-unit-sm rounded bg-surface-container flex items-center font-label-mono text-label-mono text-rose-700 font-bold border border-outline-variant/20">
-              ₹{currentRate.toLocaleString('en-IN')} /yr
+              {currentReg ? currentReg.renewalFormatted : `₹${currentRate.toLocaleString('en-IN')}`} /yr
             </div>
           </div>
 
@@ -111,13 +139,15 @@ export const TransferSavingsCalculator: React.FC = () => {
               Target Registrar
             </label>
             <select
-              value={targetRate}
-              onChange={(e) => setTargetRate(Number(e.target.value))}
-              className="h-9 px-unit-sm rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary border border-outline-variant/30 cursor-pointer"
+              value={targetReg?.id || targetRegId}
+              onChange={(e) => setTargetRegId(e.target.value)}
+              className="h-9 px-unit-sm rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary border border-outline-variant/30 cursor-pointer truncate"
             >
-              <option value="899">Cloudflare (₹899/yr)</option>
-              <option value="950">Porkbun (₹950/yr)</option>
-              <option value="999">Dynadot (₹999/yr)</option>
+              {registrars.map((reg) => (
+                <option key={reg.id} value={reg.id}>
+                  {reg.registrarName} ({reg.renewalFormatted}/yr)
+                </option>
+              ))}
             </select>
           </div>
 
@@ -126,7 +156,7 @@ export const TransferSavingsCalculator: React.FC = () => {
               Target Renewal Price
             </label>
             <div className="h-9 px-unit-sm rounded bg-surface-container flex items-center font-label-mono text-label-mono text-primary font-bold border border-outline-variant/20">
-              ₹{targetRate.toLocaleString('en-IN')} /yr
+              {targetReg ? targetReg.renewalFormatted : `₹${targetRate.toLocaleString('en-IN')}`} /yr
             </div>
           </div>
 
