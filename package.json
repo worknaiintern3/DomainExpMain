@@ -1,0 +1,29 @@
+{
+  "name": "domainpulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DomainPulse - Infrastructure & Domain Portfolio Management Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/web",
+    "lint": "npm run lint --workspace=apps/web",
+    "preview": "npm run preview --workspace=apps/web"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "domain-management",
+    "infrastructure",
+    "portfolio",
+    "dns",
+    "vps"
+  ],
+  "author": "Aman",
+  "license": "UNLICENSED"
+}
