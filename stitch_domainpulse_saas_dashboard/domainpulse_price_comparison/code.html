@@ -1,0 +1,955 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline": "#777587", "tertiary-container": "#005cc6", "secondary-fixed-dim": "#bec6e0", "inverse-surface": "#213145", "on-tertiary": "#ffffff", "on-secondary-container": "#5c647a", "error-container": "#ffdad6", "tertiary-fixed-dim": "#adc6ff", "secondary-container": "#dae2fd", "on-error-container": "#93000a", "on-primary-fixed-variant": "#3323cc", "primary-fixed": "#e2dfff", "on-background": "#0b1c30", "tertiary": "#004598", "surface-tint": "#4d44e3", "on-tertiary-container": "#cedbff", "inverse-primary": "#c3c0ff", "on-surface": "#0b1c30", "surface-container-lowest": "#ffffff", "primary-container": "#4f46e5", "on-tertiary-fixed-variant": "#004395", "secondary": "#565e74", "background": "#f8f9ff", "on-secondary-fixed": "#131b2e", "error": "#ba1a1a", "on-secondary": "#ffffff", "on-primary": "#ffffff", "surface-container": "#e5eeff", "secondary-fixed": "#dae2fd", "surface-bright": "#f8f9ff", "on-secondary-fixed-variant": "#3f465c", "surface-dim": "#cbdbf5", "surface": "#f8f9ff", "on-surface-variant": "#464555", "on-primary-fixed": "#0f0069", "inverse-on-surface": "#eaf1ff", "on-error": "#ffffff", "surface-variant": "#d3e4fe", "primary": "#3525cd", "on-primary-container": "#dad7ff", "primary-fixed-dim": "#c3c0ff", "tertiary-fixed": "#d8e2ff", "surface-container-low": "#eff4ff", "surface-container-highest": "#d3e4fe", "outline-variant": "#c7c4d8", "surface-container-high": "#dce9ff", "on-tertiary-fixed": "#001a42" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "unit-2xs": "0.125rem", "gutter-table": "0.75rem", "unit-2xl": "3rem", "unit-sm": "0.5rem", "unit-lg": "1.5rem", "unit-xl": "2rem", "header-height": "3.5rem", "unit-xs": "0.25rem", "unit-md": "0.75rem", "unit-base": "1rem", "sidebar-width": "16rem" }, "fontFamily": { "body-sm": ["Inter"], "headline-md": ["Inter"], "display-lg": ["Inter"], "body-md": ["Inter"], "display-lg-mobile": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"], "headline-sm": ["Inter"], "caption-xs": ["Inter"], "label-mono": ["JetBrains Mono"] }, "fontSize": { "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0.005em", "fontWeight": "400" }], "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.025em", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "caption-xs": ["11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500" }], "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "-0.01em", "fontWeight": "500" }] } } } };</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-sidebar-width bg-inverse-surface text-inverse-on-surface z-50 flex flex-col justify-between select-none"><div class="flex flex-col"><div class="h-header-height px-unit-lg flex items-center gap-unit-md"><img alt="DomainPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WThqsiQBL4jQ62XGNvkTN_JhzSxDa9An-7pwYb5HNd_EpQMwHHDxbUiaFvQiQN0r6bKGe-se85iEl1NO2D101VAygOC0_C83EWXlzGXcPVzedDYHqEMhQAB0O_iyQl5PQv0trGslYzWjvyTagE6_dKPVZpdHj4dL_r1u3KZsjjnOJ_yM84LRH_dKy_IIFNeklu5LSpbYWpKJq2qrOnn4CakmIoRXIR_pxxzf6v8KETjgy8QeFiRW76ng"><span class="font-headline-sm text-headline-sm text-on-primary tracking-tight">DomainPulse</span></div><nav class="flex flex-col gap-unit-2xs px-unit-md mt-unit-sm" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded-lg shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]"><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-md text-label-md">Overview</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="my-domains" href="#"><span class="material-symbols-outlined text-[20px]">dns</span><span class="font-label-md text-label-md">My Domains</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="find-domain" href="#"><span class="material-symbols-outlined text-[20px]">travel_explore</span><span class="font-label-md text-label-md">Find Domain</span></a><a aria-current="page" class="flex items-center gap-unit-md px-unit-md py-unit-sm transition-colors bg-primary-container text-on-primary font-label-md text-label-md rounded-lg shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]" data-path="price-comparison" href="#"><span class="material-symbols-outlined text-[20px]">price_change</span><span class="font-label-md text-label-md">Price Comparison</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="alerts" href="#"><span class="material-symbols-outlined text-[20px]">notifications_active</span><span class="font-label-md text-label-md">Alerts</span></a></nav></div><div class="flex flex-col gap-unit-md px-unit-md pb-unit-md"><nav class="flex flex-col gap-unit-2xs" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded-lg"><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="settings" href="#"><span class="material-symbols-outlined text-[20px]">settings</span><span class="font-label-md text-label-md">Settings</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="help-and-support" href="#"><span class="material-symbols-outlined text-[20px]">contact_support</span><span class="font-label-md text-label-md">Help &amp; Support</span></a></nav><div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-variant/5 hover:bg-surface-variant/10 transition-colors cursor-pointer"><div class="flex items-center gap-unit-sm min-w-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-label-md text-label-md text-inverse-on-surface truncate">Aman Developer</span><span class="font-caption-xs text-caption-xs text-secondary-fixed-dim truncate">Pro Plan</span></div></div><span class="material-symbols-outlined text-secondary-fixed-dim text-[18px]">unfold_more</span></div></div></aside><div class="pl-sidebar-width min-h-screen bg-background"><header class="fixed top-0 left-sidebar-width right-0 h-header-height bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-unit-xl flex items-center justify-between gap-unit-lg"><div class="flex flex-col"><h1 class="font-headline-sm text-headline-sm text-on-surface leading-none">Good afternoon, Aman</h1><p class="font-caption-xs text-caption-xs text-secondary mt-unit-2xs">Here’s what’s happening with your domain portfolio.</p></div><div class="flex items-center gap-unit-md"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-unit-sm text-on-surface-variant text-[18px] pointer-events-none">search</span><input class="h-9 pl-9 pr-14 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary w-64" placeholder="Search domains, TLDs, DNS..." type="text"><span class="absolute right-unit-xs font-caption-xs text-caption-xs text-on-surface-variant px-unit-xs py-unit-2xs rounded bg-surface-container font-label-mono text-label-mono">⌘K</span></div><button class="relative w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-secondary-container ring-2 ring-surface-container-lowest"></span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="w-full pt-header-height px-unit-xl pb-unit-2xl"><div class="flex flex-col w-full gap-unit-md">
+<!-- REFERENCE PRICING DISCLAIMER BANNER -->
+<div class="flex items-center justify-between px-unit-base py-unit-sm rounded-lg bg-surface-container-low text-on-surface shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]">
+<div class="flex items-center gap-unit-sm min-w-0">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0">info</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate"><strong class="font-label-md text-on-surface">Reference Data:</strong> Reference/demo pricing only. Actual registrar pricing, promotions, taxes and renewal rates may vary. Live provider integrations are planned for a production version.</p>
+</div>
+<div class="flex items-center gap-unit-md shrink-0 ml-unit-base">
+<span class="font-caption-xs text-caption-xs text-secondary whitespace-nowrap">Reference Dataset: Benchmark Prototype Data • Currency: INR (₹)</span>
+<button class="text-on-surface-variant hover:text-on-surface flex items-center justify-center p-unit-2xs rounded hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</div>
+<!-- PAGE HEADER & PRIMARY CONTROLS -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-unit-base">
+<div class="flex flex-col">
+<div class="flex items-center gap-unit-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface tracking-tight">Price Comparison</h2>
+<span class="px-unit-xs py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-caption-xs text-caption-xs">Concept C Matrix</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary mt-unit-2xs">
+        Compare registration, renewal and transfer pricing across popular domain providers.
+      </p>
+</div>
+<!-- Right Side Actions & Mode Switcher -->
+<div class="flex flex-wrap items-center gap-unit-sm">
+<button class="h-9 px-unit-md flex items-center gap-unit-xs rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md hover:bg-surface-container shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">bookmark</span>
+<span class="">Saved Comparisons (4)</span>
+</button>
+<button class="h-9 px-unit-md flex items-center gap-unit-xs rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md hover:bg-surface-container shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">balance</span>
+<span class="">Methodology</span>
+</button>
+<!-- Segmented Mode Switcher -->
+<div class="flex items-center p-1 bg-surface-container rounded-lg shadow-inner">
+<button class="h-7 px-unit-md rounded-md bg-surface-container-lowest text-primary font-label-md text-label-md shadow-sm transition-all flex items-center gap-1.5" id="modeRegistrarsBtn" onclick="switchMode('registrars')" type="button">
+<span class="material-symbols-outlined text-[16px]">domain</span>
+<span class="">Domain Registrars</span>
+</button>
+<button class="h-7 px-unit-md rounded-md text-secondary hover:text-on-surface font-label-md text-label-md transition-all flex items-center gap-1.5" id="modeHostingBtn" onclick="switchMode('hosting')" type="button">
+<span class="material-symbols-outlined text-[16px]">dns</span>
+<span class="">Hosting Providers</span>
+</button>
+</div>
+</div>
+</div>
+<!-- VIEW CONTAINER: REGISTRARS MODE (DEFAULT) -->
+<div class="flex flex-col gap-unit-md" id="registrarsView">
+<!-- TOOLBAR & TLD SELECTOR -->
+<div class="flex flex-col gap-unit-sm p-unit-base rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]">
+<!-- TLD Row -->
+<div class="flex items-center justify-between gap-unit-base overflow-x-auto pb-1">
+<div class="flex items-center gap-1.5 shrink-0" id="tldContainer">
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-primary text-on-primary shadow-sm font-medium" onclick="selectTld(this, '.com')" type="button">.com</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.in')" type="button">.in</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.co.in')" type="button">.co.in</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.ai')" type="button">.ai</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.io')" type="button">.io</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.org')" type="button">.org</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.net')" type="button">.net</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.co')" type="button">.co</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.dev')" type="button">.dev</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.app')" type="button">.app</button>
+<button class="tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors" onclick="selectTld(this, '.tech')" type="button">.tech</button>
+</div>
+<div class="flex items-center gap-unit-xs text-secondary font-caption-xs shrink-0"><span class="material-symbols-outlined text-[16px] text-tertiary">analytics</span><span class="">Illustrative Benchmark Dataset</span></div>
+</div>
+<!-- Secondary Filters Strip -->
+<div class="flex flex-wrap items-center justify-between gap-unit-sm pt-unit-xs">
+<div class="flex flex-wrap items-center gap-unit-md">
+<!-- Currency badge -->
+<div class="h-8 px-unit-sm rounded bg-surface-container text-on-surface font-label-mono text-label-mono flex items-center gap-1">
+<span class="text-secondary">Currency:</span>
+<span class="font-semibold text-primary">INR (₹)</span>
+</div>
+<!-- Sort Select -->
+<div class="relative flex items-center">
+<select class="h-8 pl-unit-sm pr-7 rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm appearance-none focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
+<option>Sort: Best Long-Term Value</option>
+<option>Lowest First Year</option>
+<option>Lowest Renewal</option>
+<option>Lowest Transfer</option>
+</select>
+<span class="material-symbols-outlined absolute right-1.5 text-on-surface-variant text-[16px] pointer-events-none">expand_more</span>
+</div>
+<!-- Checkbox Filters -->
+<label class="flex items-center gap-unit-xs cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded text-primary accent-primary cursor-pointer" type="checkbox">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Include WHOIS Privacy</span>
+</label>
+<label class="flex items-center gap-unit-xs cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded text-primary accent-primary cursor-pointer" type="checkbox">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Free DNSSEC</span>
+</label>
+</div>
+<!-- Quick Filter Input -->
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2 text-outline text-[16px]">filter_list</span>
+<input class="h-8 pl-7 pr-3 rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary w-48" placeholder="Filter providers..." type="text">
+</div>
+</div>
+</div>
+<!-- COMPACT METRIC SUMMARY STRIP (.com) -->
+<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-unit-sm">
+<div class="p-unit-sm rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Lowest Registration</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-headline-sm text-headline-sm font-label-mono text-on-surface">₹699</span>
+<span class="font-caption-xs text-caption-xs text-secondary">/1st yr</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-primary font-medium mt-1">Hostinger Promo</span>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Lowest Renewal</span>
+<span class="px-1.5 py-0.5 rounded bg-secondary-container text-on-secondary-container font-caption-xs text-[10px]">Best Value</span>
+</div>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-headline-sm text-headline-sm font-label-mono text-primary">₹899</span>
+<span class="font-caption-xs text-caption-xs text-secondary">/yr recurring</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-tertiary font-medium mt-1">Cloudflare (At-Cost)</span>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Lowest Transfer</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-headline-sm text-headline-sm font-label-mono text-on-surface">₹749</span>
+<span class="font-caption-xs text-caption-xs text-secondary">+1 yr included</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-on-surface-variant font-medium mt-1">Porkbun LLC</span>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col justify-between"><span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Registrars Compared</span><div class="flex items-baseline gap-1 mt-1"><span class="font-headline-sm text-headline-sm font-label-mono text-on-surface">8</span><span class="font-caption-xs text-caption-xs text-secondary">Providers Compared</span></div><span class="font-caption-xs text-caption-xs text-secondary mt-1">Reference Sample</span></div>
+<div class="p-unit-sm rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Industry Avg Renewal</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-headline-sm text-headline-sm font-label-mono text-on-surface">₹1,249</span>
+<span class="font-caption-xs text-caption-xs text-secondary">/yr</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary mt-1">Across 8 registrars</span>
+</div>
+<div class="p-unit-sm rounded-lg bg-error-container text-on-error-container shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col justify-between">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-error">warning</span>
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider font-semibold">Markup Alert</span>
+</div>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-headline-sm text-headline-sm font-label-mono text-on-error-container">3 of 8</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-on-error-container font-medium mt-1">Providers hike renewals &gt;80%</span>
+</div>
+</div>
+<!-- 5-YEAR OWNERSHIP VISUALIZATION & BENCHMARK DUAL CARD -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-unit-md">
+<!-- Horizon Benchmark Card (Left 5 Cols) -->
+<div class="xl:col-span-5 p-unit-base rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col justify-between">
+<div class="flex items-center justify-between mb-unit-sm">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">insights</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Ownership Cost Benchmark</h3>
+</div>
+<!-- Horizon Selector -->
+<div class="flex items-center p-0.5 bg-surface-container rounded-md">
+<button class="px-2 py-0.5 rounded text-caption-xs font-caption-xs text-secondary hover:text-on-surface" type="button">1 Year</button>
+<button class="px-2 py-0.5 rounded text-caption-xs font-caption-xs text-secondary hover:text-on-surface" type="button">3 Years</button>
+<button class="px-2 py-0.5 rounded text-caption-xs font-caption-xs bg-surface-container-lowest text-primary font-semibold shadow-xs" type="button">5 Years</button>
+</div>
+</div>
+<p class="font-caption-xs text-caption-xs text-secondary mb-unit-sm">First-year discounts mask high recurring charges. Benchmark calculated over a 5-year rolling cycle. <span class="block mt-1 text-[11px] text-outline">Estimated ownership cost based on the selected reference prices and assumes the displayed renewal rate remains unchanged.</span></p>
+<!-- Comparative Preview List -->
+<div class="flex flex-col gap-unit-xs">
+<div class="p-unit-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Cloudflare</span>
+<span class="px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container font-caption-xs text-[10px]">⭐ Best 5-Yr Value</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary truncate mt-0.5">At-cost registry wholesale pricing (0% markup)</span>
+</div>
+<div class="flex flex-col items-end shrink-0 ml-unit-sm">
+<span class="font-label-mono text-label-mono font-semibold text-primary">₹4,495</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Yr-1: ₹899</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Porkbun</span>
+<span class="font-caption-xs text-caption-xs text-secondary truncate mt-0.5">Transparent ICANN wholesale fees + minimal buffer</span>
+</div>
+<div class="flex flex-col items-end shrink-0 ml-unit-sm">
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">₹4,649</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Yr-1: ₹849</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Namecheap</span>
+<span class="font-caption-xs text-caption-xs text-secondary truncate mt-0.5">Free lifetime privacy + standard renewal tiers</span>
+</div>
+<div class="flex flex-col items-end shrink-0 ml-unit-sm">
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">₹5,195</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Yr-1: ₹799</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-lg bg-error-container/40 flex items-center justify-between">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1">
+<span class="font-label-md text-label-md text-on-error-container font-semibold">GoDaddy</span>
+<span class="px-1 py-0.2 rounded bg-error-container text-on-error-container font-caption-xs text-[10px]">⚠️ +180% Spike</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-on-surface-variant truncate mt-0.5">Promotional ₹699 first yr, ₹1,499/yr thereafter</span>
+</div>
+<div class="flex flex-col items-end shrink-0 ml-unit-sm">
+<span class="font-label-mono text-label-mono font-semibold text-error">₹6,695</span>
+<span class="font-caption-xs text-caption-xs text-on-surface-variant">Yr-1: ₹699</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 5-Year Ownership Cost Bar Chart Visualization (Right 7 Cols) -->
+<div class="xl:col-span-7 p-unit-base rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col justify-between">
+<div class="flex items-center justify-between mb-unit-xs">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">5-Year Cumulative Cost Trajectory</h3>
+<p class="font-caption-xs text-caption-xs text-secondary">Registration promo vs. 4-year cumulative renewal load</p>
+</div>
+<div class="flex items-center gap-unit-md text-caption-xs font-caption-xs">
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-3 rounded bg-primary"></span>
+<span class="text-on-surface-variant">Year 1 Promo</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-3 rounded bg-secondary-container"></span>
+<span class="text-on-surface-variant">Years 2-5 Renewals</span>
+</div>
+</div>
+</div>
+<!-- Custom Horizontal Stacked Bar Charts -->
+<div class="flex flex-col gap-unit-sm my-unit-xs">
+<!-- Cloudflare -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="font-medium text-on-surface flex items-center gap-1">
+                Cloudflare <span class="text-caption-xs text-secondary font-normal">(At-cost)</span>
+</span>
+<span class="font-label-mono text-label-mono font-semibold text-primary">₹4,495 Total</span>
+</div>
+<div class="w-full h-5 bg-surface-container rounded-md overflow-hidden flex">
+<div class="bg-primary h-full transition-all duration-500" style="width: 20%;" title="Year 1: ₹899"></div>
+<div class="bg-secondary-fixed-dim h-full transition-all duration-500" style="width: 47%;" title="Years 2-5: ₹3,596"></div>
+</div>
+</div>
+<!-- Porkbun -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="font-medium text-on-surface flex items-center gap-1">
+                Porkbun <span class="text-caption-xs text-secondary font-normal">(Transparent)</span>
+</span>
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">₹4,649 Total</span>
+</div>
+<div class="w-full h-5 bg-surface-container rounded-md overflow-hidden flex">
+<div class="bg-primary h-full transition-all duration-500" style="width: 18.2%;" title="Year 1: ₹849"></div>
+<div class="bg-secondary-fixed-dim h-full transition-all duration-500" style="width: 51.1%;" title="Years 2-5: ₹3,800"></div>
+</div>
+</div>
+<!-- Namecheap -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="font-medium text-on-surface flex items-center gap-1">
+                Namecheap <span class="text-caption-xs text-secondary font-normal">(Standard)</span>
+</span>
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">₹5,195 Total</span>
+</div>
+<div class="w-full h-5 bg-surface-container rounded-md overflow-hidden flex">
+<div class="bg-primary h-full transition-all duration-500" style="width: 15.3%;" title="Year 1: ₹799"></div>
+<div class="bg-secondary-fixed-dim h-full transition-all duration-500" style="width: 62.3%;" title="Years 2-5: ₹4,396"></div>
+</div>
+</div>
+<!-- GoDaddy -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="font-medium text-on-surface flex items-center gap-1">GoDaddy <span class="text-caption-xs text-error font-medium">(Promotional First-Year Pricing)</span></span>
+<span class="font-label-mono text-label-mono font-semibold text-error">₹6,695 Total (+49%)</span>
+</div>
+<div class="w-full h-5 bg-surface-container rounded-md overflow-hidden flex">
+<div class="bg-primary h-full transition-all duration-500" style="width: 10.4%;" title="Year 1 Promo: ₹699"></div>
+<div class="bg-error/70 h-full transition-all duration-500" style="width: 89.6%;" title="Years 2-5: ₹5,996"></div>
+</div>
+</div>
+</div>
+<!-- Savings callout bar -->
+<div class="mt-unit-xs px-unit-sm py-unit-xs rounded bg-surface-container text-on-surface-variant flex items-center justify-between text-caption-xs font-caption-xs"><div class="flex items-center gap-1"><span class="material-symbols-outlined text-primary text-[16px]">savings</span><span class="">Estimated ₹2,200 savings (32.8% estimated reduction over 5 years). Based on the current reference pricing dataset.</span></div><span class="font-semibold text-primary">32.8% Est. Reduction</span></div>
+</div>
+</div>
+<!-- MAIN DATA MATRIX & PROVIDER INSPECTION DRAWER (SPLIT VIEW) -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-unit-md items-start">
+<!-- Matrix Table (Left 8 Cols) -->
+<div class="xl:col-span-8 rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] overflow-hidden">
+<div class="px-unit-base py-unit-sm bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-unit-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Registrar Benchmark Matrix</h3>
+<span class="px-2 py-0.5 rounded bg-surface-container font-label-mono text-label-mono text-on-surface-variant">.com Top-Level Domain</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary">Click row to view provider details</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="h-8 bg-surface-container-low text-secondary font-caption-xs text-caption-xs uppercase tracking-wider">
+<th class="px-unit-md py-1 font-medium">Registrar</th>
+<th class="px-unit-sm py-1 font-medium">Registration</th>
+<th class="px-unit-sm py-1 font-medium">Renewal</th>
+<th class="px-unit-sm py-1 font-medium">Transfer</th>
+<th class="px-unit-sm py-1 font-medium">Hike %</th>
+<th class="px-unit-sm py-1 font-medium">WHOIS Privacy</th>
+<th class="px-unit-sm py-1 font-medium">DNSSEC</th>
+<th class="px-unit-sm py-1 font-medium">Score</th>
+<th class="px-unit-md py-1 font-medium text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container text-body-sm font-body-sm">
+<!-- Cloudflare -->
+<tr class="h-11 hover:bg-surface-container-low/60 cursor-pointer transition-colors group" onclick="inspectProvider('cloudflare')">
+<td class="px-unit-md py-1.5 flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] text-primary">cloud</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary">Cloudflare</span>
+<span class="font-caption-xs text-[10px] text-secondary">ICANN #1479</span>
+</div>
+</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹899</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono font-semibold text-primary">₹899</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹899</td>
+<td class="px-unit-sm py-1.5">
+<span class="px-1.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-caption-xs text-[11px] font-semibold">Flat (0%)</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="text-on-surface font-medium text-caption-xs">Free Lifetime</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">9.8</span><span class="text-caption-xs text-secondary">/10</span>
+</td>
+<td class="px-unit-md py-1.5 text-right">
+<div class="flex items-center justify-end gap-1">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[10px]">Best Long-Term</span>
+<button class="p-1 rounded text-secondary hover:text-primary hover:bg-surface-container" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Porkbun (Active Row Highlight) -->
+<tr class="h-11 bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors group" onclick="inspectProvider('porkbun')">
+<td class="px-unit-md py-1.5 flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px]">savings</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-primary font-bold">Porkbun LLC</span>
+<span class="font-caption-xs text-[10px] text-secondary">ICANN #1861</span>
+</div>
+</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹849</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface font-semibold">₹950</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono font-bold text-primary">₹749</td>
+<td class="px-unit-sm py-1.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[11px] font-medium">+12%</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="text-on-surface font-medium text-caption-xs">Free Lifetime</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="font-label-mono text-label-mono font-semibold text-primary">9.5</span><span class="text-caption-xs text-secondary">/10</span>
+</td>
+<td class="px-unit-md py-1.5 text-right">
+<div class="flex items-center justify-end gap-1">
+<span class="px-1.5 py-0.5 rounded bg-primary text-on-primary font-caption-xs text-[10px]">Lowest Transfer</span>
+<button class="p-1 rounded text-primary hover:bg-surface-container" type="button">
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Namecheap -->
+<tr class="h-11 hover:bg-surface-container-low/60 cursor-pointer transition-colors group" onclick="inspectProvider('namecheap')">
+<td class="px-unit-md py-1.5 flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] text-tertiary">tag</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary">Namecheap</span>
+<span class="font-caption-xs text-[10px] text-secondary">ICANN #1068</span>
+</div>
+</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹799</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,099</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹899</td>
+<td class="px-unit-sm py-1.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[11px]">+37%</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="text-on-surface font-medium text-caption-xs">Free Lifetime</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">8.9</span><span class="text-caption-xs text-secondary">/10</span>
+</td>
+<td class="px-unit-md py-1.5 text-right">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[10px]">Popular</span>
+</td>
+</tr>
+<!-- Hostinger -->
+<tr class="h-11 hover:bg-surface-container-low/60 cursor-pointer transition-colors group" onclick="inspectProvider('hostinger')">
+<td class="px-unit-md py-1.5 flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] text-tertiary">rocket_launch</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary">Hostinger</span>
+<span class="font-caption-xs text-[10px] text-secondary">ICANN #1636</span>
+</div>
+</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono font-semibold text-primary">₹699</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,299</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹849</td>
+<td class="px-unit-sm py-1.5">
+<span class="px-1.5 py-0.5 rounded bg-secondary-container text-on-secondary-container font-caption-xs text-[11px] font-semibold">⚠️ +85%</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="text-on-surface font-medium text-caption-xs">Free Lifetime</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">7.8</span><span class="text-caption-xs text-secondary">/10</span>
+</td>
+<td class="px-unit-md py-1.5 text-right">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[10px]">Best 1st-Year</span>
+</td>
+</tr>
+<!-- Dynadot -->
+<tr class="h-11 hover:bg-surface-container-low/60 cursor-pointer transition-colors group" onclick="inspectProvider('dynadot')">
+<td class="px-unit-md py-1.5 flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] text-secondary">storefront</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary">Dynadot</span>
+<span class="font-caption-xs text-[10px] text-secondary">ICANN #472</span>
+</div>
+</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹789</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹999</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹799</td>
+<td class="px-unit-sm py-1.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[11px]">+26%</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="text-on-surface font-medium text-caption-xs">Free Lifetime</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">9.1</span><span class="text-caption-xs text-secondary">/10</span>
+</td>
+<td class="px-unit-md py-1.5 text-right">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[10px]">Wholesale</span>
+</td>
+</tr>
+<!-- AWS Route 53 -->
+<tr class="h-11 hover:bg-surface-container-low/60 cursor-pointer transition-colors group" onclick="inspectProvider('aws')">
+<td class="px-unit-md py-1.5 flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] text-on-surface">hub</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary">AWS Route 53</span>
+<span class="font-caption-xs text-[10px] text-secondary">Amazon Registrar</span>
+</div>
+</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,150</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,150</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,150</td>
+<td class="px-unit-sm py-1.5">
+<span class="px-1.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-caption-xs text-[11px]">Flat (0%)</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="text-on-surface font-medium text-caption-xs">Free Lifetime</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">8.4</span><span class="text-caption-xs text-secondary">/10</span>
+</td>
+<td class="px-unit-md py-1.5 text-right">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[10px]">Enterprise</span>
+</td>
+</tr>
+<!-- Squarespace -->
+<tr class="h-11 hover:bg-surface-container-low/60 cursor-pointer transition-colors group" onclick="inspectProvider('squarespace')">
+<td class="px-unit-md py-1.5 flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] text-on-surface">web</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary">Squarespace</span>
+<span class="font-caption-xs text-[10px] text-secondary">ex-Google Domains</span>
+</div>
+</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,650</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,650</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,650</td>
+<td class="px-unit-sm py-1.5">
+<span class="px-1.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-caption-xs text-[11px]">Flat (0%)</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="text-on-surface font-medium text-caption-xs">Free Lifetime</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">7.2</span><span class="text-caption-xs text-secondary">/10</span>
+</td>
+<td class="px-unit-md py-1.5 text-right">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-[10px]">Bundle</span>
+</td>
+</tr>
+<!-- GoDaddy -->
+<tr class="h-11 bg-error-container/20 hover:bg-error-container/30 cursor-pointer transition-colors group" onclick="inspectProvider('godaddy')">
+<td class="px-unit-md py-1.5 flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-error-container text-on-error-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-error font-semibold">GoDaddy</span>
+<span class="font-caption-xs text-[10px] text-secondary">ICANN #146</span>
+</div>
+</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹499</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono font-bold text-error">₹1,499</td>
+<td class="px-unit-sm py-1.5 font-label-mono text-label-mono text-on-surface">₹1,299</td>
+<td class="px-unit-sm py-1.5">
+<span class="px-1.5 py-0.5 rounded bg-error-container text-on-error-container font-caption-xs text-[11px] font-bold">High Renewal Increase (+200%)</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="text-error font-medium text-caption-xs">Upsell (₹299/yr)</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="material-symbols-outlined text-outline text-[16px]">cancel</span>
+</td>
+<td class="px-unit-sm py-1.5">
+<span class="font-label-mono text-label-mono font-bold text-error">5.8</span><span class="text-caption-xs text-secondary">/10</span>
+</td>
+<td class="px-unit-md py-1.5 text-right">
+<span class="px-1.5 py-0.5 rounded bg-error-container text-on-error-container font-caption-xs text-[10px] font-medium">Markup Risk</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Provider Details Drawer (Right 4 Cols - Active on Porkbun) -->
+<div class="xl:col-span-4 p-unit-base rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] flex flex-col gap-unit-md" id="providerDrawer"><div class="flex items-start justify-between"><div class="flex items-center gap-unit-sm"><div class="w-10 h-10 rounded-lg bg-primary text-on-primary flex items-center justify-center"><span class="material-symbols-outlined text-[24px]">savings</span></div><div class="flex flex-col"><h3 class="font-headline-sm text-headline-sm text-on-surface" id="drawerName">Porkbun LLC</h3><p class="font-caption-xs text-caption-xs text-secondary" id="drawerTagline">Accredited ICANN #1861 • Reference Sample</p></div></div><span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-caption-xs text-caption-xs font-semibold">Provider Details</span></div><div class="flex flex-col gap-unit-xs"><span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-medium">Pricing Information</span><div class="grid grid-cols-3 gap-unit-xs p-unit-sm rounded-lg bg-surface-container-low"><div class="flex flex-col text-center"><span class="font-caption-xs text-caption-xs text-secondary">Reg (Yr 1)</span><span class="font-label-mono text-label-mono font-bold text-on-surface mt-0.5" id="drawerReg">₹849</span></div><div class="flex flex-col text-center"><span class="font-caption-xs text-caption-xs text-secondary">Renewal/Yr</span><span class="font-label-mono text-label-mono font-bold text-on-surface mt-0.5" id="drawerRen">₹950</span></div><div class="flex flex-col text-center"><span class="font-caption-xs text-caption-xs text-secondary">Transfer</span><span class="font-label-mono text-label-mono font-bold text-primary mt-0.5" id="drawerTrans">₹749</span></div></div><div class="flex items-center justify-between px-unit-sm py-unit-xs rounded bg-surface-container text-body-sm font-body-sm"><span class="text-secondary">3-Year Projected Total:</span><span class="font-label-mono text-label-mono font-semibold text-on-surface">₹2,749</span></div><div class="flex items-center justify-between px-unit-sm py-unit-xs rounded bg-surface-container text-body-sm font-body-sm"><span class="text-secondary">5-Year Projected Total:</span><span class="font-label-mono text-label-mono font-semibold text-primary">₹4,649</span></div></div><div class="flex flex-col gap-unit-xs"><span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-medium">Features &amp; Safeguards</span><div class="flex items-center justify-between text-body-sm font-body-sm py-0.5"><div class="flex items-center gap-1.5 text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-primary">shield</span><span class="">WHOIS Privacy</span></div><span class="font-semibold text-primary text-caption-xs">Included</span></div><div class="flex items-center justify-between text-body-sm font-body-sm py-0.5"><div class="flex items-center gap-1.5 text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-primary">lock</span><span class="">SSL Certificate</span></div><span class="text-caption-xs text-on-surface">Available</span></div><div class="flex items-center justify-between text-body-sm font-body-sm py-0.5"><div class="flex items-center gap-1.5 text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-primary">verified_user</span><span class="">DNSSEC</span></div><span class="text-caption-xs text-on-surface font-medium">Supported</span></div></div><div class="flex flex-col gap-unit-xs"><span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-medium">Reference Information</span><div class="flex items-center justify-between text-body-sm font-body-sm py-0.5"><div class="flex items-center gap-1.5 text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-primary">payments</span><span class="">Supported Payments</span></div><span class="text-caption-xs text-on-surface">Provider-specific</span></div><div class="flex items-center justify-between text-body-sm font-body-sm py-0.5"><div class="flex items-center gap-1.5 text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-primary">support_agent</span><span class="">Support Channels</span></div><span class="text-caption-xs text-on-surface">Reference Information only</span></div></div><div class="flex flex-col gap-unit-xs mt-auto pt-unit-xs"><a class="h-9 px-unit-md flex items-center justify-center gap-unit-xs rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-tertiary transition-colors shadow-sm" href="#"><span class="">Visit Provider</span><span class="material-symbols-outlined text-[16px]">open_in_new</span></a><div class="grid grid-cols-2 gap-unit-xs"><button class="h-8 px-unit-sm rounded bg-surface-container text-on-surface font-caption-xs text-caption-xs hover:bg-surface-container-high transition-colors text-center" type="button">Compare Provider</button><button class="h-8 px-unit-sm rounded bg-surface-container text-on-surface font-caption-xs text-caption-xs hover:bg-surface-container-high transition-colors text-center" type="button">Save to Watchlist</button></div><p class="font-caption-xs text-[10px] text-secondary text-center mt-1">External reference link. DomainPulse receives no commission on transfers.</p></div></div>
+</div>
+<!-- TRANSFER SAVINGS CALCULATOR (BOTTOM GRID) -->
+<div class="p-unit-base rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]">
+<div class="flex items-center justify-between mb-unit-base">
+<div class="flex items-center gap-unit-sm">
+<div class="w-8 h-8 rounded bg-primary/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">calculate</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Transfer Savings Calculator</h3>
+<p class="font-caption-xs text-caption-xs text-secondary">Calculate exact portfolio consolidation savings by migrating away from markups</p>
+</div>
+</div>
+<div class="flex items-center gap-unit-sm">
+<button class="h-8 px-unit-sm rounded bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">download</span>
+<span class="">Export Transfer Plan (CSV)</span>
+</button>
+<a class="h-8 px-unit-sm rounded bg-surface-container text-primary font-label-md text-label-md hover:bg-surface-container-high flex items-center gap-1 transition-colors" href="#">
+<span class="">Step-by-step Guide</span>
+<span class="material-symbols-outlined text-[14px]">open_in_new</span>
+</a>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-unit-lg items-center">
+<!-- Input Deck (5 cols) -->
+<div class="lg:col-span-5 grid grid-cols-2 gap-unit-sm">
+<div class="flex flex-col gap-1">
+<label class="font-caption-xs text-caption-xs text-secondary font-medium">Current Registrar</label>
+<select class="h-9 px-unit-sm rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary" id="calcCurrentReg" onchange="updateCalc()">
+<option value="1499">GoDaddy (₹1,499/yr)</option>
+<option value="1650">Squarespace (₹1,650/yr)</option>
+<option value="1299">Hostinger (₹1,299/yr)</option>
+<option value="1099">Namecheap (₹1,099/yr)</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-caption-xs text-caption-xs text-secondary font-medium">Current Renewal Price</label>
+<div class="h-9 px-unit-sm rounded bg-surface-container flex items-center font-label-mono text-label-mono text-error font-semibold">
+              ₹1,499 /yr
+            </div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-caption-xs text-caption-xs text-secondary font-medium">Target Registrar</label>
+<select class="h-9 px-unit-sm rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary" id="calcTargetReg" onchange="updateCalc()">
+<option value="899">Cloudflare (₹899/yr)</option>
+<option value="950">Porkbun (₹950/yr)</option>
+<option value="999">Dynadot (₹999/yr)</option>
+</select>
+</div>
+<div class="flex flex-col gap-1"><span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Registrars Compared</span><div class="flex items-baseline gap-1 mt-1"><span class="font-headline-sm text-headline-sm font-label-mono text-on-surface">8</span><span class="font-caption-xs text-caption-xs text-secondary">Providers Compared</span></div><span class="font-caption-xs text-caption-xs text-secondary mt-1">Reference Sample</span></div>
+<div class="col-span-2 flex flex-col gap-1 mt-1">
+<div class="flex items-center justify-between">
+<label class="font-caption-xs text-caption-xs text-secondary font-medium">Number of Domains to Transfer</label>
+<span class="font-label-mono text-label-mono font-bold text-primary" id="domainCountVal">12 domains</span>
+</div>
+<input class="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary" id="domainSlider" max="100" min="1" oninput="updateDomainSlider(this.value)" type="range" value="12">
+<div class="flex items-center justify-between text-caption-xs font-caption-xs text-secondary">
+<span class="">1</span>
+<span class="">25</span>
+<span class="">50</span>
+<span class="">100</span>
+</div>
+</div>
+</div>
+<!-- Results Output Deck (7 cols) -->
+<div class="lg:col-span-7 grid grid-cols-2 md:grid-cols-4 gap-unit-sm p-unit-base rounded-lg bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Current Annual</span>
+<span class="font-headline-sm text-headline-sm font-label-mono text-error mt-1" id="currentCostVal">₹17,988</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Without transfers</span>
+</div>
+<div class="flex flex-col">
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Projected Annual</span>
+<span class="font-headline-sm text-headline-sm font-label-mono text-primary mt-1" id="projectedCostVal">₹10,788</span>
+<span class="font-caption-xs text-caption-xs text-secondary">At wholesale rate</span>
+</div>
+<div class="flex flex-col"><span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Estimated Annual Savings</span><span class="font-headline-sm text-headline-sm font-label-mono text-primary font-bold mt-1" id="annualSavingsVal">₹7,200</span><span class="font-caption-xs text-caption-xs text-primary font-semibold">40% Cost Drop</span></div>
+<div class="flex flex-col"><span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary">Estimated 3-Year Savings</span><span class="font-headline-sm text-headline-sm font-label-mono text-on-surface font-bold mt-1" id="threeYearSavingsVal">₹21,600</span><span class="font-caption-xs text-caption-xs text-secondary">Total Net Saved</span></div>
+</div>
+</div><div class="mt-unit-sm pt-unit-xs text-caption-xs font-caption-xs text-secondary border-t border-surface-container">Note: Actual savings may differ due to taxes, promotions, transfer fees and future pricing changes.</div>
+</div>
+</div>
+<!-- VIEW CONTAINER: HOSTING PROVIDERS MODE (EXPANDABLE/SWITCHABLE) -->
+<div class="hidden flex-col gap-unit-md" id="hostingView">
+<!-- Category Filter Bar -->
+<div class="flex flex-wrap items-center justify-between gap-unit-sm p-unit-base rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]">
+<div class="flex flex-wrap items-center gap-1.5">
+<button class="px-unit-md py-1 rounded-full text-label-md font-label-md bg-primary text-on-primary" type="button">All Hosting</button>
+<button class="px-unit-md py-1 rounded-full text-label-md font-label-md bg-surface-container text-on-surface-variant hover:bg-surface-variant" type="button">Shared</button>
+<button class="px-unit-md py-1 rounded-full text-label-md font-label-md bg-surface-container text-on-surface-variant hover:bg-surface-variant" type="button">WordPress</button>
+<button class="px-unit-md py-1 rounded-full text-label-md font-label-md bg-surface-container text-on-surface-variant hover:bg-surface-variant" type="button">VPS</button>
+<button class="px-unit-md py-1 rounded-full text-label-md font-label-md bg-surface-container text-on-surface-variant hover:bg-surface-variant" type="button">Cloud</button>
+<button class="px-unit-md py-1 rounded-full text-label-md font-label-md bg-surface-container text-on-surface-variant hover:bg-surface-variant" type="button">Serverless</button>
+</div>
+<div class="flex items-center gap-unit-sm">
+<span class="font-caption-xs text-caption-xs text-secondary">Server Geo:</span>
+<select class="h-8 px-unit-sm rounded bg-surface-container text-on-surface font-body-sm text-body-sm focus:outline-none">
+<option>All Locations (India, Singapore, US, EU)</option>
+<option>India Only (Mumbai / Bangalore / Delhi)</option>
+<option>Singapore (APAC Low Latency)</option>
+<option>US &amp; Europe</option>
+</select>
+</div>
+</div>
+<!-- Hosting Providers Benchmark Matrix Table -->
+<div class="rounded-lg bg-surface-container-lowest shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] overflow-hidden">
+<div class="px-unit-base py-unit-sm bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-unit-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Hosting Benchmark &amp; Infrastructure Matrix</h3>
+<span class="px-2 py-0.5 rounded bg-surface-container font-label-mono text-label-mono text-on-surface-variant">India &amp; Global Datacenters</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary">Normalized monthly &amp; annual tiers</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="h-8 bg-surface-container-low text-secondary font-caption-xs text-caption-xs uppercase tracking-wider">
+<th class="px-unit-md py-1 font-medium">Provider &amp; Tier</th>
+<th class="px-unit-sm py-1 font-medium">Monthly Effective</th>
+<th class="px-unit-sm py-1 font-medium">Annual Billed</th>
+<th class="px-unit-sm py-1 font-medium">Storage / Bandwidth</th>
+<th class="px-unit-sm py-1 font-medium">SSL &amp; Domain</th>
+<th class="px-unit-sm py-1 font-medium">Datacenter Locations</th>
+<th class="px-unit-sm py-1 font-medium">Refund Policy</th>
+<th class="px-unit-md py-1 font-medium text-right">Verdict</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container text-body-sm font-body-sm">
+<!-- Hostinger Cloud Startup -->
+<tr class="h-12 hover:bg-surface-container-low/60 transition-colors">
+<td class="px-unit-md py-2 flex items-center gap-2">
+<div class="w-7 h-7 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-primary">cloud</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Hostinger</span>
+<span class="font-caption-xs text-[11px] text-secondary">Cloud Startup (100 Sites)</span>
+</div>
+</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono font-semibold text-primary">₹799/mo</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono text-on-surface">₹9,588/yr</td>
+<td class="px-unit-sm py-2">
+<span class="font-label-mono text-caption-xs text-on-surface font-medium">200 GB NVMe</span>
+<span class="text-caption-xs text-secondary block">Unlimited BW</span>
+</td>
+<td class="px-unit-sm py-2">
+<span class="text-caption-xs text-on-surface font-medium">Free SSL + Free 1st Yr Domain</span>
+</td>
+<td class="px-unit-sm py-2 text-caption-xs text-on-surface">India, Singapore, US, UK</td>
+<td class="px-unit-sm py-2 text-caption-xs text-secondary">30-day money-back</td>
+<td class="px-unit-md py-2 text-right">
+<span class="px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-caption-xs text-caption-xs font-semibold">Best for India</span>
+</td>
+</tr>
+<!-- DigitalOcean Droplet -->
+<tr class="h-12 hover:bg-surface-container-low/60 transition-colors">
+<td class="px-unit-md py-2 flex items-center gap-2">
+<div class="w-7 h-7 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-tertiary">memory</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">DigitalOcean</span>
+<span class="font-caption-xs text-[11px] text-secondary">Basic Droplet (1 vCPU, 1GB)</span>
+</div>
+</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono font-semibold text-on-surface">₹499/mo</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono text-on-surface">₹5,988/yr</td>
+<td class="px-unit-sm py-2">
+<span class="font-label-mono text-caption-xs text-on-surface font-medium">25 GB SSD</span>
+<span class="text-caption-xs text-secondary block">1 TB Transfer</span>
+</td>
+<td class="px-unit-sm py-2">
+<span class="text-caption-xs text-on-surface font-medium">Let's Encrypt / Bring Own</span>
+</td>
+<td class="px-unit-sm py-2 text-caption-xs text-on-surface">Bangalore (BLR1), Singapore, NYC</td>
+<td class="px-unit-sm py-2 text-caption-xs text-secondary">Hourly billing (pay-as-you-go)</td>
+<td class="px-unit-md py-2 text-right">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs font-semibold">Best Developer</span>
+</td>
+</tr>
+<!-- Vultr High Performance -->
+<tr class="h-12 hover:bg-surface-container-low/60 transition-colors">
+<td class="px-unit-md py-2 flex items-center gap-2">
+<div class="w-7 h-7 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-primary">speed</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Vultr</span>
+<span class="font-caption-xs text-[11px] text-secondary">High Performance NVMe</span>
+</div>
+</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono font-semibold text-on-surface">₹520/mo</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono text-on-surface">₹6,240/yr</td>
+<td class="px-unit-sm py-2">
+<span class="font-label-mono text-caption-xs text-on-surface font-medium">32 GB NVMe</span>
+<span class="text-caption-xs text-secondary block">1 TB Transfer</span>
+</td>
+<td class="px-unit-sm py-2">
+<span class="text-caption-xs text-on-surface font-medium">Free Auto SSL</span>
+</td>
+<td class="px-unit-sm py-2 text-caption-xs text-on-surface">Mumbai, Delhi NCR, Singapore</td>
+<td class="px-unit-sm py-2 text-caption-xs text-secondary">Hourly usage metering</td>
+<td class="px-unit-md py-2 text-right">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-caption-xs text-caption-xs font-semibold">Best VPS Value</span>
+</td>
+</tr>
+<!-- AWS Lightsail -->
+<tr class="h-12 hover:bg-surface-container-low/60 transition-colors">
+<td class="px-unit-md py-2 flex items-center gap-2">
+<div class="w-7 h-7 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-on-surface">hub</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">AWS Lightsail</span>
+<span class="font-caption-xs text-[11px] text-secondary">Entry Bundle (ap-south-1)</span>
+</div>
+</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono font-bold text-primary">₹290/mo</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono text-on-surface">₹3,480/yr</td>
+<td class="px-unit-sm py-2">
+<span class="font-label-mono text-caption-xs text-on-surface font-medium">20 GB SSD</span>
+<span class="text-caption-xs text-secondary block">1 TB Transfer</span>
+</td>
+<td class="px-unit-sm py-2">
+<span class="text-caption-xs text-on-surface font-medium">AWS Certificate Manager</span>
+</td>
+<td class="px-unit-sm py-2 text-caption-xs text-on-surface">Mumbai (ap-south-1)</td>
+<td class="px-unit-sm py-2 text-caption-xs text-secondary">3-Month Free Tier eligible</td>
+<td class="px-unit-md py-2 text-right">
+<span class="px-2 py-0.5 rounded bg-primary text-on-primary font-caption-xs text-caption-xs font-semibold">Lowest Cost</span>
+</td>
+</tr>
+<!-- SiteGround -->
+<tr class="h-12 bg-error-container/20 hover:bg-error-container/30 transition-colors">
+<td class="px-unit-md py-2 flex items-center gap-2">
+<div class="w-7 h-7 rounded bg-error-container text-on-error-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-error font-semibold">SiteGround</span>
+<span class="font-caption-xs text-[11px] text-secondary">GrowBig (Promo Tier)</span>
+</div>
+</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono font-bold text-error">
+                ₹899 <span class="text-caption-xs text-secondary font-normal">→ ₹2,499 ren</span>
+</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono text-on-surface">₹10,788/yr</td>
+<td class="px-unit-sm py-2">
+<span class="font-label-mono text-caption-xs text-on-surface font-medium">20 GB Web Space</span>
+<span class="text-caption-xs text-secondary block">Unmetered Traffic</span>
+</td>
+<td class="px-unit-sm py-2">
+<span class="text-caption-xs text-on-surface font-medium">High Renewal Increase (+200%)</span>
+</td>
+<td class="px-unit-sm py-2 text-caption-xs text-on-surface">Singapore, Frankfurt, London</td>
+<td class="px-unit-sm py-2 text-caption-xs text-secondary">30-day guarantee</td>
+<td class="px-unit-md py-2 text-right">
+<span class="px-2 py-0.5 rounded bg-error-container text-on-error-container font-caption-xs text-caption-xs font-bold">⚠️ Renewal Hike</span>
+</td>
+</tr>
+<!-- Cloudways -->
+<tr class="h-12 hover:bg-surface-container-low/60 transition-colors">
+<td class="px-unit-md py-2 flex items-center gap-2">
+<div class="w-7 h-7 rounded bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-primary">cloud_done</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Cloudways</span>
+<span class="font-caption-xs text-[11px] text-secondary">DO Managed Cloud (1GB RAM)</span>
+</div>
+</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono font-semibold text-on-surface">₹1,150/mo</td>
+<td class="px-unit-sm py-2 font-label-mono text-label-mono text-on-surface">₹13,800/yr</td>
+<td class="px-unit-sm py-2">
+<span class="font-label-mono text-caption-xs text-on-surface font-medium">25 GB SSD</span>
+<span class="text-caption-xs text-secondary block">1 TB Transfer</span>
+</td>
+<td class="px-unit-sm py-2">
+<span class="text-caption-xs text-on-surface font-medium">Free 1-Click SSL</span>
+</td>
+<td class="px-unit-sm py-2 text-caption-xs text-on-surface">65+ Global Datacenters</td>
+<td class="px-unit-sm py-2 text-caption-xs text-secondary">3-day free trial</td>
+<td class="px-unit-md py-2 text-right">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs font-semibold">Managed Stack</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<script>
+  // Mode Switcher Logic
+  function switchMode(mode) {
+    const registrarsView = document.getElementById('registrarsView');
+    const hostingView = document.getElementById('hostingView');
+    const regBtn = document.getElementById('modeRegistrarsBtn');
+    const hostBtn = document.getElementById('modeHostingBtn');
+
+    if (mode === 'registrars') {
+      registrarsView.classList.remove('hidden');
+      registrarsView.classList.add('flex');
+      hostingView.classList.add('hidden');
+      hostingView.classList.remove('flex');
+
+      regBtn.className = 'h-7 px-unit-md rounded-md bg-surface-container-lowest text-primary font-label-md text-label-md shadow-sm transition-all flex items-center gap-1.5';
+      hostBtn.className = 'h-7 px-unit-md rounded-md text-secondary hover:text-on-surface font-label-md text-label-md transition-all flex items-center gap-1.5';
+    } else {
+      hostingView.classList.remove('hidden');
+      hostingView.classList.add('flex');
+      registrarsView.classList.add('hidden');
+      registrarsView.classList.remove('flex');
+
+      hostBtn.className = 'h-7 px-unit-md rounded-md bg-surface-container-lowest text-primary font-label-md text-label-md shadow-sm transition-all flex items-center gap-1.5';
+      regBtn.className = 'h-7 px-unit-md rounded-md text-secondary hover:text-on-surface font-label-md text-label-md transition-all flex items-center gap-1.5';
+    }
+  }
+
+  // TLD Selection Pill Logic
+  function selectTld(btn, tld) {
+    const container = document.getElementById('tldContainer');
+    const pills = container.querySelectorAll('.tld-pill');
+    pills.forEach(p => {
+      p.className = 'tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-surface-container text-on-surface-variant hover:bg-surface-variant transition-colors';
+    });
+    btn.className = 'tld-pill px-unit-md py-1 rounded-full text-label-mono font-label-mono bg-primary text-on-primary shadow-sm font-medium';
+  }
+
+  // Transfer Calculator Reactive Math
+  function updateDomainSlider(val) {
+    document.getElementById('domainCountVal').innerText = val + ' domains';
+    updateCalc();
+  }
+
+  function updateCalc() {
+    const currentRate = parseInt(document.getElementById('calcCurrentReg').value) || 1499;
+    const targetRate = parseInt(document.getElementById('calcTargetReg').value) || 899;
+    const count = parseInt(document.getElementById('domainSlider').value) || 12;
+
+    const currentTotal = currentRate * count;
+    const projectedTotal = targetRate * count;
+    const annualSavings = currentTotal - projectedTotal;
+    const threeYearSavings = annualSavings * 3;
+
+    document.getElementById('currentCostVal').innerText = '₹' + currentTotal.toLocaleString('en-IN');
+    document.getElementById('projectedCostVal').innerText = '₹' + projectedTotal.toLocaleString('en-IN');
+    document.getElementById('annualSavingsVal').innerText = '₹' + annualSavings.toLocaleString('en-IN');
+    document.getElementById('threeYearSavingsVal').innerText = '₹' + threeYearSavings.toLocaleString('en-IN');
+  }
+
+  // Provider Drawer Inspection data map
+  const providersData = {
+    cloudflare: { name: 'Cloudflare', tagline: 'ICANN #1479 • At-Cost Wholesale', reg: '₹899', ren: '₹899', trans: '₹899' },
+    porkbun: { name: 'Porkbun LLC', tagline: 'Accredited ICANN #1861 • Top Rated Value', reg: '₹849', ren: '₹950', trans: '₹749' },
+    namecheap: { name: 'Namecheap', tagline: 'ICANN #1068 • Popular Global Registrar', reg: '₹799', ren: '₹1,099', trans: '₹899' },
+    hostinger: { name: 'Hostinger', tagline: 'ICANN #1636 • Promotional Aggressive Pricing', reg: '₹699', ren: '₹1,299', trans: '₹849' },
+    dynadot: { name: 'Dynadot', tagline: 'ICANN #472 • Wholesale Margin Structure', reg: '₹789', ren: '₹999', trans: '₹799' },
+    aws: { name: 'AWS Route 53', tagline: 'Amazon Infrastructure • Enterprise DNS', reg: '₹1,150', ren: '₹1,150', trans: '₹1,150' },
+    squarespace: { name: 'Squarespace Domains', tagline: 'Unified Web Suite • ex-Google Domains', reg: '₹1,650', ren: '₹1,650', trans: '₹1,650' },
+    godaddy: { name: 'GoDaddy', tagline: 'ICANN #146 • Deep Promotional First-Year Markup', reg: '₹499', ren: '₹1,499', trans: '₹1,299' }
+  };
+
+  function inspectProvider(key) {
+    const data = providersData[key];
+    if (!data) return;
+    document.getElementById('drawerName').innerText = data.name;
+    document.getElementById('drawerTagline').innerText = data.tagline;
+    document.getElementById('drawerReg').innerText = data.reg;
+    document.getElementById('drawerRen').innerText = data.ren;
+    document.getElementById('drawerTrans').innerText = data.trans;
+  }
+</script></main></div>
+
+</body></html>

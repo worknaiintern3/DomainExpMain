@@ -1,0 +1,1028 @@
+DOMAINPULSE
+STAGE 1 + STAGE 2 DEVELOPMENT ROADMAP
+(Stage 3 Production Version kept for the end)
+
+Project Type:
+Portfolio Project -> Senior Review -> Complete Working Website -> Possible Production SaaS
+
+============================================================
+0. PROJECT GOAL
+============================================================
+
+DomainPulse is a domain finder, portfolio manager, pricing comparison, and expiry-monitoring platform.
+
+Primary target users:
+- Entrepreneurs
+- Domain investors
+- Agency owners
+- Developers
+- Small companies managing many domains
+
+Core product pillars:
+1. Domain Portfolio Manager
+2. Domain Finder & Multi-TLD Availability
+3. Registrar & Hosting Pricing Comparison
+4. Expiry Alerts & Renewal Planning
+5. DNS / SSL / WHOIS information
+6. Import / Export and portfolio utilities
+
+Development strategy:
+- Stage 1 = Fast but polished prototype for senior review
+- Stage 2 = Complete working portfolio website
+- Stage 3 = Production SaaS only if the project is approved for real use
+
+Important rule:
+Do NOT overbuild Stage 1. Build only enough to validate the idea, UI, navigation, flows, and value proposition.
+
+============================================================
+1. RECOMMENDED TECH STACK
+============================================================
+
+Frontend:
+- React
+- Vite
+- TypeScript
+- Tailwind CSS
+
+UI / Supporting Libraries:
+- React Router
+- Lucide Icons
+- Recharts
+- Optional: lightweight animation library if needed
+
+Stage 1 Data:
+- localStorage
+- Mock / realistic demo data
+
+Stage 2 Data & APIs:
+- localStorage or lightweight persistence for portfolio data
+- Real RDAP / WHOIS lookup where practical
+- Real domain availability checks where practical
+- Structured local datasets for registrar / hosting comparison if live commercial APIs are unavailable
+
+Production backend is NOT required before Stage 3.
+
+============================================================
+2. OVERALL DELIVERY TIMELINE
+============================================================
+
+Stage 1 Prototype:
+- 2 to 3 days
+
+Senior Review:
+- 0.5 to 1 day for review + feedback consolidation
+
+Stage 2 Complete Working Portfolio Website:
+- 7 to 12 days depending on complexity and feedback
+
+Expected total through Stage 2:
+- About 9 to 15 days
+
+Stage 3:
+- Only after Stage 2 approval
+
+============================================================
+3. STAGE 1 — SENIOR DEMO PROTOTYPE
+============================================================
+
+Duration:
+2 to 3 days
+
+Main Goal:
+Build a premium-looking, functional prototype that clearly demonstrates the complete product idea without spending time on production infrastructure.
+
+The prototype should feel like a real SaaS dashboard even if some data is mocked.
+
+------------------------------------------------------------
+3.1 Stage 1 Scope
+------------------------------------------------------------
+
+A. Application Shell
+- Responsive sidebar
+- Top navigation/header
+- Search area
+- Notification icon
+- Currency selector placeholder
+- User profile placeholder
+- Light / dark theme option if easy to implement
+
+Main navigation:
+- Dashboard
+- My Domains
+- Find Domain
+- Price Comparison
+- Alerts
+- Settings
+
+------------------------------------------------------------
+B. Dashboard
+------------------------------------------------------------
+
+Show summary cards:
+- Total Domains
+- Critical: Expiring in < 7 Days
+- Warning: Expiring in < 30 Days
+- Safe Domains
+- Total Annual Renewal Cost
+- Average Domain Price
+
+Dashboard widgets:
+- Upcoming renewals
+- Domain distribution by TLD
+- Registrar distribution
+- Expiry timeline / countdown
+- Renewal cost overview
+
+Use realistic sample domains from providers such as:
+- GoDaddy
+- Namecheap
+- Cloudflare
+- Hostinger
+- Porkbun
+
+------------------------------------------------------------
+C. My Domains
+------------------------------------------------------------
+
+Working prototype actions:
+- Add domain
+- Edit domain
+- Delete domain
+- Search domain
+- Sort
+- Basic filters
+
+Suggested fields:
+- Domain name
+- Registrar
+- Purchase date
+- Expiry date
+- Purchase price
+- Renewal price
+- Auto-renew status
+- Tags / client
+- Notes
+
+Status rules:
+- Critical: less than 7 days
+- Warning: less than 30 days
+- Safe: more than 30 days
+
+Store prototype data in localStorage.
+
+------------------------------------------------------------
+D. Domain Details
+------------------------------------------------------------
+
+Domain detail screen or modal should show:
+- Domain name
+- Registrar
+- Registration date
+- Expiry date
+- Days remaining
+- Purchase price
+- Renewal price
+- Auto-renew status
+- Nameservers
+- SSL status
+- Notes
+- DNS summary
+
+Some DNS / SSL values may be demo data in Stage 1.
+
+------------------------------------------------------------
+E. Find Domain
+------------------------------------------------------------
+
+Prototype search UI:
+- Search a keyword or brand name
+- Show results across:
+  .com
+  .in
+  .co.in
+  .ai
+  .io
+  .org
+  .net
+  .co
+  .tech
+  .app
+  .dev
+  .xyz
+
+Show:
+- Available
+- Registered
+- Estimated price
+- Suggested alternatives
+
+Stage 1 can use demo availability data.
+
+------------------------------------------------------------
+F. Registrar Price Comparison
+------------------------------------------------------------
+
+Create comparison matrix for:
+- Cloudflare
+- Porkbun
+- Namecheap
+- GoDaddy
+- Hostinger
+- Dynadot
+- AWS Route 53
+- Squarespace
+
+Columns:
+- First-year registration price
+- Renewal price
+- Transfer price
+- WHOIS privacy
+- SSL
+- Best value indicator
+
+Prototype pricing may use clearly labeled sample/demo data.
+
+------------------------------------------------------------
+G. Alerts
+------------------------------------------------------------
+
+Show:
+- Critical expiry alerts
+- Upcoming renewals
+- Notification badges
+- 30 / 15 / 7 / 3 / 1 day reminder settings preview
+
+Stage 1 does not need real scheduled notifications.
+
+------------------------------------------------------------
+3.2 Stage 1 UI Quality Requirements
+------------------------------------------------------------
+
+The prototype must include:
+- Premium modern SaaS layout
+- Clean typography
+- Strong spacing hierarchy
+- Consistent card system
+- Empty states
+- Hover states
+- Modal styling
+- Responsive desktop layout
+- Basic tablet/mobile support
+- Smooth but minimal animation
+- No broken routes
+- No obviously unfinished screens
+
+Avoid:
+- Overloaded glassmorphism
+- Too many gradients
+- Excessive animations
+- Fake production integrations
+- Dead buttons without explanation
+
+------------------------------------------------------------
+3.3 Stage 1 Deliverables
+------------------------------------------------------------
+
+1. Working local React application
+2. Dashboard
+3. My Domains CRUD
+4. Domain Details
+5. Find Domain demo
+6. Registrar price comparison
+7. Alerts screen
+8. localStorage persistence
+9. Realistic seeded demo data
+10. Responsive UI
+11. Senior demo-ready build
+
+------------------------------------------------------------
+3.4 Stage 1 Acceptance Criteria
+------------------------------------------------------------
+
+Stage 1 is complete only if:
+
+- App launches without console-blocking errors
+- Navigation works
+- Add/Edit/Delete domain works
+- Data survives refresh using localStorage
+- Expiry countdowns calculate correctly
+- Dashboard metrics update from portfolio data
+- Search/filter works
+- Domain finder visually works
+- Pricing comparison is understandable
+- Alerts clearly show expiry urgency
+- UI looks consistent across screens
+- Senior can understand the product without extra explanation
+
+============================================================
+4. SENIOR REVIEW CHECKPOINT
+============================================================
+
+After Stage 1, stop feature development temporarily and collect feedback.
+
+Review questions:
+1. Is the overall product idea useful?
+2. Is the dashboard understandable?
+3. Is the navigation correct?
+4. Which features feel unnecessary?
+5. Which features are missing?
+6. Should hosting comparison remain?
+7. Should AI name generation remain?
+8. Is the domain finder flow useful?
+9. Should alerts be more prominent?
+10. Is the UI suitable for the final portfolio version?
+
+Classify feedback into:
+- Must change
+- Should change
+- Nice to have
+- Reject / not needed
+
+Do not immediately rewrite architecture unless feedback requires it.
+
+============================================================
+5. STAGE 2 — COMPLETE WORKING PORTFOLIO WEBSITE
+============================================================
+
+Duration:
+7 to 12 days after Stage 1 approval/feedback
+
+Main Goal:
+Convert the prototype into a complete, reliable, working portfolio application.
+
+Stage 2 should be something you can confidently demonstrate in:
+- College
+- Interviews
+- Resume
+- GitHub
+- Senior review
+- Portfolio presentation
+
+Stage 2 is NOT a production SaaS yet.
+
+============================================================
+6. STAGE 2 DEVELOPMENT ROADMAP
+============================================================
+
+------------------------------------------------------------
+DAY 1 — Architecture Cleanup + Stage 1 Feedback
+------------------------------------------------------------
+
+Tasks:
+- Review Stage 1 code
+- Apply senior feedback
+- Finalize routes
+- Finalize component architecture
+- Finalize TypeScript interfaces
+- Remove prototype-only hacks
+- Define data services
+- Separate UI from business logic
+
+Create clean modules for:
+- portfolio
+- domain finder
+- pricing
+- alerts
+- analytics
+- import/export
+- settings
+
+Output:
+Stable foundation for all remaining Stage 2 work.
+
+------------------------------------------------------------
+DAY 2 — Complete Domain Portfolio Manager
+------------------------------------------------------------
+
+Features:
+- Add domain
+- Edit domain
+- Delete domain
+- Bulk selection
+- Search
+- Sort
+- Filter by registrar
+- Filter by TLD
+- Filter by status
+- Filter by tags/client/project
+- Table view
+- Optional grid view
+- Persistent storage
+- Validation
+
+Add:
+- Purchase price
+- Renewal price
+- Auto-renew toggle
+- Notes
+- Tags
+- Client/project grouping
+
+Output:
+Fully working domain portfolio management.
+
+------------------------------------------------------------
+DAY 3 — Expiry Engine + Analytics
+------------------------------------------------------------
+
+Implement:
+- Accurate expiry countdown
+- Critical / Warning / Healthy status engine
+- Next 7 / 30 / 60 / 90 day forecasts
+- Annual renewal cost
+- Monthly renewal forecast
+- Average domain price
+- Registrar distribution
+- TLD distribution
+- Upcoming expiry timeline
+
+Charts:
+- Expiry distribution
+- Renewal cost forecast
+- TLD portfolio breakdown
+
+Output:
+Dashboard metrics are derived from real portfolio data rather than hardcoded cards.
+
+------------------------------------------------------------
+DAY 4 — Domain Details + DNS / SSL / WHOIS
+------------------------------------------------------------
+
+Domain Detail screen:
+- Registrar details
+- Registration date
+- Expiry date
+- Cost details
+- Auto-renew
+- Notes
+- Nameservers
+- DNS summary
+- SSL status
+
+Add real data lookup where practical:
+- RDAP
+- WHOIS-style data
+- DNS records
+
+Possible records:
+- A
+- CNAME
+- MX
+- TXT
+
+If a field cannot be retrieved reliably, show:
+- "Unavailable"
+- "Not returned by provider"
+rather than fake data.
+
+Output:
+Useful domain inspection page.
+
+------------------------------------------------------------
+DAY 5 — Domain Finder + Multi-TLD Availability
+------------------------------------------------------------
+
+Build working domain finder:
+- Search keyword
+- Search full domain
+- Multi-TLD lookup
+- Availability states
+- Registered states
+- Loading/error handling
+
+Priority TLDs:
+- .com
+- .in
+- .co.in
+- .ai
+- .io
+- .org
+- .net
+- .co
+- .tech
+- .app
+- .dev
+- .xyz
+
+Add:
+- Favorite/save candidate
+- Copy domain
+- Filter results
+- Sort by price / extension
+
+Output:
+Working domain discovery flow.
+
+------------------------------------------------------------
+DAY 6 — Smart Domain Name Generator
+------------------------------------------------------------
+
+Portfolio-friendly smart generator.
+
+Inputs:
+- Business keyword
+- Niche
+- Tone
+
+Tones:
+- Brandable
+- Short & Punchy
+- Compound / Modern
+- Tech-focused
+
+Generation approaches:
+- Prefix + keyword
+- Keyword + suffix
+- Compound words
+- Portmanteau
+- Modern SaaS naming
+- Short phonetic combinations
+
+Then run generated names through availability checks where practical.
+
+Output:
+Functional domain name suggestion engine without requiring a paid AI API.
+
+Optional:
+If later an AI API is available, add an adapter instead of rewriting the whole generator.
+
+------------------------------------------------------------
+DAY 7 — Registrar Pricing Comparison
+------------------------------------------------------------
+
+Build complete comparison matrix.
+
+Providers:
+- Cloudflare
+- Porkbun
+- Namecheap
+- GoDaddy
+- Hostinger
+- Dynadot
+- AWS Route 53
+- Squarespace
+
+Compare:
+- First-year price
+- Renewal price
+- Transfer price
+- WHOIS privacy
+- SSL
+- Renewal spike
+- Long-term cost
+
+Add:
+- TLD filter
+- Sort by cheapest
+- Best first-year badge
+- Best renewal badge
+- Best long-term badge
+
+Important:
+If pricing is not live, label it as sample/reference pricing in the UI and README.
+
+Output:
+High-value comparison feature suitable for portfolio demonstration.
+
+------------------------------------------------------------
+DAY 8 — Hosting Comparison + Transfer Savings
+------------------------------------------------------------
+
+Hosting categories:
+- Shared
+- WordPress
+- VPS
+- Cloud
+- Serverless
+
+Providers:
+- Hostinger
+- Bluehost
+- SiteGround
+- DigitalOcean
+- Cloudways
+- Vultr
+- AWS Lightsail
+- Vercel
+
+Compare:
+- Storage
+- Bandwidth
+- Free domain
+- SSL
+- Server locations
+- Monthly price
+- Yearly price
+- Refund policy
+
+Transfer Savings Calculator:
+- Current registrar
+- Current renewal cost
+- Target registrar
+- Target renewal cost
+- Transfer price
+- Estimated first-year saving
+- Estimated annual saving
+
+Output:
+Working hosting and transfer cost comparison section.
+
+------------------------------------------------------------
+DAY 9 — Alerts, Calendar, Import / Export
+------------------------------------------------------------
+
+Alerts:
+- Expiry notification center
+- Unread count
+- Critical alerts
+- Upcoming reminders
+- Reminder preferences
+
+Calendar:
+- Generate .ics renewal calendar
+- Allow import into:
+  - Google Calendar
+  - Apple Calendar
+  - Outlook
+
+Import / Export:
+- CSV export
+- JSON export
+- CSV import
+- JSON import
+- Validation
+- Duplicate detection
+
+Output:
+Portfolio productivity tools completed.
+
+------------------------------------------------------------
+DAY 10 — Multi-Currency + Settings + UX Polish
+------------------------------------------------------------
+
+Currencies:
+- INR
+- USD
+- EUR
+- GBP
+
+Add:
+- Consistent currency formatter
+- Conversion layer
+- Theme preference
+- Table density
+- Default reminder settings
+- Default TLD preferences
+
+UX polish:
+- Skeleton loaders
+- Empty states
+- Error states
+- Toast messages
+- Confirmation dialogs
+- Keyboard-friendly forms
+- Better mobile layout
+- Accessible labels
+- Consistent focus states
+
+Output:
+Professional final interaction layer.
+
+------------------------------------------------------------
+DAY 11 — Testing & Bug Fixing
+------------------------------------------------------------
+
+Test:
+- Domain CRUD
+- Expiry calculations
+- Filters
+- Sorting
+- Search
+- Dashboard metrics
+- Domain finder
+- RDAP/WHOIS lookup
+- Price comparison
+- Hosting comparison
+- Savings calculator
+- Currency switching
+- CSV import/export
+- ICS generation
+- localStorage persistence
+- Responsive layout
+
+Test edge cases:
+- Expired domain
+- Expiry today
+- Missing registrar
+- Missing renewal price
+- Invalid date
+- Duplicate domain
+- Invalid CSV
+- API unavailable
+- Domain availability timeout
+
+Output:
+Stable working build.
+
+------------------------------------------------------------
+DAY 12 — Portfolio Presentation & Documentation
+------------------------------------------------------------
+
+Create:
+- Strong README
+- Feature list
+- Architecture explanation
+- Screenshots
+- Demo data instructions
+- Installation steps
+- Development commands
+- API notes
+- Known limitations
+- Future roadmap
+
+README should clearly distinguish:
+- Real data
+- Demo/reference data
+- Features planned for production
+
+Add:
+- Project architecture diagram
+- Main user flow diagram
+- Technical decisions
+- Challenges solved
+- Screenshots of important screens
+
+Output:
+Interview / senior / GitHub ready portfolio project.
+
+============================================================
+7. OPTIONAL DAYS 13–15 — BUFFER / ADVANCED POLISH
+============================================================
+
+Use these only if required.
+
+Possible improvements:
+- Better charts
+- Better mobile layout
+- More TLDs
+- Improved domain generator
+- Advanced filtering
+- Saved searches
+- Favorites/watchlist
+- More hosting plans
+- Better accessibility
+- More realistic sample datasets
+- Unit tests
+- Component tests
+- Integration tests
+- Performance optimization
+- Code cleanup
+- Senior-requested changes
+
+Do not add random features just to fill time.
+
+============================================================
+8. STAGE 2 FINAL FEATURE CHECKLIST
+============================================================
+
+Dashboard:
+[ ] Total domains
+[ ] Expiry metrics
+[ ] Renewal cost
+[ ] Charts
+[ ] Upcoming renewals
+
+Portfolio:
+[ ] Add
+[ ] Edit
+[ ] Delete
+[ ] Search
+[ ] Sort
+[ ] Filter
+[ ] Tags
+[ ] Table/grid
+[ ] Import/export
+
+Domain Details:
+[ ] Registrar
+[ ] Dates
+[ ] Cost
+[ ] Auto renew
+[ ] Notes
+[ ] SSL
+[ ] Nameservers
+[ ] DNS
+[ ] RDAP/WHOIS
+
+Domain Finder:
+[ ] Multi-TLD search
+[ ] Availability
+[ ] Registered state
+[ ] Suggestions
+[ ] Name generator
+
+Pricing:
+[ ] Registrar matrix
+[ ] Registration
+[ ] Renewal
+[ ] Transfer
+[ ] WHOIS privacy
+[ ] SSL
+[ ] Renewal spike warnings
+
+Hosting:
+[ ] Provider comparison
+[ ] Hosting types
+[ ] Specs
+[ ] Pricing
+
+Savings:
+[ ] Transfer savings calculator
+
+Alerts:
+[ ] Expiry center
+[ ] Reminder settings
+[ ] ICS calendar
+
+Utilities:
+[ ] CSV
+[ ] JSON
+[ ] Multi-currency
+[ ] Theme
+
+Quality:
+[ ] Responsive
+[ ] Loading
+[ ] Errors
+[ ] Empty states
+[ ] Validation
+[ ] README
+[ ] Screenshots
+[ ] Architecture diagram
+
+============================================================
+9. STAGE 2 COMPLETION DEFINITION
+============================================================
+
+Stage 2 is complete when:
+
+1. The website works locally without major errors.
+2. Major features are functional, not just clickable.
+3. Portfolio data persists.
+4. Dashboard calculations come from real app data.
+5. Domain availability / RDAP works where technically available.
+6. Sample pricing is clearly labeled if not live.
+7. Import/export works.
+8. Expiry alerts are derived from actual dates.
+9. UI works on desktop and mobile.
+10. There are no obvious dead-end flows.
+11. README explains setup and limitations.
+12. The project can be demonstrated without manually fixing anything during the demo.
+
+At this point, DomainPulse is a COMPLETE WORKING PORTFOLIO WEBSITE.
+
+============================================================
+10. WHAT NOT TO BUILD BEFORE STAGE 3
+============================================================
+
+Do NOT spend Stage 1 or Stage 2 time on:
+
+- Payment gateway
+- Subscription billing
+- Production user authentication
+- Enterprise RBAC
+- Production database scaling
+- Registrar account linking
+- Automatic real domain renewal
+- Real domain purchasing
+- Production email infrastructure
+- Background distributed job queues
+- Production monitoring
+- Backup infrastructure
+- CI/CD production pipelines
+- Kubernetes
+- Complex microservices
+- Enterprise security architecture
+
+These are production concerns.
+
+============================================================
+11. STAGE 3 — FUTURE PRODUCTION VERSION
+============================================================
+
+Start Stage 3 only if:
+- Senior approves Stage 2
+- Product is intended for real users
+- Real deployment is required
+
+Stage 3 high-level goals:
+
+Backend:
+- Node.js / Express or suitable production backend
+- PostgreSQL or MongoDB
+- Real API layer
+- Authentication
+- Authorization
+
+User Accounts:
+- Signup/login
+- Email verification
+- Password reset
+- Social login if needed
+- User workspaces
+- Team support
+
+Production Domain Management:
+- Secure portfolio storage
+- Registrar integrations where APIs allow
+- Real scheduled expiry checks
+- Real notification jobs
+- Email notifications
+- Optional WhatsApp / Slack / Discord / Telegram
+
+Pricing:
+- Live provider feeds/APIs where commercially allowed
+- Caching
+- Price update timestamps
+- Affiliate/deal integration if needed
+
+Billing:
+- Free / Pro / Agency plans
+- Payment gateway
+- Subscription management
+- Usage limits
+
+Security:
+- Rate limiting
+- Input validation
+- Encryption
+- Secret management
+- Audit logs
+- Security headers
+- Production-safe API architecture
+
+Operations:
+- Deployment
+- Logging
+- Monitoring
+- Backups
+- Error tracking
+- CI/CD
+- Performance optimization
+
+Important:
+Before Stage 3, perform an architecture audit of the Stage 2 codebase.
+Preserve good frontend components and business logic, but do not blindly convert prototype shortcuts into production infrastructure.
+
+============================================================
+12. FINAL WORKFLOW
+============================================================
+
+STAGE 1
+Prototype
+    |
+    v
+Senior Review
+    |
+    v
+Feedback
+    |
+    v
+STAGE 2
+Complete Working Portfolio Website
+    |
+    v
+Senior Review
+    |
+    +---- Not Approved ---> Improve Stage 2
+    |
+    +---- Approved -------> STAGE 3
+                             Production SaaS
+
+============================================================
+13. DEVELOPMENT RULES
+============================================================
+
+For every major module:
+
+1. Understand the module
+2. Plan
+3. Implement
+4. Test
+5. Fix
+6. Polish
+7. Commit
+8. Move to next module
+
+Never:
+- Build everything in one giant file
+- Add a feature without testing its main flow
+- Fake live data without labeling it
+- Mix production infrastructure into Stage 1
+- Rewrite stable parts without a reason
+- Add unnecessary complexity for portfolio appearance
+
+Priority:
+Functionality + clarity + polish > number of features
+
+END OF ROADMAP

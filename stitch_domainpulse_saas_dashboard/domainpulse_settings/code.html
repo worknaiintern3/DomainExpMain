@@ -1,0 +1,789 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline": "#777587", "tertiary-container": "#005cc6", "secondary-fixed-dim": "#bec6e0", "inverse-surface": "#213145", "on-tertiary": "#ffffff", "on-secondary-container": "#5c647a", "error-container": "#ffdad6", "tertiary-fixed-dim": "#adc6ff", "secondary-container": "#dae2fd", "on-error-container": "#93000a", "on-primary-fixed-variant": "#3323cc", "primary-fixed": "#e2dfff", "on-background": "#0b1c30", "tertiary": "#004598", "surface-tint": "#4d44e3", "on-tertiary-container": "#cedbff", "inverse-primary": "#c3c0ff", "on-surface": "#0b1c30", "surface-container-lowest": "#ffffff", "primary-container": "#4f46e5", "on-tertiary-fixed-variant": "#004395", "secondary": "#565e74", "background": "#f8f9ff", "on-secondary-fixed": "#131b2e", "error": "#ba1a1a", "on-secondary": "#ffffff", "on-primary": "#ffffff", "surface-container": "#e5eeff", "secondary-fixed": "#dae2fd", "surface-bright": "#f8f9ff", "on-secondary-fixed-variant": "#3f465c", "surface-dim": "#cbdbf5", "surface": "#f8f9ff", "on-surface-variant": "#464555", "on-primary-fixed": "#0f0069", "inverse-on-surface": "#eaf1ff", "on-error": "#ffffff", "surface-variant": "#d3e4fe", "primary": "#3525cd", "on-primary-container": "#dad7ff", "primary-fixed-dim": "#c3c0ff", "tertiary-fixed": "#d8e2ff", "surface-container-low": "#eff4ff", "surface-container-highest": "#d3e4fe", "outline-variant": "#c7c4d8", "surface-container-high": "#dce9ff", "on-tertiary-fixed": "#001a42" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "unit-2xs": "0.125rem", "gutter-table": "0.75rem", "unit-2xl": "3rem", "unit-sm": "0.5rem", "unit-lg": "1.5rem", "unit-xl": "2rem", "header-height": "3.5rem", "unit-xs": "0.25rem", "unit-md": "0.75rem", "unit-base": "1rem", "sidebar-width": "16rem" }, "fontFamily": { "body-sm": ["Inter"], "headline-md": ["Inter"], "display-lg": ["Inter"], "body-md": ["Inter"], "display-lg-mobile": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"], "headline-sm": ["Inter"], "caption-xs": ["Inter"], "label-mono": ["JetBrains Mono"] }, "fontSize": { "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0.005em", "fontWeight": "400" }], "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.025em", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "caption-xs": ["11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500" }], "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "-0.01em", "fontWeight": "500" }] } } } };</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-sidebar-width bg-inverse-surface text-inverse-on-surface z-50 flex flex-col justify-between select-none"><div class="flex flex-col"><div class="h-header-height px-unit-lg flex items-center gap-unit-md"><img alt="DomainPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WThqsiQBL4jQ62XGNvkTN_JhzSxDa9An-7pwYb5HNd_EpQMwHHDxbUiaFvQiQN0r6bKGe-se85iEl1NO2D101VAygOC0_C83EWXlzGXcPVzedDYHqEMhQAB0O_iyQl5PQv0trGslYzWjvyTagE6_dKPVZpdHj4dL_r1u3KZsjjnOJ_yM84LRH_dKy_IIFNeklu5LSpbYWpKJq2qrOnn4CakmIoRXIR_pxxzf6v8KETjgy8QeFiRW76ng"><span class="font-headline-sm text-headline-sm text-on-primary tracking-tight">DomainPulse</span></div><nav class="flex flex-col gap-unit-2xs px-unit-md mt-unit-sm" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded-lg shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]"><a aria-current="page" class="flex items-center gap-unit-md px-unit-md py-unit-sm transition-colors font-label-md text-label-md rounded-lg text-secondary-fixed-dim" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-md text-label-md">Overview</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="my-domains" href="#"><span class="material-symbols-outlined text-[20px]">dns</span><span class="font-label-md text-label-md">My Domains</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="find-domain" href="#"><span class="material-symbols-outlined text-[20px]">travel_explore</span><span class="font-label-md text-label-md">Find Domain</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="price-comparison" href="#"><span class="material-symbols-outlined text-[20px]">price_change</span><span class="font-label-md text-label-md">Price Comparison</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="alerts" href="#"><span class="material-symbols-outlined text-[20px]">notifications_active</span><span class="font-label-md text-label-md">Alerts</span></a></nav></div><div class="flex flex-col gap-unit-md px-unit-md pb-unit-md"><nav class="flex flex-col gap-unit-2xs" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded-lg"><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg hover:text-on-primary transition-colors bg-primary-container text-on-primary shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]" data-path="settings" href="#"><span class="material-symbols-outlined text-[20px]">settings</span><span class="font-label-md text-label-md">Settings</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="help-and-support" href="#"><span class="material-symbols-outlined text-[20px]">contact_support</span><span class="font-label-md text-label-md">Help &amp; Support</span></a></nav><div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-variant/5 hover:bg-surface-variant/10 transition-colors cursor-pointer"><div class="flex items-center gap-unit-sm min-w-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-label-md text-label-md text-inverse-on-surface truncate">Aman Developer</span><span class="font-caption-xs text-caption-xs text-secondary-fixed-dim truncate">Portfolio Workspace</span></div></div><span class="material-symbols-outlined text-secondary-fixed-dim text-[18px]">unfold_more</span></div></div></aside><div class="pl-sidebar-width min-h-screen bg-background"><header class="fixed top-0 left-sidebar-width right-0 h-header-height bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-unit-xl flex items-center justify-between gap-unit-lg"><div class="flex flex-col"><h1 class="font-headline-sm text-headline-sm text-on-surface leading-none">Good afternoon, Aman</h1><p class="font-caption-xs text-caption-xs text-secondary mt-unit-2xs">Here’s what’s happening with your domain portfolio.</p></div><div class="flex items-center gap-unit-md"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-unit-sm text-on-surface-variant text-[18px] pointer-events-none">search</span><input class="h-9 pl-9 pr-14 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary w-64" placeholder="Search settings, preferences..." type="text"><span class="absolute right-unit-xs font-caption-xs text-caption-xs text-on-surface-variant px-unit-xs py-unit-2xs rounded bg-surface-container font-label-mono text-label-mono">⌘K</span></div><button class="relative w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-secondary-container ring-2 ring-surface-container-lowest"></span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="w-full pt-header-height px-unit-xl pb-unit-2xl"><div class="flex flex-col w-full">
+<!-- Toast Notification -->
+<div class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 ease-out flex items-center gap-unit-sm px-unit-base py-unit-sm rounded-xl bg-inverse-surface text-inverse-on-surface shadow-xl shadow-inverse-surface/10 border border-outline/20" id="settings-toast">
+<span class="material-symbols-outlined text-emerald-400 text-[20px]">check_circle</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-semibold text-inverse-on-surface">Preferences saved successfully</span>
+<span class="font-caption-xs text-caption-xs text-secondary-fixed-dim">Session cached &amp; updated in local storage</span>
+</div>
+</div>
+<!-- Top Action Bar / Page Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-unit-md pb-unit-lg border-b border-surface-container-high">
+<div class="flex flex-col">
+<div class="flex items-center gap-unit-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface tracking-tight">Settings</h2>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-caption-xs text-caption-xs font-mono transition-colors" data-state="saved" id="save-status-pill"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse transition-colors" id="save-status-dot"></span><span class="transition-colors" id="save-status-text">Saved</span></span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary mt-unit-2xs">
+        Configure portfolio preferences, domain defaults, notifications and application behavior.
+      </p>
+</div>
+<!-- Right Header Meta & Controls -->
+<div class="flex flex-wrap items-center gap-unit-sm">
+<div class="hidden sm:flex items-center gap-unit-xs px-2.5 py-1 rounded-lg bg-surface-container-low text-secondary font-label-mono text-label-mono"><span class="material-symbols-outlined text-[15px] text-tertiary">folder_open</span><span class="">Portfolio Workspace</span></div>
+<div class="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-low text-secondary font-label-md text-label-md">
+<span class="">INR (₹)</span>
+<span class="text-outline">·</span>
+<span class="text-tertiary font-semibold">Compact</span>
+</div>
+<button class="h-9 px-unit-md inline-flex items-center gap-unit-xs rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors shadow-sm" onclick="triggerToast('Default preferences restored')" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">restart_alt</span>
+<span class="">Reset to Defaults</span>
+</button>
+<button class="h-9 px-unit-md inline-flex items-center gap-unit-xs rounded-lg bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-colors shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2)]" onclick="setSaveState('saving'); setTimeout(() =&gt; { setSaveState('saved'); triggerToast('Settings updated successfully'); }, 800);" type="button">
+<span class="material-symbols-outlined text-[18px]">check</span>
+<span class="">Save Changes</span>
+</button>
+</div>
+</div>
+<!-- Settings Layout Body -->
+<div class="flex flex-col lg:flex-row gap-unit-xl mt-unit-lg items-start">
+<!-- Left Column: Compact Navigation Rail & Meta Card -->
+<aside class="w-full lg:w-64 shrink-0 flex flex-col gap-unit-lg">
+<nav class="flex flex-row lg:flex-col overflow-x-auto lg:overflow-visible gap-1 p-1 bg-surface-container-low/70 rounded-xl shadow-sm">
+<button class="tab-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left font-label-md text-label-md transition-all bg-surface-container-lowest text-primary shadow-sm font-semibold" data-tab="tab-general" type="button">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+<span class="">General</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-primary">chevron_right</span>
+</button>
+<button class="tab-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left font-label-md text-label-md text-secondary hover:text-on-surface hover:bg-surface-container-lowest/60 transition-all" data-tab="tab-portfolio" type="button">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[18px]">folder_special</span>
+<span class="">Portfolio</span>
+</div>
+<span class="material-symbols-outlined text-[16px] opacity-0">chevron_right</span>
+</button>
+<button class="tab-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left font-label-md text-label-md text-secondary hover:text-on-surface hover:bg-surface-container-lowest/60 transition-all" data-tab="tab-domain-discovery" type="button">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[18px]">travel_explore</span>
+<span class="">Domain Discovery</span>
+</div>
+<span class="material-symbols-outlined text-[16px] opacity-0">chevron_right</span>
+</button>
+<button class="tab-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left font-label-md text-label-md text-secondary hover:text-on-surface hover:bg-surface-container-lowest/60 transition-all" data-tab="tab-alerts" type="button">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[18px]">notifications_active</span>
+<span class="">Alerts &amp; Notifications</span>
+</div>
+<span class="material-symbols-outlined text-[16px] opacity-0">chevron_right</span>
+</button>
+<button class="tab-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left font-label-md text-label-md text-secondary hover:text-on-surface hover:bg-surface-container-lowest/60 transition-all" data-tab="tab-pricing" type="button">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[18px]">payments</span>
+<span class="">Pricing &amp; Currency</span>
+</div>
+<span class="material-symbols-outlined text-[16px] opacity-0">chevron_right</span>
+</button>
+<button class="tab-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left font-label-md text-label-md text-secondary hover:text-on-surface hover:bg-surface-container-lowest/60 transition-all" data-tab="tab-appearance" type="button">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[18px]">palette</span>
+<span class="">Appearance</span>
+</div>
+<span class="material-symbols-outlined text-[16px] opacity-0">chevron_right</span>
+</button>
+<button class="tab-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left font-label-md text-label-md text-secondary hover:text-on-surface hover:bg-surface-container-lowest/60 transition-all" data-tab="tab-data" type="button">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[18px] text-error">dataset</span>
+<span class="">Data Management</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-error"></span>
+</button>
+</nav>
+<!-- Status & Build Info Card -->
+<div class="rounded-xl bg-surface-container-low p-unit-md flex flex-col gap-unit-sm shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold">Storage &amp; Version</span>
+<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-mono text-[10px]">DomainPulse Portfolio Build</span>
+</div>
+<div class="space-y-unit-xs pt-unit-xs">
+<div class="flex flex-col"><span class="font-caption-xs text-caption-xs text-secondary">Storage</span>
+<span class="font-label-md text-label-md text-on-surface font-medium">Portfolio Workspace</span></div>
+<div class="flex flex-col"><span class="font-caption-xs text-caption-xs text-secondary">Domain Data Sources</span><span class="font-label-md text-label-md text-on-surface font-medium">RDAP / DNS / SSL</span></div>
+<div class="flex flex-col">
+<span class="font-caption-xs text-caption-xs text-secondary">Pricing Mode</span>
+<span class="font-label-md text-label-md text-on-surface font-medium">Reference dataset</span>
+</div>
+</div>
+<div class="pt-unit-xs mt-unit-2xs border-t border-surface-container-high/60">
+<p class="font-caption-xs text-caption-xs text-outline leading-tight">Preferences apply to your portfolio workspace.</p>
+</div>
+</div>
+</aside>
+<!-- Right Column: Tab Panels -->
+<div class="flex-1 w-full min-w-0">
+<!-- 1. GENERAL SETTINGS -->
+<section class="tab-panel flex flex-col gap-unit-lg" id="tab-general">
+<div class="rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm">
+<div class="flex flex-col pb-unit-md border-b border-surface-container-low">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">General Preferences</h3>
+<p class="font-body-sm text-body-sm text-secondary">Basic account display and regional settings for active sessions.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-unit-md mt-unit-md">
+<!-- Display Name -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Display Name</label>
+<input class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-sm" type="text" value="Aman">
+<span class="font-caption-xs text-caption-xs text-secondary">Visible on portfolio summaries and generated audits.</span>
+</div>
+<!-- Default Currency -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Default Currency</label>
+<select class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-sm cursor-pointer">
+<option selected="" value="INR">INR (₹) - Indian Rupee</option>
+<option value="USD">USD ($) - US Dollar</option>
+<option value="EUR">EUR (€) - Euro</option>
+<option value="GBP">GBP (£) - British Pound</option>
+</select>
+<span class="font-caption-xs text-caption-xs text-secondary">Primary valuation denomination.</span>
+</div>
+<!-- Date Format -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Date Format</label>
+<select class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-sm cursor-pointer">
+<option selected="">DD MMM YYYY (e.g., 24 Oct 2026)</option>
+<option>YYYY-MM-DD (ISO standard)</option>
+<option>MM/DD/YYYY</option>
+</select>
+<span class="font-caption-xs text-caption-xs text-secondary">Applied across expiration monitors and audit histories.</span>
+</div>
+<!-- Timezone -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Timezone</label>
+<select class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-sm cursor-pointer">
+<option selected="">Asia/Kolkata (IST +05:30)</option>
+<option>UTC (Coordinated Universal Time)</option>
+<option>America/New_York (EST / EDT)</option>
+<option>Europe/London (GMT / BST)</option>
+</select>
+<span class="font-caption-xs text-caption-xs text-secondary">Calculates accurate 24-hour expiration flags.</span>
+</div>
+<!-- Rows Per Page -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Default Rows Per Page</label>
+<div class="grid grid-cols-3 gap-1 p-1 bg-surface-container-low rounded-lg">
+<button class="py-1.5 text-center font-label-md text-label-md rounded bg-surface-container-lowest text-primary font-semibold shadow-sm" type="button">20</button>
+<button class="py-1.5 text-center font-label-md text-label-md rounded text-secondary hover:text-on-surface transition-colors" type="button">50</button>
+<button class="py-1.5 text-center font-label-md text-label-md rounded text-secondary hover:text-on-surface transition-colors" type="button">100</button>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary">Table pagination density across all views.</span>
+</div>
+<!-- Default Landing Page -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Default Landing Page</label>
+<select class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-sm cursor-pointer">
+<option selected="">Overview</option>
+<option>My Domains</option>
+<option>Find Domain</option>
+<option>Alerts &amp; Monitoring</option>
+</select>
+<span class="font-caption-xs text-caption-xs text-secondary">Initial workspace loaded on startup.</span>
+</div>
+</div>
+<div class="mt-unit-lg pt-unit-md border-t border-surface-container-low flex justify-end">
+<button class="h-9 px-unit-lg rounded-lg bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-colors shadow-sm" onclick="triggerToast('General settings saved')" type="button">
+              Save General Settings
+            </button>
+</div>
+</div>
+</section>
+<!-- 2. PORTFOLIO SETTINGS -->
+<section class="tab-panel hidden flex flex-col gap-unit-lg" id="tab-portfolio">
+<div class="rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm">
+<div class="flex flex-col pb-unit-md border-b border-surface-container-low">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Portfolio Defaults</h3>
+<p class="font-body-sm text-body-sm text-secondary">Default behavior and risk calculation rules for your tracked domains.</p>
+</div>
+<div class="flex flex-col gap-unit-md mt-unit-md">
+<!-- Auto renew status default -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-unit-sm p-unit-md rounded-xl bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Default Auto-Renew Assumption</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Assumed renewal posture for freshly imported domain assets.</span>
+</div>
+<div class="inline-flex p-1 bg-surface-container-high rounded-lg">
+<button class="px-3 py-1 font-label-md text-label-md text-secondary hover:text-on-surface" type="button">On</button>
+<button class="px-3 py-1 font-label-md text-label-md bg-surface-container-lowest text-primary font-semibold rounded shadow-sm" type="button">Off</button>
+<button class="px-3 py-1 font-label-md text-label-md text-secondary hover:text-on-surface" type="button">Unknown</button>
+</div>
+</div>
+<!-- Expiration thresholds -->
+<div class="flex flex-col gap-unit-sm p-unit-md rounded-xl bg-surface-container-low">
+<span class="font-label-md text-label-md text-on-surface font-medium">Health &amp; Expiry Warning Horizons</span>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-unit-md mt-1">
+<!-- Critical -->
+<div class="flex flex-col gap-1 p-unit-sm bg-surface-container-lowest rounded-lg shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Critical Flag</span>
+<span class="px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-caption-xs text-caption-xs font-medium">Urgent action flag</span>
+</div>
+<input class="h-8 px-2 mt-1 rounded bg-surface-container-low text-on-surface font-label-mono text-label-mono focus:ring-1 focus:ring-primary" type="text" value="7 days">
+</div>
+<!-- Warning -->
+<div class="flex flex-col gap-1 p-unit-sm bg-surface-container-lowest rounded-lg shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Warning Flag</span>
+<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-caption-xs text-caption-xs font-medium">Attention window</span>
+</div>
+<input class="h-8 px-2 mt-1 rounded bg-surface-container-low text-on-surface font-label-mono text-label-mono focus:ring-1 focus:ring-primary" type="text" value="30 days">
+</div>
+<!-- Healthy -->
+<div class="flex flex-col gap-1 p-unit-sm bg-surface-container-lowest rounded-lg shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Optimal Tier</span>
+<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-caption-xs text-caption-xs font-medium">Optimal</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary mt-2">More than 30 days remaining safely</span>
+</div>
+</div>
+</div>
+<!-- Default Project Tag -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Default Project / Category Tag</label>
+<input class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-sm" placeholder="Optional (e.g. Core SaaS, Side Projects, Parking)" type="text">
+</div>
+<!-- Toggle switches -->
+<div class="space-y-unit-sm pt-unit-xs">
+<div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Auto-fetch domain metadata on creation</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Attempts immediate RDAP &amp; WHOIS lookup upon addition.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-unit-sm p-unit-sm rounded-lg bg-surface-container-low"><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface font-medium">Automatic Metadata Refresh</span><span class="font-caption-xs text-caption-xs text-secondary">Synchronize WHOIS, RDAP records, and nameserver lookups.</span></div><select class="h-9 px-3 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer"><option value="manual">Manual</option><option selected="" value="on-start">On App Start</option><option value="daily">Every 24 Hours</option></select></div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. DOMAIN DISCOVERY SETTINGS -->
+<section class="tab-panel hidden flex flex-col gap-unit-lg" id="tab-domain-discovery">
+<div class="rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm">
+<div class="flex flex-col pb-unit-md border-b border-surface-container-low">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Domain Discovery Preferences</h3>
+<p class="font-body-sm text-body-sm text-secondary">Target TLDs and search algorithm defaults for the query engine.</p>
+</div>
+<div class="flex flex-col gap-unit-md mt-unit-md">
+<!-- Preferred TLDs multi-select chip group -->
+<div class="flex flex-col gap-unit-xs">
+<label class="font-label-md text-label-md text-on-surface font-medium">Preferred Extensions (TLDs)</label>
+<div class="flex flex-wrap gap-2 pt-1">
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container text-primary font-label-mono text-label-mono font-medium cursor-pointer shadow-sm">
+<input checked="" class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.com</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container text-primary font-label-mono text-label-mono font-medium cursor-pointer shadow-sm">
+<input checked="" class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.in</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container text-primary font-label-mono text-label-mono font-medium cursor-pointer shadow-sm">
+<input checked="" class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.ai</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container text-primary font-label-mono text-label-mono font-medium cursor-pointer shadow-sm">
+<input checked="" class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.io</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container-low text-secondary font-label-mono text-label-mono cursor-pointer hover:bg-surface-container transition-colors">
+<input class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.co.in</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container-low text-secondary font-label-mono text-label-mono cursor-pointer hover:bg-surface-container transition-colors">
+<input class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.dev</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container-low text-secondary font-label-mono text-label-mono cursor-pointer hover:bg-surface-container transition-colors">
+<input class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.app</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container-low text-secondary font-label-mono text-label-mono cursor-pointer hover:bg-surface-container transition-colors">
+<input class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.tech</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container-low text-secondary font-label-mono text-label-mono cursor-pointer hover:bg-surface-container transition-colors">
+<input class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.net</span>
+</label>
+<label class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container-low text-secondary font-label-mono text-label-mono cursor-pointer hover:bg-surface-container transition-colors">
+<input class="rounded text-primary focus:ring-0 accent-primary" type="checkbox">
+<span class="">.org</span>
+</label>
+</div>
+</div>
+<!-- Check Mode & Default Sort -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-unit-md pt-unit-xs">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Availability Check Mode</label>
+<div class="flex gap-2">
+<label class="flex-1 flex items-center gap-2 p-2.5 rounded-lg bg-surface-container-low cursor-pointer hover:bg-surface-container transition-colors">
+<input checked="" class="accent-primary" name="check_mode" type="radio">
+<span class="font-label-md text-label-md text-on-surface">Selected TLDs Only</span>
+</label>
+<label class="flex-1 flex items-center gap-2 p-2.5 rounded-lg bg-surface-container-low cursor-pointer hover:bg-surface-container transition-colors">
+<input class="accent-primary" name="check_mode" type="radio">
+<span class="font-label-md text-label-md text-on-surface">All Preferred TLDs</span>
+</label>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Default Search Sort</label>
+<select class="h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer">
+<option selected="">Availability First</option>
+<option>Lowest Price</option>
+<option>Extension A-Z</option>
+<option>Best Match (Heuristic)</option>
+</select>
+</div>
+</div>
+<!-- Suggestion Engine & Name Style -->
+<div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Smart Name Variations &amp; Synonyms</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Generates intelligent prefix, suffix, and compound ideas.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex flex-col gap-unit-xs">
+<label class="font-label-md text-label-md text-on-surface font-medium">Preferred Suggestion Style</label>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+<label class="flex items-center justify-center p-2.5 rounded-lg bg-surface-container text-primary font-label-md text-label-md font-semibold cursor-pointer shadow-sm">
+<input checked="" class="sr-only" name="style_mode" type="radio">
+<span class="">Brandable</span>
+</label>
+<label class="flex items-center justify-center p-2.5 rounded-lg bg-surface-container-low text-secondary font-label-md text-label-md cursor-pointer hover:bg-surface-container transition-colors">
+<input class="sr-only" name="style_mode" type="radio">
+<span class="">Short &amp; Punchy</span>
+</label>
+<label class="flex items-center justify-center p-2.5 rounded-lg bg-surface-container-low text-secondary font-label-md text-label-md cursor-pointer hover:bg-surface-container transition-colors">
+<input class="sr-only" name="style_mode" type="radio">
+<span class="">Modern</span>
+</label>
+<label class="flex items-center justify-center p-2.5 rounded-lg bg-surface-container-low text-secondary font-label-md text-label-md cursor-pointer hover:bg-surface-container transition-colors">
+<input class="sr-only" name="style_mode" type="radio">
+<span class="">Tech-Focused</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. ALERTS & NOTIFICATIONS -->
+<section class="tab-panel hidden flex flex-col gap-unit-lg" id="tab-alerts">
+<div class="rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm">
+<div class="flex flex-col pb-unit-md border-b border-surface-container-low">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Renewal &amp; Security Alerts</h3>
+<p class="font-body-sm text-body-sm text-secondary">Configure warning horizons and notification dispatch channels.</p>
+</div>
+<div class="flex flex-col gap-unit-md mt-unit-md">
+<!-- Renewal Expiry Horizon Checkboxes -->
+<div class="flex flex-col gap-unit-xs">
+<label class="font-label-md text-label-md text-on-surface font-medium">Domain Renewal Warning Intervals</label>
+<span class="font-caption-xs text-caption-xs text-secondary mb-1">Generate warnings when reaching the following thresholds prior to expiry:</span>
+<div class="flex flex-wrap gap-2">
+<label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="">30 Days</span>
+</label>
+<label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="">15 Days</span>
+</label>
+<label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="">7 Days</span>
+</label>
+<label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="">3 Days</span>
+</label>
+<label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="">1 Day</span>
+</label>
+</div>
+</div>
+<!-- SSL Checkboxes -->
+<div class="flex flex-col gap-unit-xs pt-unit-xs">
+<label class="font-label-md text-label-md text-on-surface font-medium">SSL Certificate Expiration Warnings</label>
+<div class="flex flex-wrap gap-2">
+<label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="">30 Days</span>
+</label>
+<label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="">14 Days</span>
+</label>
+<label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="">7 Days</span>
+</label>
+</div>
+</div>
+<!-- Quick Toggles -->
+<div class="space-y-unit-sm pt-unit-xs">
+<div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Auto-Renew Discrepancy Alert</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Flags domains nearing expiry where auto-renew is unexpectedly disabled.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">DNS Resolution Status Check</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Triggers an alert if authoritative nameservers return NXDOMAIN or fail to resolve.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+<!-- Delivery Channels -->
+<div class="flex flex-col gap-unit-xs pt-unit-xs"><label class="font-label-md text-label-md text-on-surface font-medium">Active Delivery Channels</label><div class="grid grid-cols-1 md:grid-cols-2 gap-unit-sm"><div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-tertiary">notifications</span><span class="font-label-md text-label-md text-on-surface">Browser Notifications</span></div><input checked="" class="rounded text-primary accent-primary" type="checkbox"></div><div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-tertiary">inbox</span><span class="font-label-md text-label-md text-on-surface">In-App Notification Feed</span></div><input checked="" class="rounded text-primary accent-primary" type="checkbox"></div><div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-outline">mail</span><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface">Email Notifications</span><span class="font-caption-xs text-caption-xs text-secondary">Email — Not Configured</span></div></div><button type="button" class="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-primary font-caption-xs text-caption-xs font-medium transition-colors" onclick="triggerToast('Opening notification channel setup...')">Configure</button></div><div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-outline">chat</span><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface">WhatsApp / SMS</span><span class="font-caption-xs text-caption-xs text-secondary">WhatsApp — Not Configured</span></div></div><button type="button" class="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-primary font-caption-xs text-caption-xs font-medium transition-colors" onclick="triggerToast('Opening notification channel setup...')">Configure</button></div></div></div>
+</div>
+</div>
+</section>
+<!-- 5. PRICING & CURRENCY -->
+<section class="tab-panel hidden flex flex-col gap-unit-lg" id="tab-pricing">
+<div class="rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm">
+<div class="flex flex-col pb-unit-md border-b border-surface-container-low">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Pricing Preferences</h3>
+<p class="font-body-sm text-body-sm text-secondary">Price display formats, fee thresholds, and registrar comparison rules.</p>
+</div>
+<div class="flex flex-col gap-unit-md mt-unit-md">
+<!-- Currency selector buttons -->
+<div class="flex flex-col gap-unit-xs">
+<label class="font-label-md text-label-md text-on-surface font-medium">Default Display Currency</label>
+<div class="grid grid-cols-4 gap-2">
+<button class="py-2 rounded-lg bg-surface-container text-primary font-label-md text-label-md font-semibold shadow-sm" type="button">INR (₹)</button>
+<button class="py-2 rounded-lg bg-surface-container-low text-secondary hover:text-on-surface font-label-md text-label-md transition-colors" type="button">USD ($)</button>
+<button class="py-2 rounded-lg bg-surface-container-low text-secondary hover:text-on-surface font-label-md text-label-md transition-colors" type="button">EUR (€)</button>
+<button class="py-2 rounded-lg bg-surface-container-low text-secondary hover:text-on-surface font-label-md text-label-md transition-colors" type="button">GBP (£)</button>
+</div>
+</div>
+<!-- Columns to display in comparison tables -->
+<div class="flex flex-col gap-unit-xs pt-unit-xs">
+<label class="font-label-md text-label-md text-on-surface font-medium">Comparison Table Columns</label>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+<label class="flex items-center gap-2 p-3 rounded-lg bg-surface-container-low cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="font-label-md text-label-md text-on-surface">Registration Price</span>
+</label>
+<label class="flex items-center gap-2 p-3 rounded-lg bg-surface-container-low cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="font-label-md text-label-md text-on-surface">Renewal Price</span>
+</label>
+<label class="flex items-center gap-2 p-3 rounded-lg bg-surface-container-low cursor-pointer">
+<input checked="" class="rounded text-primary accent-primary" type="checkbox">
+<span class="font-label-md text-label-md text-on-surface">Transfer Price</span>
+</label>
+</div>
+</div>
+<!-- Renewal Markup Threshold -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-unit-sm p-unit-md rounded-xl bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Renewal Markup Warning Trigger</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Flags registrars whose renewal rates exceed first-year fee by this factor.</span>
+</div>
+<div class="flex items-center gap-2">
+<input class="w-16 h-8 text-center rounded bg-surface-container-lowest text-on-surface font-label-mono text-label-mono font-medium shadow-sm" type="text" value="50%">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+<!-- Long-term cost horizon -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Long-Term Cost Projection Horizon</label>
+<select class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer">
+<option>3 Years</option>
+<option selected="">5 Years</option>
+<option>10 Years</option>
+</select>
+<span class="font-caption-xs text-caption-xs text-secondary">Estimated total cost of ownership model in pricing comparisons.</span>
+</div>
+<!-- Disclaimer Notice Box -->
+<div class="p-unit-md rounded-xl bg-surface-container-high/40 flex items-start gap-3">
+<span class="material-symbols-outlined text-[20px] text-tertiary shrink-0 mt-0.5">info</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Reference Pricing Notice Active</span>
+<p class="font-body-sm text-body-sm text-secondary">
+                  "Provider pricing may vary and should be verified before purchase." This helper callout remains pinned to price lookup screens.
+                </p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 6. APPEARANCE -->
+<section class="tab-panel hidden flex flex-col gap-unit-lg" id="tab-appearance">
+<div class="rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm">
+<div class="flex flex-col pb-unit-md border-b border-surface-container-low">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Interface &amp; Appearance</h3>
+<p class="font-body-sm text-body-sm text-secondary">Theme modes, layout options, and visual density configuration.</p>
+</div>
+<div class="flex flex-col gap-unit-md mt-unit-md">
+<!-- Theme Mode Cards -->
+<div class="flex flex-col gap-unit-xs">
+<label class="font-label-md text-label-md text-on-surface font-medium">Theme Mode</label>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-unit-sm">
+<!-- Light (Active) -->
+<div class="p-unit-sm rounded-xl bg-surface-container-lowest shadow-sm ring-2 ring-primary flex flex-col gap-2 cursor-pointer">
+<div class="h-16 rounded-lg bg-surface flex items-center justify-center p-2">
+<div class="w-full h-full rounded bg-surface-container-lowest shadow-sm flex items-center px-2">
+<span class="w-4 h-2 rounded-sm bg-primary"></span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Light</span>
+<span class="material-symbols-outlined text-[16px] text-primary">check_circle</span>
+</div>
+</div>
+<!-- Dark -->
+<div class="p-unit-sm rounded-xl bg-surface-container-low flex flex-col gap-2 cursor-pointer hover:bg-surface-container transition-colors">
+<div class="h-16 rounded-lg bg-inverse-surface flex items-center justify-center p-2">
+<div class="w-full h-full rounded bg-inverse-surface/80 flex items-center px-2">
+<span class="w-4 h-2 rounded-sm bg-primary-fixed-dim"></span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-secondary">Dark</span>
+<span class="font-caption-xs text-caption-xs text-outline">Preview</span>
+</div>
+</div>
+<!-- System -->
+<div class="p-unit-sm rounded-xl bg-surface-container-low flex flex-col gap-2 cursor-pointer hover:bg-surface-container transition-colors">
+<div class="h-16 rounded-lg bg-gradient-to-r from-surface to-inverse-surface flex items-center justify-center p-2">
+<div class="w-full h-full rounded bg-surface-container-high/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px] text-on-surface">sync</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-secondary">System Sync</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Interface Density & Sidebar -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-unit-md pt-unit-xs">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Interface Density</label>
+<div class="grid grid-cols-2 gap-2">
+<div class="p-unit-sm rounded-lg bg-surface-container text-primary font-label-md text-label-md font-semibold flex items-center justify-between shadow-sm cursor-pointer">
+<span class="">Compact (Concept C)</span>
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-low text-secondary font-label-md text-label-md flex items-center justify-between cursor-pointer hover:bg-surface-container">
+<span class="">Comfortable</span>
+</div>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary">Strict 44px compact table row standard.</span>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">Sidebar Behavior</label>
+<div class="grid grid-cols-2 gap-2">
+<div class="p-unit-sm rounded-lg bg-surface-container text-primary font-label-md text-label-md font-semibold flex items-center justify-between shadow-sm cursor-pointer">
+<span class="">Expanded (256px)</span>
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-low text-secondary font-label-md text-label-md flex items-center justify-between cursor-pointer hover:bg-surface-container">
+<span class="">Collapsed</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Accessibility & Motion -->
+<div class="space-y-unit-sm pt-unit-xs">
+<div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Micro-Interactions &amp; Transitions</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Smooth animated height tabs and state alerts.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Respect Reduced Motion</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Adheres directly to OS system-level prefers-reduced-motion settings.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 7. DATA MANAGEMENT -->
+<section class="tab-panel hidden flex flex-col gap-unit-lg" id="tab-data">
+<div class="rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm">
+<div class="flex flex-col pb-unit-md border-b border-surface-container-low">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Portfolio Data &amp; Storage</h3>
+<p class="font-body-sm text-body-sm text-secondary">Import, export, backup, or reset your portfolio dataset.</p>
+</div>
+<div class="flex flex-col gap-unit-lg mt-unit-md">
+<!-- Action Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-unit-md">
+<div class="p-unit-md rounded-xl bg-surface-container-low flex items-start gap-unit-sm cursor-pointer hover:bg-surface-container transition-colors shadow-sm" onclick="triggerToast('Opening CSV import tool...')">
+<div class="w-10 h-10 rounded-lg bg-surface-container-lowest flex items-center justify-center shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[20px] text-tertiary">upload_file</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Import CSV</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Import registrar CSV lists directly into current portfolio.</span>
+</div>
+</div>
+<div class="p-unit-md rounded-xl bg-surface-container-low flex items-start gap-unit-sm cursor-pointer hover:bg-surface-container transition-colors shadow-sm" onclick="triggerToast('Opening JSON restore tool...')">
+<div class="w-10 h-10 rounded-lg bg-surface-container-lowest flex items-center justify-center shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[20px] text-tertiary">code</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Import JSON</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Restore domain JSON dump and snapshot backups.</span>
+</div>
+</div>
+<div class="p-unit-md rounded-xl bg-surface-container-low flex items-start gap-unit-sm cursor-pointer hover:bg-surface-container transition-colors shadow-sm" onclick="triggerToast('Exporting 42 domain records to CSV...')">
+<div class="w-10 h-10 rounded-lg bg-surface-container-lowest flex items-center justify-center shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[20px] text-tertiary">file_download</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Export CSV</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Download active 42 domain records and health metrics.</span>
+</div>
+</div>
+<div class="p-unit-md rounded-xl bg-surface-container-low flex items-start gap-unit-sm cursor-pointer hover:bg-surface-container transition-colors shadow-sm" onclick="triggerToast('Generating full JSON portfolio backup...')">
+<div class="w-10 h-10 rounded-lg bg-surface-container-lowest flex items-center justify-center shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[20px] text-tertiary">data_object</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Export JSON</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Download full portfolio configuration, alerts, and tags.</span>
+</div>
+</div>
+</div>
+<!-- Danger Zone -->
+<div class="p-unit-lg rounded-xl bg-error-container/30 flex flex-col gap-unit-md shadow-sm"><div class="flex items-center gap-2 text-error font-headline-sm text-headline-sm"><span class="material-symbols-outlined text-[22px]">warning</span><span class="">Danger Zone</span></div><p class="font-body-sm text-body-sm text-on-error-container">Clear or reset your saved portfolio records.</p><div class="grid grid-cols-1 md:grid-cols-2 gap-unit-md pt-unit-xs"><div class="flex flex-col gap-2 p-unit-sm rounded-lg bg-surface-container-lowest/80"><span class="font-label-md text-label-md font-medium text-on-surface">Clear All Portfolio Data</span><span class="font-caption-xs text-caption-xs text-secondary">Permanently removes all saved domain records from this workspace.</span><button class="mt-1 h-9 px-unit-md rounded-lg bg-error text-on-error font-label-md text-label-md hover:bg-error/90 transition-colors shadow-sm self-start" onclick="confirmReset()" type="button">Clear Workspace Data</button></div><div class="flex flex-col gap-2 p-unit-sm rounded-lg bg-surface-container-lowest/80"><span class="font-label-md text-label-md font-medium text-on-surface">Reset Demo Data</span><span class="font-caption-xs text-caption-xs text-secondary">Restore the default demonstration dataset.</span><button class="mt-1 h-9 px-unit-md rounded-lg bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors shadow-sm self-start" onclick="triggerToast('Demo dataset reloaded (42 domains)')" type="button">Restore Default Dataset</button></div></div></div>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- Interactive Logic -->
+<script>
+    (function initSettings() {
+      // 1. Highlight 'Settings' in global App Shell sidebar and deactivate overview
+      try {
+        const sidebarLinks = document.querySelectorAll('aside nav a');
+        sidebarLinks.forEach(link => {
+          const path = link.getAttribute('data-path');
+          if (path === 'settings') {
+            link.classList.remove('text-secondary-fixed-dim', 'hover:bg-surface-variant/10');
+            link.classList.add('bg-primary-container', 'text-on-primary', 'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]');
+          } else {
+            link.classList.remove('bg-primary-container', 'text-on-primary', 'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]');
+            link.classList.add('text-secondary-fixed-dim');
+          }
+        });
+
+        // Update header search placeholder
+        const searchInput = document.querySelector('header input[type="text"]');
+        if (searchInput) {
+          searchInput.setAttribute('placeholder', 'Search settings, preferences...');
+        }
+
+        // Remove '+ Add Domain' button from header if present
+        const headerButtons = document.querySelectorAll('header button');
+        headerButtons.forEach(btn => {
+          if (btn.textContent.includes('Add Domain')) {
+            btn.remove();
+          }
+        });
+      } catch (e) {
+        // Fallback gracefully
+      }
+
+      // 2. Tab switcher interaction
+      const tabs = document.querySelectorAll('.tab-btn');
+      const panels = document.querySelectorAll('.tab-panel');
+
+      tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.getAttribute('data-tab');
+
+          // Reset all tabs
+          tabs.forEach(t => {
+            t.classList.remove('bg-surface-container-lowest', 'text-primary', 'shadow-sm', 'font-semibold');
+            t.classList.add('text-secondary');
+            const chev = t.querySelector('.material-symbols-outlined:last-child');
+            if (chev && !t.querySelector('.bg-error')) {
+              chev.classList.add('opacity-0');
+            }
+          });
+
+          // Activate clicked tab
+          btn.classList.add('bg-surface-container-lowest', 'text-primary', 'shadow-sm', 'font-semibold');
+          btn.classList.remove('text-secondary');
+          const activeChev = btn.querySelector('.material-symbols-outlined:last-child');
+          if (activeChev && !btn.querySelector('.bg-error')) {
+            activeChev.classList.remove('opacity-0');
+          }
+
+          // Show corresponding panel
+          panels.forEach(panel => {
+            if (panel.id === targetId) {
+              panel.classList.remove('hidden');
+            } else {
+              panel.classList.add('hidden');
+            }
+          });
+        });
+      });
+    })();
+
+    // 3. Global Toast Functionality
+    function triggerToast(message) {
+      const toast = document.getElementById('settings-toast');
+      if (!toast) return;
+
+      const label = toast.querySelector('.text-inverse-on-surface');
+      if (label && message) {
+        label.textContent = message;
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3200);
+    }
+
+    function confirmReset() {
+      if (confirm("Are you sure? This will remove 42 domains and 8 active alerts from your local session.")) {
+        triggerToast("Portfolio storage cleared");
+      }
+    }
+  </script>
+</div></main></div>
+
+</body></html>

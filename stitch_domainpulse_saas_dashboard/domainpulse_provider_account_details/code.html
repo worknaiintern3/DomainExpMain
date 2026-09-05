@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline": "#777587", "tertiary-container": "#005cc6", "secondary-fixed-dim": "#bec6e0", "inverse-surface": "#213145", "on-tertiary": "#ffffff", "on-secondary-container": "#5c647a", "error-container": "#ffdad6", "tertiary-fixed-dim": "#adc6ff", "secondary-container": "#dae2fd", "on-error-container": "#93000a", "on-primary-fixed-variant": "#3323cc", "primary-fixed": "#e2dfff", "on-background": "#0b1c30", "tertiary": "#004598", "surface-tint": "#4d44e3", "on-tertiary-container": "#cedbff", "inverse-primary": "#c3c0ff", "on-surface": "#0b1c30", "surface-container-lowest": "#ffffff", "primary-container": "#4f46e5", "on-tertiary-fixed-variant": "#004395", "secondary": "#565e74", "background": "#f8f9ff", "on-secondary-fixed": "#131b2e", "error": "#ba1a1a", "on-secondary": "#ffffff", "on-primary": "#ffffff", "surface-container": "#e5eeff", "secondary-fixed": "#dae2fd", "surface-bright": "#f8f9ff", "on-secondary-fixed-variant": "#3f465c", "surface-dim": "#cbdbf5", "surface": "#f8f9ff", "on-surface-variant": "#464555", "on-primary-fixed": "#0f0069", "inverse-on-surface": "#eaf1ff", "on-error": "#ffffff", "surface-variant": "#d3e4fe", "primary": "#3525cd", "on-primary-container": "#dad7ff", "primary-fixed-dim": "#c3c0ff", "tertiary-fixed": "#d8e2ff", "surface-container-low": "#eff4ff", "surface-container-highest": "#d3e4fe", "outline-variant": "#c7c4d8", "surface-container-high": "#dce9ff", "on-tertiary-fixed": "#001a42" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "unit-2xs": "0.125rem", "gutter-table": "0.75rem", "unit-2xl": "3rem", "unit-sm": "0.5rem", "unit-lg": "1.5rem", "unit-xl": "2rem", "header-height": "3.5rem", "unit-xs": "0.25rem", "unit-md": "0.75rem", "unit-base": "1rem", "sidebar-width": "16rem" }, "fontFamily": { "body-sm": ["Inter"], "headline-md": ["Inter"], "display-lg": ["Inter"], "body-md": ["Inter"], "display-lg-mobile": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"], "headline-sm": ["Inter"], "caption-xs": ["Inter"], "label-mono": ["JetBrains Mono"] }, "fontSize": { "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0.005em", "fontWeight": "400" }], "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.025em", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "caption-xs": ["11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500" }], "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "-0.01em", "fontWeight": "500" }] } } } };</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-sidebar-width bg-inverse-surface text-inverse-on-surface z-50 flex flex-col justify-between select-none"><div class="flex flex-col"><div class="h-header-height px-unit-lg flex items-center gap-unit-md"><img alt="DomainPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WThqsiQBL4jQ62XGNvkTN_JhzSxDa9An-7pwYb5HNd_EpQMwHHDxbUiaFvQiQN0r6bKGe-se85iEl1NO2D101VAygOC0_C83EWXlzGXcPVzedDYHqEMhQAB0O_iyQl5PQv0trGslYzWjvyTagE6_dKPVZpdHj4dL_r1u3KZsjjnOJ_yM84LRH_dKy_IIFNeklu5LSpbYWpKJq2qrOnn4CakmIoRXIR_pxxzf6v8KETjgy8QeFiRW76ng"/><span class="font-headline-sm text-headline-sm text-on-primary tracking-tight">DomainPulse</span></div><nav class="flex flex-col gap-unit-2xs px-unit-md mt-unit-sm"><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">grid_view</span><span class="font-label-md text-label-md">Overview</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="my-domains" href="#"><span class="material-symbols-outlined text-[20px]">language</span><span class="font-label-md text-label-md">My Domains</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="vps-and-servers" href="#"><span class="material-symbols-outlined text-[20px]">dns</span><span class="font-label-md text-label-md">VPS &amp; Servers</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="websites-and-apps" href="#"><span class="material-symbols-outlined text-[20px]">web</span><span class="font-label-md text-label-md">Websites &amp; Apps</span></a><a aria-current="page" class="flex items-center gap-unit-md px-unit-md py-unit-sm transition-colors bg-primary-container text-on-primary font-label-md text-label-md rounded-lg shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]" data-path="accounts-and-emails" href="#"><span class="material-symbols-outlined text-[20px]">mail</span><span class="font-label-md text-label-md">Accounts &amp; Emails</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="find-domain" href="#"><span class="material-symbols-outlined text-[20px]">search</span><span class="font-label-md text-label-md">Find Domain</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="price-comparison" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span class="font-label-md text-label-md">Price Comparison</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="alerts" href="#"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="font-label-md text-label-md">Alerts &amp; Monitoring</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="infrastructure-map" href="#"><span class="material-symbols-outlined text-[20px]">hub</span><span class="font-label-md text-label-md">Infrastructure Map</span></a></nav></div><div class="flex flex-col gap-unit-md px-unit-md pb-unit-md"><nav class="flex flex-col gap-unit-2xs"><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="settings" href="#"><span class="material-symbols-outlined text-[20px]">settings</span><span class="font-label-md text-label-md">Settings</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="help-and-support" href="#"><span class="material-symbols-outlined text-[20px]">help_outline</span><span class="font-label-md text-label-md">Help &amp; Support</span></a></nav><div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-variant/5 hover:bg-surface-variant/10 transition-colors cursor-pointer"><div class="flex items-center gap-unit-sm min-w-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-label-md text-label-md text-inverse-on-surface truncate">Aman Developer</span><span class="font-caption-xs text-caption-xs text-secondary-fixed-dim truncate">Portfolio Workspace</span></div></div><span class="material-symbols-outlined text-secondary-fixed-dim text-[18px]">expand_more</span></div></div></aside><div class="pl-sidebar-width min-h-screen bg-background"><header class="fixed top-0 left-sidebar-width right-0 h-header-height bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-unit-xl flex items-center justify-between gap-unit-lg"><div class="flex items-center gap-unit-xs"><span class="font-caption-xs text-caption-xs text-secondary font-medium">DomainPulse</span><span class="text-secondary text-[12px]">/</span><span class="font-label-md text-label-md text-on-surface font-semibold">Portfolio Workspace</span></div><div class="flex items-center gap-unit-md"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-unit-sm text-on-surface-variant text-[18px] pointer-events-none">search</span><input class="h-9 pl-9 pr-14 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary w-64" placeholder="Search domains, TLDs, servers..." type="text"/><span class="absolute right-unit-xs font-caption-xs text-caption-xs text-on-surface-variant px-unit-xs py-unit-2xs rounded bg-surface-container font-label-mono text-label-mono">⌘K</span></div><button class="relative w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-secondary-container ring-2 ring-surface-container-lowest"></span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="w-full pt-header-height px-unit-xl pb-unit-2xl"><div class="flex flex-col w-full">
+<!-- Top Breadcrumb & Metadata Path -->
+<div class="flex items-center justify-between py-unit-sm">
+<div class="flex items-center gap-unit-xs">
+<span class="font-caption-xs text-caption-xs text-secondary font-medium">DomainPulse</span>
+<span class="text-secondary text-[11px]">/</span>
+<span class="font-caption-xs text-caption-xs text-secondary font-medium">Accounts &amp; Emails</span>
+<span class="text-secondary text-[11px]">/</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Hostinger (WorknAi Hostinger Main)</span>
+</div>
+<div class="flex items-center gap-unit-xs">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-label-mono text-label-mono">
+        Internal Record ID: HST-941029
+      </span>
+</div>
+</div>
+<!-- Primary Page Header Block -->
+<div class="mt-unit-xs rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm">
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-unit-md">
+<div class="flex items-start gap-unit-md">
+<div class="w-12 h-12 rounded-lg bg-[#673de6]/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[#673de6] text-[26px]">dns</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center flex-wrap gap-unit-sm">
+<h1 class="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight">WorknAi Hostinger Main</h1>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-primary font-caption-xs text-caption-xs font-semibold uppercase">
+              HOSTINGER CLOUD
+            </span>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-caption-xs text-caption-xs font-medium border border-emerald-200/50">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Connected • User Mapped
+            </span>
+</div>
+<div class="flex items-center flex-wrap gap-unit-md mt-unit-xs">
+<div class="flex items-center gap-1.5 font-label-mono text-label-mono text-primary font-medium bg-primary-fixed/40 px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[14px]">mail</span>
+<span class="">infra@worknai.com</span>
+</div>
+<span class="text-outline-variant text-[12px]">•</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Account Type:</span>
+<span class="font-label-md text-label-md text-on-surface font-medium">Hosting / VPS &amp; Cloud Compute</span>
+<span class="text-outline-variant text-[12px]">•</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Region Hub:</span>
+<span class="font-label-md text-label-md text-on-surface font-medium">Mumbai (IN-South-01)</span>
+</div>
+</div>
+</div>
+<!-- Action Toolbar -->
+<div class="flex items-center flex-wrap gap-unit-xs shrink-0">
+<button class="h-9 px-unit-md flex items-center gap-1.5 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-label-md text-label-md transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">label</span>
+<span class="">Edit Label</span>
+</button>
+<button class="h-9 px-unit-md flex items-center gap-1.5 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-label-md text-label-md transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">tune</span>
+<span class="">Connection Settings</span>
+</button>
+<button class="h-9 px-unit-md flex items-center gap-1.5 rounded-lg bg-primary text-on-primary hover:bg-tertiary font-label-md text-label-md shadow-sm transition-colors" id="syncBtn" onclick="triggerSync()" type="button">
+<span class="material-symbols-outlined text-[16px]" id="syncIcon">sync</span>
+<span class="" id="syncLabel">Sync Assets</span>
+</button>
+<button class="h-9 w-9 flex items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-colors shadow-sm" title="Export Account Sheet" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Relationship Chain Visualizer Flow Bar -->
+<div class="mt-unit-sm rounded-xl bg-surface-container-lowest p-unit-md shadow-sm">
+<div class="flex items-center justify-between pb-unit-xs">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">account_tree</span>
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold">ACCOUNT RELATIONSHIP MAP</span>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary font-mono px-2 py-0.5 rounded bg-surface-container-low">Mapped Asset Relationships</span>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-unit-xs mt-unit-xs">
+<!-- Node 1 -->
+<div class="flex flex-col p-unit-xs px-unit-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
+<span class="font-caption-xs text-caption-xs text-secondary truncate">Registered Email</span>
+<div class="flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-primary text-[14px]">alternate_email</span>
+<span class="font-label-mono text-label-mono text-on-surface truncate font-semibold">infra@worknai.com</span>
+</div>
+</div>
+<!-- Node 2 -->
+<div class="flex flex-col p-unit-xs px-unit-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
+<span class="font-caption-xs text-caption-xs text-secondary truncate">Provider</span>
+<div class="flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[#673de6] text-[14px]">cloud_circle</span>
+<span class="font-label-md text-label-md text-on-surface truncate font-semibold">Hostinger</span>
+</div>
+</div>
+<!-- Node 3 -->
+<div class="flex flex-col p-unit-xs px-unit-sm rounded-lg bg-primary/10 transition-colors">
+<span class="font-caption-xs text-caption-xs text-primary truncate font-medium">Account Label</span>
+<div class="flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-primary text-[14px]">domain_verification</span>
+<span class="font-label-md text-label-md text-primary truncate font-semibold">WorknAi Hostinger Main</span>
+</div>
+</div>
+<!-- Node 4 -->
+<div class="flex flex-col p-unit-xs px-unit-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
+<span class="font-caption-xs text-caption-xs text-secondary truncate">Compute Nodes</span>
+<div class="flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-secondary text-[14px]">terminal</span>
+<span class="font-label-mono text-label-mono text-on-surface truncate font-semibold">3 Mapped Servers</span>
+</div>
+</div>
+<!-- Node 5 -->
+<div class="flex flex-col p-unit-xs px-unit-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
+<span class="font-caption-xs text-caption-xs text-secondary truncate">Deployed Apps</span>
+<div class="flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-secondary text-[14px]">language</span>
+<span class="font-label-md text-label-md text-on-surface truncate font-semibold">9 Mapped Apps</span>
+</div>
+</div>
+<!-- Node 6 -->
+<div class="flex flex-col p-unit-xs px-unit-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
+<span class="font-caption-xs text-caption-xs text-secondary truncate">Apex Domain</span>
+<div class="flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-emerald-600 text-[14px]">link</span>
+<span class="font-label-mono text-label-mono text-on-surface truncate font-semibold">2 Connected Domains</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Summary Metric Strip (6 Columns compact) -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-unit-sm mt-unit-sm">
+<div class="p-unit-sm rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs text-secondary font-medium tracking-wide uppercase">Owned Servers</span>
+<div class="flex items-baseline justify-between mt-unit-xs">
+<span class="font-headline-md text-headline-md text-on-surface font-semibold">3</span>
+<span class="font-caption-xs text-caption-xs text-primary bg-primary-fixed/40 px-1.5 py-0.5 rounded font-medium">3 mapped servers</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs text-secondary font-medium tracking-wide uppercase">Hosted Websites</span>
+<div class="flex items-baseline justify-between mt-unit-xs">
+<span class="font-headline-md text-headline-md text-on-surface font-semibold">9</span>
+<span class="font-caption-xs text-caption-xs text-primary bg-primary-fixed/40 px-1.5 py-0.5 rounded font-medium">9 mapped apps</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs text-secondary font-medium tracking-wide uppercase">Linked Domains</span>
+<div class="flex items-baseline justify-between mt-unit-xs">
+<span class="font-headline-md text-headline-md text-on-surface font-semibold">2</span>
+<span class="font-caption-xs text-caption-xs text-secondary font-mono">2 connected domains</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs text-secondary font-medium tracking-wide uppercase">Monthly Run-Rate</span>
+<div class="mt-unit-xs">
+<span class="font-headline-md text-headline-md text-on-surface font-semibold">₹4,250</span>
+<span class="font-caption-xs text-caption-xs text-secondary block mt-0.5 font-mono">/ mo • Estimated monthly cost</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs text-secondary font-medium tracking-wide uppercase">Annual Commitment</span>
+<div class="mt-unit-xs">
+<span class="font-headline-md text-headline-md text-on-surface font-semibold">₹51,000</span>
+<span class="font-caption-xs text-caption-xs text-secondary block mt-0.5 font-mono">/ yr • Estimated annual cost</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<span class="font-caption-xs text-caption-xs text-secondary font-medium tracking-wide uppercase">Next Renewal</span>
+<div class="mt-unit-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold truncate block">18 Oct 2026</span>
+<span class="font-caption-xs text-caption-xs text-secondary block mt-0.5">Stored renewal date • User Mapped On</span>
+</div>
+</div>
+</div>
+<!-- Main Body Content Split Grid -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-unit-md mt-unit-md items-start">
+<!-- Left 8-col Column: Owned Servers Table & Projects -->
+<div class="xl:col-span-8 flex flex-col gap-unit-md">
+<!-- Section 1: Owned Servers Table -->
+<div class="rounded-xl bg-surface-container-lowest shadow-sm overflow-hidden">
+<div class="p-unit-md flex items-center justify-between">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">dns</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Owned Servers</h2>
+<span class="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs font-semibold">3 Mapped</span>
+</div>
+<div class="flex items-center gap-unit-xs">
+<span class="font-caption-xs text-caption-xs text-secondary">Data Source:</span>
+<span class="font-caption-xs text-caption-xs text-on-surface font-medium">User Mapped / Inventory Records</span>
+</div>
+</div>
+<!-- Table Container with strict Compact Design -->
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container-low text-secondary font-caption-xs text-caption-xs uppercase tracking-wider">
+<th class="py-2.5 px-unit-md font-semibold">Server Name</th>
+<th class="py-2.5 px-unit-sm font-semibold">Public IP</th>
+<th class="py-2.5 px-unit-sm font-semibold">Hardware Sizing</th>
+<th class="py-2.5 px-unit-sm font-semibold text-center">Websites</th>
+<th class="py-2.5 px-unit-sm font-semibold text-right">Cost</th>
+<th class="py-2.5 px-unit-sm font-semibold">Renewal Due</th>
+<th class="py-2.5 px-unit-md font-semibold text-center">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container text-body-sm">
+<!-- Server 01 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-unit-sm px-unit-md">
+<div class="flex items-center gap-unit-xs">
+<span class="w-2 h-2 rounded-full bg-primary shrink-0"></span>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md font-semibold text-on-surface truncate">Production VPS 01</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Ubuntu 22.04 LTS (Litespeed)</span>
+</div>
+</div>
+</td>
+<td class="py-unit-sm px-unit-sm font-label-mono text-label-mono text-on-surface">
+<div class="flex items-center gap-1 group cursor-pointer" onclick="navigator.clipboard.writeText('103.21.58.112')">
+<span class="">103.21.58.112</span>
+<span class="material-symbols-outlined text-[14px] text-secondary opacity-0 group-hover:opacity-100 transition-opacity">content_copy</span>
+</div>
+</td>
+<td class="py-unit-sm px-unit-sm">
+<span class="font-label-mono text-label-mono text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">4 vCPU / 8 GB</span>
+</td>
+<td class="py-unit-sm px-unit-sm text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container text-on-surface font-caption-xs text-caption-xs font-semibold">
+                    5 Apps
+                  </span>
+</td>
+<td class="py-unit-sm px-unit-sm text-right font-label-mono text-label-mono font-semibold text-on-surface">
+                  ₹1,499<span class="text-secondary text-[10px]">/mo</span>
+</td>
+<td class="py-unit-sm px-unit-sm font-label-mono text-label-mono text-on-surface-variant">
+                  18 Oct 2026
+                </td>
+<td class="py-unit-sm px-unit-md text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Mapped Record
+                  </span>
+</td>
+</tr>
+<!-- Server 02 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-unit-sm px-unit-md">
+<div class="flex items-center gap-unit-xs">
+<span class="w-2 h-2 rounded-full bg-primary shrink-0"></span>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md font-semibold text-on-surface truncate">AnyWork Staging Node</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Debian 12 (CyberPanel)</span>
+</div>
+</div>
+</td>
+<td class="py-unit-sm px-unit-sm font-label-mono text-label-mono text-on-surface">
+<div class="flex items-center gap-1 group cursor-pointer" onclick="navigator.clipboard.writeText('103.21.59.84')">
+<span class="">103.21.59.84</span>
+<span class="material-symbols-outlined text-[14px] text-secondary opacity-0 group-hover:opacity-100 transition-opacity">content_copy</span>
+</div>
+</td>
+<td class="py-unit-sm px-unit-sm">
+<span class="font-label-mono text-label-mono text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">2 vCPU / 4 GB</span>
+</td>
+<td class="py-unit-sm px-unit-sm text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container text-on-surface font-caption-xs text-caption-xs font-semibold">
+                    3 Apps
+                  </span>
+</td>
+<td class="py-unit-sm px-unit-sm text-right font-label-mono text-label-mono font-semibold text-on-surface">
+                  ₹899<span class="text-secondary text-[10px]">/mo</span>
+</td>
+<td class="py-unit-sm px-unit-sm font-label-mono text-label-mono text-on-surface-variant font-medium">
+                  12 Feb 2025
+                </td>
+<td class="py-unit-sm px-unit-md text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Mapped Record
+                  </span>
+</td>
+</tr>
+<!-- Server 03 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-unit-sm px-unit-md">
+<div class="flex items-center gap-unit-xs">
+<span class="w-2 h-2 rounded-full bg-primary shrink-0"></span>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md font-semibold text-on-surface truncate">Dev Cluster Node 03</span>
+<span class="font-caption-xs text-caption-xs text-secondary">Ubuntu 24.04 (Docker Swarm)</span>
+</div>
+</div>
+</td>
+<td class="py-unit-sm px-unit-sm font-label-mono text-label-mono text-on-surface">
+<div class="flex items-center gap-1 group cursor-pointer" onclick="navigator.clipboard.writeText('103.21.60.19')">
+<span class="">103.21.60.19</span>
+<span class="material-symbols-outlined text-[14px] text-secondary opacity-0 group-hover:opacity-100 transition-opacity">content_copy</span>
+</div>
+</td>
+<td class="py-unit-sm px-unit-sm">
+<span class="font-label-mono text-label-mono text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">4 vCPU / 8 GB</span>
+</td>
+<td class="py-unit-sm px-unit-sm text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container text-on-surface font-caption-xs text-caption-xs font-semibold">
+                    1 App
+                  </span>
+</td>
+<td class="py-unit-sm px-unit-sm text-right font-label-mono text-label-mono font-semibold text-on-surface">
+                  ₹1,852<span class="text-secondary text-[10px]">/mo</span>
+</td>
+<td class="py-unit-sm px-unit-sm font-label-mono text-label-mono text-on-surface-variant">
+                  29 Nov 2025
+                </td>
+<td class="py-unit-sm px-unit-md text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Mapped Record
+                  </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-unit-sm px-unit-md bg-surface-container-low flex items-center justify-between text-caption-xs font-caption-xs text-secondary">
+<span class="">Displaying 3 of 3 active compute units</span>
+<a class="text-primary hover:underline font-medium inline-flex items-center gap-1" href="#">
+<span class="">Manage VPS Settings in Servers Tab</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Section 2: Linked Domains & DNS Routing -->
+<div class="rounded-xl bg-surface-container-lowest p-unit-md shadow-sm">
+<div class="flex items-center justify-between mb-unit-sm">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">hub</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Linked Domains &amp; DNS Routing</h2>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary font-mono">2 Domains Linked</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-unit-sm">
+<!-- Domain Item 1 -->
+<div class="p-unit-sm rounded-lg bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">globe</span>
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">worknai.com</span>
+</div>
+<span class="font-caption-xs text-caption-xs px-2 py-0.5 rounded bg-primary/10 text-primary font-medium">Apex Root</span>
+</div>
+<div class="mt-unit-sm space-y-1.5 text-caption-xs font-caption-xs text-secondary">
+<div class="flex items-center justify-between">
+<span class="">DNS Routing Target:</span>
+<span class="font-mono text-on-surface font-medium">Production VPS 01 (103.21.58.112)</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="">Nameserver Status:</span>
+<span class="text-on-surface font-medium inline-flex items-center gap-1">
+<span class="font-mono">ns1.dns-parking.com</span>
+<span class="text-[10px] text-primary bg-primary-fixed/50 px-1 py-0.2 rounded font-sans">DNS Retrieved</span>
+</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="">SSL / Edge Security:</span>
+<span class="text-on-surface font-medium inline-flex items-center gap-1">
+<span>Let's Encrypt Wildcard</span>
+<span class="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded font-sans">SSL Retrieved</span>
+</span>
+</div>
+<div class="flex items-center justify-between pt-1 border-t border-surface-container">
+<span class="">Project:</span>
+<span class="font-medium text-primary">WorknAi</span>
+</div>
+</div>
+</div>
+<!-- Domain Item 2 -->
+<div class="p-unit-sm rounded-lg bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">globe</span>
+<span class="font-label-mono text-label-mono font-semibold text-on-surface">anywork.in</span>
+</div>
+<span class="font-caption-xs text-caption-xs px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-medium">Sub-brand</span>
+</div>
+<div class="mt-unit-sm space-y-1.5 text-caption-xs font-caption-xs text-secondary">
+<div class="flex items-center justify-between">
+<span class="">DNS Routing Target:</span>
+<span class="font-mono text-on-surface font-medium">AnyWork Staging Node (103.21.59.84)</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="">Nameserver Status:</span>
+<span class="text-on-surface font-medium inline-flex items-center gap-1">
+<span class="font-mono">ns2.dns-parking.com</span>
+<span class="text-[10px] text-primary bg-primary-fixed/50 px-1 py-0.2 rounded font-sans">DNS Retrieved</span>
+</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="">SSL / Edge Security:</span>
+<span class="text-on-surface font-medium inline-flex items-center gap-1">
+<span>Hostinger Cloudflare Caching</span>
+<span class="text-[10px] text-primary bg-primary-fixed/50 px-1 py-0.2 rounded font-sans">DNS Retrieved</span>
+</span>
+</div>
+<div class="flex items-center justify-between pt-1 border-t border-surface-container">
+<span class="">Project:</span>
+<span class="font-medium text-primary">AnyWork</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section 3: Associated Projects Breakdown -->
+<div class="rounded-xl bg-surface-container-lowest p-unit-md shadow-sm">
+<div class="flex items-center justify-between mb-unit-sm">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">folder_special</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Associated Projects</h2>
+</div>
+<span class="font-caption-xs text-caption-xs text-secondary">2 Product Scopes</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-unit-sm">
+<div class="p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex items-center justify-between pb-unit-xs">
+<span class="font-label-md text-label-md font-semibold text-on-surface">WorknAi Enterprise</span>
+<span class="font-caption-xs text-caption-xs text-primary font-mono font-medium">5 Linked Assets</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Core customer dashboard, API gateway, enterprise tenant auth, webhooks daemon, and landing portal.</p>
+<div class="flex items-center gap-unit-xs mt-unit-sm">
+<span class="font-caption-xs text-caption-xs text-secondary">Servers:</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs">Production VPS 01</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs">Dev Node 03</span>
+</div>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex items-center justify-between pb-unit-xs">
+<span class="font-label-md text-label-md font-semibold text-on-surface">AnyWork Platform</span>
+<span class="font-caption-xs text-caption-xs text-primary font-mono font-medium">4 Linked Assets</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Freelancer gig marketplace client apps, testing sandbox instances, QA database replicas.</p>
+<div class="flex items-center gap-unit-xs mt-unit-sm">
+<span class="font-caption-xs text-caption-xs text-secondary">Servers:</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-caption-xs text-caption-xs">AnyWork Staging</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Section: Assets Requiring Mapping (Compact Banner) -->
+<div class="rounded-lg bg-surface-container p-unit-sm flex flex-col sm:flex-row sm:items-center justify-between gap-unit-xs text-caption-xs font-caption-xs text-on-surface border border-outline-variant/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">verified</span>
+<span><strong>Relationship Coverage:</strong> All 3 servers, 9 apps, and 2 domains for this provider account are currently mapped.</span>
+</div>
+<a class="text-primary hover:underline font-medium shrink-0 inline-flex items-center gap-1" href="#">
+<span>Inspect Unmapped Queue</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Right 4-col Column: Billing, Invoices & Notes -->
+<div class="xl:col-span-4 flex flex-col gap-unit-md">
+<!-- Section 4: Billing, Invoices & Notifications Card -->
+<div class="rounded-xl bg-surface-container-lowest p-unit-md shadow-sm">
+<div class="flex items-center gap-unit-xs mb-unit-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">credit_card</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Billing &amp; Financials</h2>
+</div>
+<div class="space-y-unit-sm">
+<!-- Billing Contact -->
+<div class="p-unit-sm rounded-lg bg-surface-container-low">
+<span class="font-caption-xs text-caption-xs text-secondary block uppercase tracking-wider">Billing Contact</span>
+<div class="flex items-center justify-between mt-1">
+<span class="font-label-mono text-label-mono font-medium text-on-surface">infra@worknai.com</span>
+<span class="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+</div>
+</div>
+<!-- Billing Currency & Cycle -->
+<div class="p-unit-sm rounded-lg bg-surface-container-low">
+<div class="flex items-center justify-between">
+<div>
+<span class="font-caption-xs text-caption-xs text-secondary block uppercase tracking-wider">Billing Currency</span>
+<span class="font-label-md text-label-md font-semibold text-on-surface mt-0.5 block">INR (₹)</span>
+</div>
+<div class="text-right">
+<span class="font-caption-xs text-caption-xs text-secondary block uppercase tracking-wider">Auto-Renew Status</span>
+<span class="font-caption-xs text-caption-xs px-2 py-0.5 rounded bg-surface-container text-primary font-medium mt-0.5 inline-block">User Mapped On</span>
+</div>
+</div>
+<div class="mt-2 pt-2 border-t border-surface-container text-caption-xs font-caption-xs text-secondary flex justify-between">
+<span>Billing Cycle:</span>
+<span class="text-on-surface font-medium">Annual Contract with Monthly Run-rate</span>
+</div>
+<div class="mt-1 flex justify-between text-caption-xs font-caption-xs text-secondary">
+<span>Next Renewal:</span>
+<span class="font-mono text-on-surface font-medium">18 Oct 2026 (Stored Record)</span>
+</div>
+</div>
+<!-- Tax Invoice Profile -->
+<div class="p-unit-sm rounded-lg bg-surface-container-low">
+<span class="font-caption-xs text-caption-xs text-secondary block uppercase tracking-wider">Tax &amp; Invoice Profile</span>
+<div class="flex items-center justify-between mt-1">
+<span class="font-label-md text-label-md font-semibold text-on-surface">WorknAi Technologies Pvt Ltd</span>
+<span class="font-caption-xs text-caption-xs text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-medium">Verified Record</span>
+</div>
+<div class="mt-1 flex items-center justify-between text-caption-xs font-caption-xs text-secondary font-mono">
+<span class="">GSTIN: 27AABCW1920R1ZG</span>
+</div>
+</div>
+<!-- Recent Invoices mini list -->
+<div class="pt-unit-xs">
+<span class="font-caption-xs text-caption-xs text-secondary uppercase font-semibold tracking-wider">Recent Account Invoices</span>
+<div class="mt-unit-xs space-y-1.5">
+<div class="flex items-center justify-between py-1 px-2 rounded bg-surface-container-low text-caption-xs font-caption-xs">
+<div class="flex items-center gap-1.5 font-mono text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-secondary">receipt_long</span>
+<span class="">INV-HST-88421</span>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface font-medium">₹4,250</span>
+<span class="text-secondary font-medium">Paid (Archived Record)</span>
+</div>
+<div class="flex items-center justify-between py-1 px-2 rounded bg-surface-container-low text-caption-xs font-caption-xs">
+<div class="flex items-center gap-1.5 font-mono text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-secondary">receipt_long</span>
+<span class="">INV-HST-83199</span>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface font-medium">₹4,250</span>
+<span class="text-secondary font-medium">Paid (Archived Record)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section 5: Account Notes & SOP -->
+<div class="rounded-xl bg-surface-container-lowest p-unit-md shadow-sm">
+<div class="flex items-center justify-between mb-unit-xs">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">sticky_note_2</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">User-Maintained Account Notes</h2>
+</div>
+<button class="text-caption-xs font-caption-xs text-primary font-medium hover:underline" type="button">Edit Notes</button>
+</div>
+<div class="p-unit-sm rounded-lg bg-surface-container-low text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+          Primary Hostinger account managing core production web fleet. Accessible by Authorized Infra Team members (<span class="font-label-mono text-label-mono text-on-surface font-semibold bg-surface-container px-1 py-0.5 rounded">infra@worknai.com</span>). For server provisioning or DNS record modifications, refer to standard infrastructure SOPs.
+        </div>
+<!-- Compliance & Security Notice (Strict security rules, no secrets stored) -->
+<div class="mt-unit-sm p-unit-sm rounded-lg bg-surface-container flex items-start gap-2 text-caption-xs font-caption-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-[18px] shrink-0">verified_user</span>
+<div class="">
+<span class="font-semibold text-on-surface block">Data Privacy Note</span>
+            Passwords, API keys, recovery tokens, and authentication secrets are strictly never stored or displayed in DomainPulse.
+          </div>
+</div>
+<!-- Fast Record Status Log -->
+<div class="mt-unit-md pt-unit-xs">
+<span class="font-caption-xs text-caption-xs text-secondary uppercase font-semibold tracking-wider">Record Status</span>
+<div class="mt-unit-xs text-caption-xs font-caption-xs space-y-1 text-secondary font-mono">
+<div class="flex justify-between">
+<span class="">Last Record Sync:</span>
+<span class="text-on-surface">User Mapped (3 mins ago)</span>
+</div>
+<div class="flex justify-between">
+<span class="">Discovered Asset Changes:</span>
+<span class="text-emerald-700">0 pending</span>
+</div>
+<div class="flex justify-between">
+<span class="">Sync Status:</span>
+<span class="text-emerald-700">Mapped (2/2)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+    function triggerSync() {
+      const icon = document.getElementById('syncIcon');
+      const label = document.getElementById('syncLabel');
+      
+      icon.classList.add('animate-spin');
+      label.textContent = 'Syncing...';
+      
+      setTimeout(() => {
+        icon.classList.remove('animate-spin');
+        label.textContent = 'Synced Now';
+        setTimeout(() => {
+          label.textContent = 'Sync Assets';
+        }, 2000);
+      }, 1200);
+    }
+  </script>
+</div></main></div>
+</body></html>

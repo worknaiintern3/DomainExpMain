@@ -1,0 +1,851 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline": "#777587", "tertiary-container": "#005cc6", "secondary-fixed-dim": "#bec6e0", "inverse-surface": "#213145", "on-tertiary": "#ffffff", "on-secondary-container": "#5c647a", "error-container": "#ffdad6", "tertiary-fixed-dim": "#adc6ff", "secondary-container": "#dae2fd", "on-error-container": "#93000a", "on-primary-fixed-variant": "#3323cc", "primary-fixed": "#e2dfff", "on-background": "#0b1c30", "tertiary": "#004598", "surface-tint": "#4d44e3", "on-tertiary-container": "#cedbff", "inverse-primary": "#c3c0ff", "on-surface": "#0b1c30", "surface-container-lowest": "#ffffff", "primary-container": "#4f46e5", "on-tertiary-fixed-variant": "#004395", "secondary": "#565e74", "background": "#f8f9ff", "on-secondary-fixed": "#131b2e", "error": "#ba1a1a", "on-secondary": "#ffffff", "on-primary": "#ffffff", "surface-container": "#e5eeff", "secondary-fixed": "#dae2fd", "surface-bright": "#f8f9ff", "on-secondary-fixed-variant": "#3f465c", "surface-dim": "#cbdbf5", "surface": "#f8f9ff", "on-surface-variant": "#464555", "on-primary-fixed": "#0f0069", "inverse-on-surface": "#eaf1ff", "on-error": "#ffffff", "surface-variant": "#d3e4fe", "primary": "#3525cd", "on-primary-container": "#dad7ff", "primary-fixed-dim": "#c3c0ff", "tertiary-fixed": "#d8e2ff", "surface-container-low": "#eff4ff", "surface-container-highest": "#d3e4fe", "outline-variant": "#c7c4d8", "surface-container-high": "#dce9ff", "on-tertiary-fixed": "#001a42" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "unit-2xs": "0.125rem", "gutter-table": "0.75rem", "unit-2xl": "3rem", "unit-sm": "0.5rem", "unit-lg": "1.5rem", "unit-xl": "2rem", "header-height": "3.5rem", "unit-xs": "0.25rem", "unit-md": "0.75rem", "unit-base": "1rem", "sidebar-width": "16rem" }, "fontFamily": { "body-sm": ["Inter"], "headline-md": ["Inter"], "display-lg": ["Inter"], "body-md": ["Inter"], "display-lg-mobile": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"], "headline-sm": ["Inter"], "caption-xs": ["Inter"], "label-mono": ["JetBrains Mono"] }, "fontSize": { "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0.005em", "fontWeight": "400" }], "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.025em", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "caption-xs": ["11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500" }], "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "-0.01em", "fontWeight": "500" }] } } } };</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-sidebar-width bg-inverse-surface text-inverse-on-surface z-50 flex flex-col justify-between select-none"><div class="flex flex-col"><div class="h-header-height px-unit-lg flex items-center gap-unit-md"><img alt="DomainPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WThqsiQBL4jQ62XGNvkTN_JhzSxDa9An-7pwYb5HNd_EpQMwHHDxbUiaFvQiQN0r6bKGe-se85iEl1NO2D101VAygOC0_C83EWXlzGXcPVzedDYHqEMhQAB0O_iyQl5PQv0trGslYzWjvyTagE6_dKPVZpdHj4dL_r1u3KZsjjnOJ_yM84LRH_dKy_IIFNeklu5LSpbYWpKJq2qrOnn4CakmIoRXIR_pxxzf6v8KETjgy8QeFiRW76ng"><span class="font-headline-sm text-headline-sm text-on-primary tracking-tight">DomainPulse</span></div><nav class="flex flex-col gap-unit-2xs px-unit-md mt-unit-sm" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded-lg shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]"><a aria-current="page" class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-md text-label-md">Overview</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="my-domains" href="#"><span class="material-symbols-outlined text-[20px]">dns</span><span class="font-label-md text-label-md">My Domains</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="find-domain" href="#"><span class="material-symbols-outlined text-[20px]">travel_explore</span><span class="font-label-md text-label-md">Find Domain</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="price-comparison" href="#"><span class="material-symbols-outlined text-[20px]">price_change</span><span class="font-label-md text-label-md">Price Comparison</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="alerts" href="#"><span class="material-symbols-outlined text-[20px]">notifications_active</span><span class="font-label-md text-label-md">Alerts</span></a></nav></div><div class="flex flex-col gap-unit-md px-unit-md pb-unit-md"><nav class="flex flex-col gap-unit-2xs" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded-lg"><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors" data-path="settings" href="#"><span class="material-symbols-outlined text-[20px]">settings</span><span class="font-label-md text-label-md">Settings</span></a><a class="flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg bg-primary-container text-on-primary font-label-md text-label-md shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]" data-path="help-and-support" href="#"><span class="material-symbols-outlined text-[20px]">contact_support</span><span class="font-label-md text-label-md">Help &amp; Support</span></a></nav><div class="flex items-center justify-between p-unit-sm rounded-lg bg-surface-variant/5 hover:bg-surface-variant/10 transition-colors cursor-pointer"><div class="flex items-center gap-unit-sm min-w-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-label-md text-label-md text-inverse-on-surface truncate">Aman Developer</span><span class="font-caption-xs text-caption-xs text-secondary-fixed-dim truncate">Portfolio Workspace</span></div></div><span class="material-symbols-outlined text-secondary-fixed-dim text-[18px]">unfold_more</span></div></div></aside><div class="pl-sidebar-width min-h-screen bg-background"><header class="fixed top-0 left-sidebar-width right-0 h-header-height bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-unit-xl flex items-center justify-between gap-unit-lg"><div class="flex flex-col"><h1 class="font-headline-sm text-headline-sm text-on-surface leading-none">Good afternoon, Aman</h1><p class="font-caption-xs text-caption-xs text-secondary mt-unit-2xs">Here’s what’s happening with your domain portfolio.</p></div><div class="flex items-center gap-unit-md"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-unit-sm text-on-surface-variant text-[18px] pointer-events-none">search</span><input class="h-9 pl-9 pr-14 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm shadow-[0_1px_2px_0_rgba(15,23,42,0.04)] placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary w-64" placeholder="Search domains, TLDs, DNS..." type="text"><span class="absolute right-unit-xs font-caption-xs text-caption-xs text-on-surface-variant px-unit-xs py-unit-2xs rounded bg-surface-container font-label-mono text-label-mono">⌘K</span></div><button class="relative w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-secondary-container ring-2 ring-surface-container-lowest"></span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="w-full pt-header-height px-unit-xl pb-unit-2xl"><div class="flex flex-col w-full">
+<!-- Interactive Navigation & Sidebar Updater Script -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Sync Shell Navigation to mark 'Help & Support' active with Electric Indigo style
+      const navLinks = document.querySelectorAll('aside nav a[data-path]');
+      navLinks.forEach(link => {
+        link.className = "flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg text-secondary-fixed-dim hover:bg-surface-variant/10 hover:text-on-primary transition-colors";
+        if (link.getAttribute('data-path') === 'help-and-support') {
+          link.className = "flex items-center gap-unit-md px-unit-md py-unit-sm rounded-lg bg-primary-container text-on-primary font-label-md text-label-md shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]";
+        }
+      });
+
+      // 2. Remove '+ Add Domain' button in header if present as instructed
+      const headerButtons = document.querySelectorAll('header button');
+      headerButtons.forEach(btn => {
+        if (btn.textContent.includes('Add Domain')) {
+          btn.remove();
+        }
+      });
+
+      // 3. Update profile caption in shell sidebar to "Portfolio Workspace"
+      const profileCaption = document.querySelector('aside .font-caption-xs');
+      if (profileCaption) {
+        profileCaption.textContent = 'Portfolio Workspace';
+      }
+
+      // 4. Accordion Toggle Logic
+      window.toggleFaq = function(id) {
+        const item = document.getElementById(id);
+        const icon = document.getElementById(id + '-icon');
+        if (!item || !icon) return;
+        const isHidden = item.classList.contains('hidden');
+        if (isHidden) {
+          item.classList.remove('hidden');
+          icon.style.transform = 'rotate(180deg)';
+        } else {
+          item.classList.add('hidden');
+          icon.style.transform = 'rotate(0deg)';
+        }
+      };
+
+      // 5. Category filter pills logic
+      window.filterCategory = function(cat, element) {
+        const buttons = document.querySelectorAll('.cat-pill');
+        buttons.forEach(b => {
+          b.classList.remove('bg-primary-container', 'text-on-primary', 'font-semibold');
+          b.classList.add('bg-surface-container-low', 'text-secondary', 'hover:bg-surface-container');
+        });
+        element.classList.remove('bg-surface-container-low', 'text-secondary', 'hover:bg-surface-container');
+        element.classList.add('bg-primary-container', 'text-on-primary', 'font-semibold');
+
+        // Scroll smoothly to section if exists
+        const target = document.getElementById('sec-' + cat);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+
+      // 6. Fast search filter in FAQ
+      const searchInput = document.getElementById('help-search-input');
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          const val = e.target.value.toLowerCase().trim();
+          const faqs = document.querySelectorAll('.faq-item');
+          faqs.forEach(faq => {
+            const text = faq.innerText.toLowerCase();
+            if (!val || text.includes(val)) {
+              faq.style.display = 'block';
+            } else {
+              faq.style.display = 'none';
+            }
+          });
+        });
+      }
+
+      window.setQuickSearch = function(query) {
+        if (searchInput) {
+          searchInput.value = query;
+          searchInput.dispatchEvent(new Event('input'));
+          const faqHeader = document.getElementById('sec-knowledge-base');
+          if (faqHeader) {
+            faqHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      };
+    });
+  </script>
+<!-- PAGE SUBHEADER: Workspace Context & Controls -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-unit-md pb-unit-lg pt-unit-sm">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-unit-xs mb-unit-2xs"><span class="font-caption-xs text-caption-xs uppercase tracking-widest text-primary font-semibold">Knowledge &amp; Support</span></div>
+<h2 class="font-display-lg text-display-lg text-on-surface tracking-tight">Help &amp; Support</h2>
+<p class="font-body-md text-body-md text-secondary mt-unit-2xs max-w-3xl">
+        Learn how DomainPulse operates, interpret domain technical telemetry, and troubleshoot common portfolio anomalies.
+      </p>
+</div>
+<!-- Top Right Controls -->
+<div class="flex flex-wrap items-center gap-unit-xs self-start md:self-auto shrink-0">
+<div class="inline-flex items-center gap-unit-xs px-unit-sm py-unit-2xs rounded-lg bg-surface-container-high text-on-surface font-caption-xs text-caption-xs shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="">Portfolio Workspace</span>
+</div>
+<div class="inline-flex items-center gap-unit-2xs px-unit-sm py-unit-2xs rounded-lg bg-surface-container-lowest text-secondary font-label-mono text-label-mono shadow-sm">
+<span class="text-on-surface font-semibold">INR (₹)</span>
+<span class="text-outline text-[10px]">FIXED</span>
+</div>
+<div class="inline-flex items-center gap-unit-2xs px-unit-sm py-unit-2xs rounded-lg bg-surface-container-lowest text-secondary font-label-md text-label-md shadow-sm">
+<span class="material-symbols-outlined text-[16px]">density_small</span>
+<span class="">Compact</span>
+</div>
+<button class="h-8 px-unit-sm flex items-center gap-unit-xs rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-md text-label-md shadow-sm transition-colors" onclick="document.getElementById('help-search-input').focus();" type="button">
+<span class="material-symbols-outlined text-[16px]">search</span>
+<span class="">Search Help</span>
+</button>
+<a class="h-8 px-unit-sm flex items-center gap-unit-xs rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-md text-label-md shadow-sm transition-colors" href="#sec-data-sources">
+<span class="material-symbols-outlined text-[16px]">menu_book</span>
+<span class="">Documentation</span>
+</a>
+</div>
+</div>
+<!-- SECTION 1: SEARCH & QUICK QUERIES -->
+<div class="w-full bg-surface-container-lowest rounded-xl p-unit-md shadow-sm mb-unit-lg">
+<div class="flex flex-col md:flex-row items-stretch gap-unit-sm">
+<div class="relative flex-1 flex items-center">
+<span class="material-symbols-outlined absolute left-unit-sm text-secondary text-[20px] pointer-events-none">manage_search</span>
+<input class="w-full h-11 pl-10 pr-16 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md placeholder:text-secondary focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-inner" id="help-search-input" placeholder="Search help topics, features, or troubleshooting..." type="text">
+<span class="absolute right-unit-sm font-caption-xs text-caption-xs text-outline font-label-mono">Esc to clear</span>
+</div>
+<button class="h-11 px-unit-lg flex items-center justify-center gap-unit-xs rounded-lg bg-primary-container text-on-primary font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity" onclick="document.getElementById('help-search-input').dispatchEvent(new Event('input'));" type="button">
+<span class="material-symbols-outlined text-[18px]">search</span>
+<span class="">Search</span>
+</button>
+</div>
+<!-- Quick query chips -->
+<div class="flex flex-wrap items-center gap-unit-xs mt-unit-sm pt-unit-xs">
+<span class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-medium mr-unit-2xs">Frequently Asked:</span>
+<button class="px-unit-sm py-unit-2xs rounded-lg bg-surface-container hover:bg-surface-variant/40 text-on-surface font-caption-xs text-caption-xs transition-colors" onclick="setQuickSearch('How do I add a domain?')" type="button">
+        How do I add a domain?
+      </button>
+<button class="px-unit-sm py-unit-2xs rounded-lg bg-surface-container hover:bg-surface-variant/40 text-on-surface font-caption-xs text-caption-xs transition-colors" onclick="setQuickSearch('What is RDAP?')" type="button">
+        What is RDAP?
+      </button>
+<button class="px-unit-sm py-unit-2xs rounded-lg bg-surface-container hover:bg-surface-variant/40 text-on-surface font-caption-xs text-caption-xs transition-colors" onclick="setQuickSearch('critical')" type="button">
+        Why is a domain marked critical?
+      </button>
+<button class="px-unit-sm py-unit-2xs rounded-lg bg-surface-container hover:bg-surface-variant/40 text-on-surface font-caption-xs text-caption-xs transition-colors" onclick="setQuickSearch('renewal pricing')" type="button">
+        How are renewal costs calculated?
+      </button>
+</div>
+</div>
+<!-- SECTION 2: QUICK START / GETTING STARTED -->
+<div class="mb-unit-xl">
+<div class="flex items-center justify-between mb-unit-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Quick Start Guides</h3>
+<span class="font-caption-xs text-caption-xs text-secondary">Core operations in DomainPulse</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-unit-md">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-md shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-primary mb-unit-sm">
+<span class="material-symbols-outlined text-[22px]">add_circle</span>
+</div>
+<h4 class="font-headline-sm text-[16px] text-on-surface mb-unit-2xs">Add Your First Domain</h4>
+<p class="font-body-sm text-body-sm text-secondary">Add domains to your portfolio workspace and retrieve available RDAP/domain metadata.</p>
+</div>
+<div class="pt-unit-md mt-unit-md">
+<a class="inline-flex items-center gap-unit-2xs font-label-md text-label-md text-primary font-semibold hover:underline" href="#faq-add-domain" onclick="toggleFaq('faq-ans-1')">
+<span class="">Learn More</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-md shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-tertiary-container mb-unit-sm">
+<span class="material-symbols-outlined text-[22px]">travel_explore</span>
+</div>
+<h4 class="font-headline-sm text-[16px] text-on-surface mb-unit-2xs">Search for a Domain</h4>
+<p class="font-body-sm text-body-sm text-secondary">Check domain availability across your selected TLDs and review available registration information.</p>
+</div>
+<div class="pt-unit-md mt-unit-md">
+<a class="inline-flex items-center gap-unit-2xs font-label-md text-label-md text-primary font-semibold hover:underline" href="#faq-search" onclick="toggleFaq('faq-ans-2')">
+<span class="">Learn More</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-md shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-error mb-unit-sm">
+<span class="material-symbols-outlined text-[22px]">notification_important</span>
+</div>
+<h4 class="font-headline-sm text-[16px] text-on-surface mb-unit-2xs">Review Expiry Alerts</h4>
+<p class="font-body-sm text-body-sm text-secondary">
+            Understand threshold mechanics: critical (≤7d), warning (≤30d), and healthy domain states.
+          </p>
+</div>
+<div class="pt-unit-md mt-unit-md">
+<a class="inline-flex items-center gap-unit-2xs font-label-md text-label-md text-primary font-semibold hover:underline" href="#sec-status">
+<span class="">Learn More</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-md shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-primary mb-unit-sm">
+<span class="material-symbols-outlined text-[22px]">price_change</span>
+</div>
+<h4 class="font-headline-sm text-[16px] text-on-surface mb-unit-2xs">Compare Registrar Pricing</h4>
+<p class="font-body-sm text-body-sm text-secondary">
+            Benchmark registration, recurring renewal costs, and transfer fees side by side without hidden markups.
+          </p>
+</div>
+<div class="pt-unit-md mt-unit-md">
+<a class="inline-flex items-center gap-unit-2xs font-label-md text-label-md text-primary font-semibold hover:underline" href="#sec-pricing">
+<span class="">Learn More</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+<!-- SECTION 3: TWO-COLUMN WORKSPACE (Left Sub-Nav & Right Main Content) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-unit-lg items-start">
+<!-- LEFT COLUMN: CATEGORIES PILLS (approx 280px sticky subnav) -->
+<div class="lg:col-span-3 lg:sticky lg:top-20 flex flex-col gap-unit-sm">
+<div class="bg-surface-container-lowest rounded-xl p-unit-md shadow-sm">
+<div class="flex items-center justify-between mb-unit-sm pb-unit-xs">
+<span class="font-label-md text-label-md uppercase tracking-wider text-secondary font-semibold">Help Categories</span>
+<span class="material-symbols-outlined text-[18px] text-outline">tune</span>
+</div>
+<div class="flex flex-col gap-unit-2xs">
+<button class="cat-pill flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-primary-container text-on-primary font-label-md text-label-md font-semibold text-left transition-colors" onclick="filterCategory('status', this)" type="button">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+<span class="">Status Explanation</span>
+</div>
+<span class="font-label-mono text-caption-xs px-1.5 py-0.5 rounded bg-surface-container-lowest/20">5</span>
+</button>
+<button class="cat-pill flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container font-label-md text-label-md text-left transition-colors" onclick="filterCategory('domain-data', this)" type="button">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-[18px]">dns</span>
+<span class="">Domain Data Specs</span>
+</div>
+<span class="font-label-mono text-caption-xs px-1.5 py-0.5 rounded bg-surface-container">8</span>
+</button>
+<button class="cat-pill flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container font-label-md text-label-md text-left transition-colors" onclick="filterCategory('pricing', this)" type="button">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-[18px]">currency_rupee</span>
+<span class="">Pricing Economics</span>
+</div>
+<span class="font-label-mono text-caption-xs px-1.5 py-0.5 rounded bg-surface-container">5</span>
+</button>
+<button class="cat-pill flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container font-label-md text-label-md text-left transition-colors" onclick="filterCategory('knowledge-base', this)" type="button">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-[18px]">quiz</span>
+<span class="">Knowledge Base &amp; FAQ</span>
+</div>
+<span class="font-label-mono text-caption-xs px-1.5 py-0.5 rounded bg-surface-container">15</span>
+</button>
+<button class="cat-pill flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container font-label-md text-label-md text-left transition-colors" onclick="filterCategory('data-sources', this)" type="button">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-[18px]">shield_lock</span>
+<span class="">Sources &amp; Limitations</span>
+</div>
+<span class="font-label-mono text-caption-xs px-1.5 py-0.5 rounded bg-surface-container">7</span>
+</button>
+<button class="cat-pill flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container font-label-md text-label-md text-left transition-colors" onclick="filterCategory('troubleshooting', this)" type="button">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-[18px]">build_circle</span>
+<span class="">Troubleshooting</span>
+</div>
+<span class="font-label-mono text-caption-xs px-1.5 py-0.5 rounded bg-surface-container">7</span>
+</button>
+<button class="cat-pill flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container font-label-md text-label-md text-left transition-colors" onclick="filterCategory('support', this)" type="button">
+<div class="flex items-center gap-unit-xs">
+<span class="material-symbols-outlined text-[18px]">headset_mic</span>
+<span class="">Workspace Support</span>
+</div>
+<span class="font-label-mono text-caption-xs px-1.5 py-0.5 rounded bg-surface-container">3</span>
+</button>
+</div>
+</div>
+<!-- Quick Snapshot Callout in Sidebar -->
+<div class="bg-surface-container-high rounded-xl p-unit-md text-on-surface shadow-sm"><div class="flex items-center gap-unit-xs text-primary mb-unit-xs"><span class="material-symbols-outlined text-[18px]">info</span><span class="font-label-md text-label-md font-semibold">DomainPulse Portfolio Workspace</span></div><p class="font-caption-xs text-caption-xs text-secondary leading-relaxed">DomainPulse organizes your domain portfolio and retrieves available domain, RDAP, DNS and SSL information through the application's data services.</p></div>
+</div>
+<!-- RIGHT COLUMN: MAIN KNOWLEDGE AREA -->
+<div class="lg:col-span-9 flex flex-col gap-unit-xl">
+<!-- SUB-SECTION A: DOMAIN STATUS EXPLANATION -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-lg shadow-sm" id="sec-status">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between pb-unit-sm mb-unit-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Domain Status Explanations</h3>
+<p class="font-body-sm text-body-sm text-secondary mt-unit-2xs">Standardized health badges across your portfolio. These health levels are DomainPulse portfolio rules and can be configured in Settings.</p>
+</div>
+
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left font-body-sm text-body-sm">
+<thead>
+<tr class="bg-surface-container-low text-secondary font-caption-xs text-caption-xs uppercase tracking-wider">
+<th class="py-2.5 px-3 rounded-l-lg">State Badge</th>
+<th class="py-2.5 px-3">Trigger Condition</th>
+<th class="py-2.5 px-3 rounded-r-lg">Operational Recommended Action</th>
+</tr>
+</thead>
+<tbody class="divide-y-0">
+<!-- Critical -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-3 px-3 align-top">
+<span class="inline-flex items-center gap-1.5 h-5 px-2 rounded-full font-caption-xs text-caption-xs font-medium bg-error-container text-on-error-container">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                    Critical
+                  </span>
+</td>
+<td class="py-3 px-3 align-top font-label-mono text-label-mono text-on-surface">
+                  Expires in ≤ 7 days
+                </td>
+<td class="py-3 px-3 align-top text-secondary font-body-sm text-body-sm">Review renewal options promptly to reduce the risk of expiration or service interruption.</td>
+</tr>
+<!-- Warning -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-3 px-3 align-top">
+<span class="inline-flex items-center gap-1.5 h-5 px-2 rounded-full font-caption-xs text-caption-xs font-medium bg-secondary-container text-on-secondary-fixed">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-fixed-dim"></span>
+                    Warning
+                  </span>
+</td>
+<td class="py-3 px-3 align-top font-label-mono text-label-mono text-on-surface">
+                  Expires in 8 to 30 days
+                </td>
+<td class="py-3 px-3 align-top text-secondary font-body-sm text-body-sm">Review the domain’s renewal status and confirm renewal arrangements with the registrar.</td>
+</tr>
+<!-- Healthy -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-3 px-3 align-top">
+<span class="inline-flex items-center gap-1.5 h-5 px-2 rounded-full font-caption-xs text-caption-xs font-medium bg-surface-container-high text-primary font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                    Healthy
+                  </span>
+</td>
+<td class="py-3 px-3 align-top font-label-mono text-label-mono text-on-surface">
+                  Expires in &gt; 30 days
+                </td>
+<td class="py-3 px-3 align-top text-secondary font-body-sm text-body-sm">No immediate expiry action is required. Review DNS, SSL and domain metadata as needed.</td>
+</tr>
+<!-- Auto-Renew Off -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-3 px-3 align-top">
+<span class="inline-flex items-center gap-1.5 h-5 px-2 rounded-full font-caption-xs text-caption-xs font-medium bg-surface-container text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                    Auto-Renew Off
+                  </span>
+</td>
+<td class="py-3 px-3 align-top font-label-mono text-label-mono text-on-surface">
+                  Flagged flag_autorenew = false
+                </td>
+<td class="py-3 px-3 align-top text-secondary font-body-sm text-body-sm">
+                  Saved portfolio record indicates registrar automated recurring renewal is toggled off.
+                </td>
+</tr>
+<!-- Unknown -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-3 px-3 align-top">
+<span class="inline-flex items-center gap-1.5 h-5 px-2 rounded-full font-caption-xs text-caption-xs font-medium bg-surface-container-high text-outline">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+                    Unknown
+                  </span>
+</td>
+<td class="py-3 px-3 align-top font-label-mono text-label-mono text-on-surface">
+                  RDAP query failed or non-responsive
+                </td>
+<td class="py-3 px-3 align-top text-secondary font-body-sm text-body-sm">
+                  The authoritative registry timed out or redacted expiry timestamp. Run manual refresh or inspect DNS.
+                </td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- SUB-SECTION B: UNDERSTANDING DOMAIN DATA -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-lg shadow-sm" id="sec-domain-data">
+<div class="flex items-center justify-between pb-unit-sm mb-unit-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Understanding Domain Data</h3>
+<p class="font-body-sm text-body-sm text-secondary mt-unit-2xs">
+              Technical taxonomy and metadata fields aggregated across the portfolio engine.
+            </p>
+</div>
+<span class="material-symbols-outlined text-primary text-[24px]">database</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-unit-md">
+<!-- Item 1 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs mb-unit-2xs">
+<span class="font-label-mono text-label-mono text-primary font-bold">Registrar</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-caption-xs text-caption-xs">Entity</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              The accredited commercial or institutional entity (e.g., Cloudflare, Namecheap, GoDaddy) managing the domain’s registration record with the upstream registry.
+            </p>
+</div>
+<!-- Item 2 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs mb-unit-2xs">
+<span class="font-label-mono text-label-mono text-primary font-bold">Registration Date</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-caption-xs text-caption-xs">Timestamp</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              The ISO 8601 UTC timestamp identifying when the domain was first initialized in the registry database, establishing portfolio asset age.
+            </p>
+</div>
+<!-- Item 3 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs mb-unit-2xs">
+<span class="font-label-mono text-label-mono text-primary font-bold">Expiry Date</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-caption-xs text-caption-xs">Countdown</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              The definitive registry deadline when the active delegation term terminates. Determines the Critical (≤7d) and Warning (≤30d) triggers.
+            </p>
+</div>
+<!-- Item 4 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs mb-unit-2xs">
+<span class="font-label-mono text-label-mono text-primary font-bold">Nameservers</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-caption-xs text-caption-xs">DNS Delegation</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Authoritative DNS hostnames (NS records) tasked with answering zone queries and resolving your web applications, mail exchanges, and API endpoints.
+            </p>
+</div>
+<!-- Item 5 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs mb-unit-2xs">
+<span class="font-label-mono text-label-mono text-primary font-bold">DNSSEC</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-caption-xs text-caption-xs">Security Extension</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Domain Name System Security Extensions. Uses cryptographic digital signatures to verify that resolver query responses have not been spoofed or poisoned.
+            </p>
+</div>
+<!-- Item 6 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs mb-unit-2xs">
+<span class="font-label-mono text-label-mono text-primary font-bold">RDAP Protocol</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-caption-xs text-caption-xs">IETF RFC 7480-7484</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Registration Data Access Protocol. The modern RESTful JSON standard replacing unstructured text WHOIS, delivering machine-verifiable status flags and dates.
+            </p>
+</div>
+<!-- Item 7 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs mb-unit-2xs">
+<span class="font-label-mono text-label-mono text-primary font-bold">WHOIS Legacy</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-caption-xs text-caption-xs">Port 43 TCP</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              The legacy plain-text protocol. Utilized as a secondary fallback query mechanism if an authoritative ccTLD registry lacks public RDAP endpoints.
+            </p>
+</div>
+<!-- Item 8 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs mb-unit-2xs">
+<span class="font-label-mono text-label-mono text-primary font-bold">SSL Certificate</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-caption-xs text-caption-xs">X.509 TLS</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Cryptographic handshake telemetry gathered via HTTPS port 443, displaying Certificate Authority (CA) issuer, cipher validity, and expiration window.
+            </p>
+</div>
+</div>
+</div>
+<!-- SUB-SECTION C: UNDERSTANDING PRICING -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-lg shadow-sm" id="sec-pricing">
+<div class="flex items-center justify-between pb-unit-sm mb-unit-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Understanding Pricing</h3>
+<p class="font-body-sm text-body-sm text-secondary mt-unit-2xs">
+              Breakdown of portfolio cost vectors, registrar discount dynamics, and multi-year forecasting.
+            </p>
+</div>
+<span class="material-symbols-outlined text-primary text-[24px]">analytics</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-unit-md mb-unit-md">
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold mb-unit-2xs">Year 1 Entry</div>
+<div class="font-headline-sm text-[16px] text-on-surface font-semibold mb-unit-2xs">Registration Price</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Initial fee required to secure a brand new domain name. Often heavily discounted by commercial registrars for promotional acquisition.
+            </p>
+</div>
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold mb-unit-2xs">Recurring Annual</div>
+<div class="font-headline-sm text-[16px] text-on-surface font-semibold mb-unit-2xs">Renewal Price</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              The standard base rate charged each subsequent 12-month period to maintain registration. Essential for accurate annual operational budgeting.
+            </p>
+</div>
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold mb-unit-2xs">Migration Fee</div>
+<div class="font-headline-sm text-[16px] text-on-surface font-semibold mb-unit-2xs">Transfer Price</div>
+<p class="font-body-sm text-body-sm text-secondary">The fee charged to move a domain between registrars. Transfer rules, included renewal periods and eligibility vary by TLD and registrar.</p>
+</div>
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold mb-unit-2xs">Delta Metric</div>
+<div class="font-headline-sm text-[16px] text-on-surface font-semibold mb-unit-2xs">Renewal Markup</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              The financial gap between initial promotional pricing and regular renewal costs. Highlights hidden subsequent-year price hikes.
+            </p>
+</div>
+<div class="p-unit-md rounded-lg bg-surface-container-low sm:col-span-2">
+<div class="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold mb-unit-2xs">Long-Term Model</div>
+<div class="font-headline-sm text-[16px] text-on-surface font-semibold mb-unit-2xs">5-Year Ownership Projection</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Formula: <span class="font-label-mono text-on-surface font-semibold bg-surface-container px-1 py-0.5 rounded">Cost = Y1_Registration + (4 × Y_Renewal)</span>. Provides executive clarity on true multi-year cash outlay beyond promotional year-one hooks.
+            </p>
+</div>
+</div>
+<!-- Note Box -->
+<div class="p-unit-md rounded-lg bg-surface-container flex items-start gap-unit-sm">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">info</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Important Registrar Pricing Notice</span>
+<p class="font-body-sm text-body-sm text-secondary mt-unit-2xs">Registrar pricing may use live sources where supported and reference datasets where live provider APIs are unavailable. Actual registration, renewal, transfer pricing, promotions and taxes should be verified with the provider before purchase.</p>
+</div>
+</div>
+</div>
+<!-- SUB-SECTION D: KNOWLEDGE BASE & FAQ (Interactive Accordions) -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-lg shadow-sm" id="sec-knowledge-base">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between pb-unit-sm mb-unit-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Knowledge Base &amp; FAQ</h3>
+<p class="font-body-sm text-body-sm text-secondary mt-unit-2xs">
+              Verified operational explanations across all system workflows. Click any question to expand.
+            </p>
+</div>
+<span class="font-caption-xs text-caption-xs px-2 py-1 rounded bg-surface-container text-secondary font-label-mono">15 TOPICS</span>
+</div>
+<div class="flex flex-col gap-unit-xs">
+<!-- FAQ 1 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-1')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">How do I add a domain?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-1-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-1">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                Navigate to <strong>My Domains</strong> from the left sidebar and click <em>Add Domain</em> in the page controls. Input the domain name (e.g. <code class="font-label-mono text-primary">example.com</code>). You can choose automatic metadata discovery, which automatically dispatches asynchronous RDAP/DNS probes, or manually configure custom parameters such as internal asset tags, acquisition cost, and target auto-renew intent.
+              </p>
+</div>
+</div>
+<!-- FAQ 2 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-2')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">What information is automatically fetched?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-2-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-2">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                DomainPulse interrogates public registry databases to pull: authoritative Nameservers (NS), current Registrar identity, exact UTC Creation &amp; Expiry timestamps, DNSSEC signing status, and active TLS/SSL certificate dates via HTTPS port 443 inspection.
+              </p>
+</div>
+</div>
+<!-- FAQ 3 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-3')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">What is RDAP?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-3-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-3">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                RDAP (Registration Data Access Protocol) is the standardized successor to WHOIS created by the IETF. Unlike older text-based query systems, RDAP responses are formatted in strict JSON, support secure REST transport over HTTPS, provide authenticated access tiers, and standardize internationalized domain characters.
+              </p>
+</div>
+</div>
+<!-- FAQ 4 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-4')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">What is WHOIS?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-4-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-4">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                WHOIS is a legacy protocol dating back to RFC 812 that queries databases on TCP Port 43. Because WHOIS outputs unstructured plain text with varying schema per registrar, modern platforms prioritize RDAP for programmatic parsing.
+              </p>
+</div>
+</div>
+<!-- FAQ 5 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-5')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">How does DomainPulse determine whether a domain is critical?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-5-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-5">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                Automated health triage uses exact day-deltas calculated against UTC midnight: Expirations ≤ 7 days are categorized as <span class="text-error font-semibold">Critical</span>; expirations between 8 and 30 days trigger <span class="text-secondary font-semibold">Warning</span>; and domains with &gt; 30 days remain <span class="text-primary font-semibold">Healthy</span>.
+              </p>
+</div>
+</div>
+<!-- FAQ 6 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-6')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">What is the difference between registration and renewal pricing?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-6-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-6">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                Registration pricing applies exclusively to the initial 1-year acquisition and frequently includes promotional subsidies. Renewal pricing is the non-discounted recurring rate charged annually to retain the domain. DomainPulse highlights the Renewal Markup so you know the long-term carrying cost.
+              </p>
+</div>
+</div>
+<!-- FAQ 7 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-7')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">Why can registrar prices differ?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-7-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-7">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                Wholesale wholesale registry fees (e.g. Verisign for .com) are identical across registrars, but consumer prices vary due to retail profit margins, bundled value-adds (such as privacy protection or DNS hosting), ICANN fee handling, and corporate discount tiers.
+              </p>
+</div>
+</div>
+<!-- FAQ 8 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-8')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">How does the 5-year ownership cost estimate work?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-8-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-8">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                We combine Year 1 initial registration cost with 4 consecutive periods of base renewal pricing. This neutralizes misleading initial discounts and gives finance teams an accurate 5-year cost projection.
+              </p>
+</div>
+</div>
+<!-- FAQ 9 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-9')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">What does DNSSEC mean?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-9-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-9">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                DNSSEC attaches cryptographic signatures (RRSIG, DS records) to DNS entries. When resolving a domain, recursive resolvers verify the cryptographic chain of trust, preventing man-in-the-middle attacks and DNS cache poisoning.
+              </p>
+</div>
+</div>
+<!-- FAQ 10 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-10')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">What SSL information does DomainPulse show?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-10-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-10">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                The SSL inspector initiates an automated TLS handshake to report Certificate Authority (e.g., Let's Encrypt, DigiCert, Cloudflare), valid-from and valid-to timestamps, remaining active validity days, and protocol cipher strength.
+              </p>
+</div>
+</div>
+<!-- FAQ 11 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-11')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">Can I import domains from CSV?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-11-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-11">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                Yes. Under <em>Settings &gt; Data Management</em>, select <strong>Import CSV</strong>. Your file should include the header column <code class="font-label-mono text-primary">domain</code>, with optional columns for <code class="font-label-mono text-primary">registrar</code>, <code class="font-label-mono text-primary">expiry</code>, and <code class="font-label-mono text-primary">autorenew</code>.
+              </p>
+</div>
+</div>
+<!-- FAQ 12 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-12')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">Can I export my portfolio?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-12-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-12">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                Yes. You can export your full portfolio at any time as clean RFC 4180 CSV or structured JSON formats for reporting, spreadsheet analysis, or backup storage.
+              </p>
+</div>
+</div>
+<!-- FAQ 13 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-13')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">Does DomainPulse renew domains directly?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-13-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-13">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+<strong>No.</strong> DomainPulse is an independent portfolio analytics, intelligence, and monitoring system. It is not an ICANN registrar. You must process renewals directly within your registrar account.
+              </p>
+</div>
+</div>
+<!-- FAQ 14 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-14')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">Does DomainPulse sell domains?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-14-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-14">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+<strong>No.</strong> DomainPulse does not broker domain transactions or collect retail registration fees. We provide neutral discovery tools and cost benchmarking, redirecting you directly to accredited registrars.
+              </p>
+</div>
+</div>
+<!-- FAQ 15 -->
+<div class="faq-item rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full py-unit-sm px-unit-md flex items-center justify-between text-left hover:bg-surface-container transition-colors" onclick="toggleFaq('faq-ans-15')" type="button">
+<span class="font-label-md text-[14px] text-on-surface font-semibold">Where does pricing data come from?</span>
+<span class="material-symbols-outlined text-secondary text-[20px] transition-transform duration-200" id="faq-ans-15-icon">expand_more</span>
+</button>
+<div class="hidden px-unit-md pb-unit-md pt-unit-2xs" id="faq-ans-15">
+<p class="font-body-sm text-body-sm text-secondary leading-relaxed">
+                Pricing is compiled from public wholesale registry benchmarks, official registrar rate cards, and periodically updated reference datasets. Live pricing APIs are used where supported by registrars.
+              </p>
+</div>
+</div>
+</div>
+</div>
+<!-- SUB-SECTION E: DATA SOURCES & LIMITATIONS -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-lg shadow-sm" id="sec-data-sources">
+<div class="flex items-center gap-unit-xs mb-unit-sm">
+<span class="material-symbols-outlined text-primary text-[22px]">policy</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Data Sources &amp; Limitations</h3>
+</div>
+<p class="font-body-sm text-body-sm text-secondary mb-unit-md">
+          DomainPulse is engineered for transparent technical intelligence. Review the boundaries of our automated data collection:
+        </p>
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<ul class="space-y-2.5 font-body-sm text-body-sm text-on-surface"><li class="flex items-start gap-unit-xs"><span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">check_circle</span><span class="">Domain registration information may be retrieved from RDAP and compatible WHOIS sources. Available fields vary by registry, registrar, privacy policy, and TLD.</span></li><li class="flex items-start gap-unit-xs"><span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">check_circle</span><span class="">DNS information is based on publicly resolvable DNS records when available.</span></li><li class="flex items-start gap-unit-xs"><span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">check_circle</span><span class="">SSL/TLS information is retrieved when the target domain exposes an accessible HTTPS endpoint.</span></li><li class="flex items-start gap-unit-xs"><span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">check_circle</span><span class="">Registrar pricing may use live sources where supported and reference datasets where live provider APIs are unavailable.</span></li><li class="flex items-start gap-unit-xs"><span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">check_circle</span><span class="">Availability checks can occasionally be inconclusive if upstream registry services are rate-limit or throttle connections.</span></li><li class="flex items-start gap-unit-xs"><span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">check_circle</span><span class="">DomainPulse does not guarantee registrar pricing, promotional terms, or availability guarantees.</span></li><li class="flex items-start gap-unit-xs"><span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">check_circle</span><span class="">Actual registration, renewal, transfer pricing, promotions and taxes should be verified with the provider before purchase.</span></li></ul>
+</div>
+</div>
+<!-- SUB-SECTION F: TROUBLESHOOTING (2-Column Grid) -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-lg shadow-sm" id="sec-troubleshooting">
+<div class="flex items-center justify-between pb-unit-sm mb-unit-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Troubleshooting Common Issues</h3>
+<p class="font-body-sm text-body-sm text-secondary mt-unit-2xs">
+              Quick resolution steps for common technical and network lookup errors.
+            </p>
+</div>
+<span class="material-symbols-outlined text-primary text-[24px]">construction</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-unit-md">
+<!-- Issue 1 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs text-error mb-unit-2xs">
+<span class="material-symbols-outlined text-[18px]">error</span>
+<h4 class="font-label-md text-label-md font-semibold text-on-surface">Domain Lookup Failed</h4>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Verify the domain syntax has no leading protocols (<code class="font-label-mono text-[11px]">https://</code>) or trailing slashes. Re-run the query or verify your local internet connection.
+            </p>
+</div>
+<!-- Issue 2 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs text-error mb-unit-2xs">
+<span class="material-symbols-outlined text-[18px]">cloud_off</span>
+<h4 class="font-label-md text-label-md font-semibold text-on-surface">RDAP Data Unavailable</h4>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">RDAP data may be unavailable, incomplete or rate-limited for some registries or TLDs. Try again later or use available fallback registration information.</p>
+</div>
+<!-- Issue 3 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs text-secondary mb-unit-2xs">
+<span class="material-symbols-outlined text-[18px]">sync_problem</span>
+<h4 class="font-label-md text-label-md font-semibold text-on-surface">DNS Records Not Found</h4>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">DNS changes may take time to propagate depending on TTL, resolver caching and provider configuration.</p>
+</div>
+<!-- Issue 4 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs text-secondary mb-unit-2xs">
+<span class="material-symbols-outlined text-[18px]">lock_reset</span>
+<h4 class="font-label-md text-label-md font-semibold text-on-surface">SSL Information Unavailable</h4>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              The target host may not support TLS/HTTPS or has web application firewall (WAF) rules filtering diagnostic automated handshakes on port 443.
+            </p>
+</div>
+<!-- Issue 5 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs text-error mb-unit-2xs">
+<span class="material-symbols-outlined text-[18px]">file_download_off</span>
+<h4 class="font-label-md text-label-md font-semibold text-on-surface">CSV / JSON Import Failed</h4>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Verify your file format. CSV imports require a lowercase <code class="font-label-mono text-[11px]">domain</code> column header. Check that date strings use standard ISO 8601 formatting (<code class="font-label-mono text-[11px]">YYYY-MM-DD</code>).
+            </p>
+</div>
+<!-- Issue 6 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-unit-xs text-secondary mb-unit-2xs">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+<h4 class="font-label-md text-label-md font-semibold text-on-surface">Duplicate Domain Warning</h4>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              The domain already exists within your active workspace. To update records, select the existing row in <strong>My Domains</strong> and trigger a manual metadata refresh.
+            </p>
+</div>
+<!-- Issue 7 -->
+<div class="p-unit-md rounded-lg bg-surface-container-low md:col-span-2">
+<div class="flex items-center gap-unit-xs text-secondary mb-unit-2xs">
+<span class="material-symbols-outlined text-[18px]">money_off</span>
+<h4 class="font-label-md text-label-md font-semibold text-on-surface">Pricing Unavailable for TLD</h4>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Niche country-code (ccTLD) or specialized sponsored extensions may lack standardized retail benchmarks. You can assign custom estimated costs in the domain settings drawer.
+            </p>
+</div>
+</div>
+</div>
+<!-- SUB-SECTION G: CONTACT / SUPPORT (Honest Local-First Portfolio Card) -->
+<div class="bg-surface-container-lowest rounded-xl p-unit-lg shadow-sm" id="sec-support">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-unit-md">
+<div class="max-w-xl"><div class="flex items-center gap-unit-xs text-primary mb-unit-2xs"><span class="material-symbols-outlined text-[20px]">support_agent</span><span class="font-caption-xs text-caption-xs uppercase tracking-wider font-semibold">DomainPulse Support</span></div><h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Need more help?</h3><p class="font-body-sm text-body-sm text-secondary mt-unit-2xs leading-relaxed">DomainPulse organizes your domain portfolio and retrieves domain telemetry through our portfolio workspace data services.</p></div>
+<!-- Honest Portfolio Action Buttons -->
+<div class="flex flex-wrap items-center gap-unit-xs shrink-0">
+<a class="h-9 px-unit-md flex items-center gap-unit-xs rounded-lg bg-surface-container text-on-surface hover:bg-surface-variant font-label-md text-label-md transition-colors shadow-sm" href="#sec-domain-data">
+<span class="material-symbols-outlined text-[18px]">menu_book</span>
+<span class="">View Documentation</span>
+</a>
+<button class="h-9 px-unit-md flex items-center gap-unit-xs rounded-lg bg-surface-container text-on-surface hover:bg-surface-variant font-label-md text-label-md transition-colors shadow-sm" onclick="alert('Issue reporting interface: Log technical tickets or registry feed inconsistencies directly to your repository issue tracker.');" type="button">
+<span class="material-symbols-outlined text-[18px]">bug_report</span>
+<span class="">Report an Issue</span>
+</button>
+<a class="h-9 px-unit-md flex items-center gap-unit-xs rounded-lg bg-primary-container text-on-primary hover:opacity-95 font-label-md text-label-md transition-opacity shadow-sm" href="#sec-data-sources">
+<span class="material-symbols-outlined text-[18px]">info</span>
+<span class="">View Known Limitations</span>
+</a>
+</div>
+</div>
+</div>
+<!-- SUB-SECTION H: FOOTER / WORKSPACE INFO -->
+<div class="w-full bg-surface-container-low rounded-xl px-unit-md py-unit-sm shadow-sm flex flex-col md:flex-row items-center justify-between gap-unit-sm"><div class="flex flex-wrap items-center gap-unit-md font-label-mono text-caption-xs text-secondary"><div class="flex items-center gap-1.5"><span class="text-outline">Product:</span><span class="text-on-surface font-semibold">DomainPulse</span></div><span class="text-outline-variant">•</span><div class="flex items-center gap-1.5"><span class="text-outline">Build:</span><span class="text-on-surface">Portfolio Build</span></div><span class="text-outline-variant">•</span><div class="flex items-center gap-1.5"><span class="text-outline">Workspace:</span><span class="text-on-surface">Portfolio Workspace</span></div></div><div class="flex flex-wrap items-center gap-unit-md font-label-mono text-caption-xs text-secondary"><div class="flex items-center gap-1.5"><span class="text-outline">Data Sources:</span><span class="text-on-surface">RDAP / DNS / SSL</span></div><span class="text-outline-variant">•</span><div class="flex items-center gap-1.5"><span class="text-outline">Pricing:</span><span class="text-secondary font-medium">Live where supported / Reference where unavailable</span></div></div></div>
+</div>
+</div>
+</div></main></div>
+
+</body></html>
