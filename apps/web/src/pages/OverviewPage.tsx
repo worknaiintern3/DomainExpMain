@@ -1,25 +1,49 @@
 import React from 'react';
-import { PageHeader } from '@/components/common/PageHeader';
+import { OVERVIEW_REFERENCE_DATA } from '@/features/overview/overview.reference';
+import { PortfolioSummaryToolbar } from '@/features/overview/components/PortfolioSummaryToolbar';
+import { OverviewMetricCards } from '@/features/overview/components/OverviewMetricCards';
+import { RenewalAttentionBanner } from '@/features/overview/components/RenewalAttentionBanner';
+import { PortfolioHealthMatrix } from '@/features/overview/components/PortfolioHealthMatrix';
+import { UpcomingRenewalsTable } from '@/features/overview/components/UpcomingRenewalsTable';
+import { RenewalForecastChart } from '@/features/overview/components/RenewalForecastChart';
+import { TldCompositionCard } from '@/features/overview/components/TldCompositionCard';
+import { RegistrarDiversityCard } from '@/features/overview/components/RegistrarDiversityCard';
 
 export const OverviewPage: React.FC = () => {
-  return (
-    <div className="flex flex-col gap-unit-lg">
-      <PageHeader
-        title="Overview"
-        description="Unified portfolio dashboard across domains, compute nodes, web applications, and provider accounts."
-      />
+  const data = OVERVIEW_REFERENCE_DATA;
 
-      {/* Neutral Workspace Placeholder Card */}
-      <div className="p-unit-xl rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-micro flex flex-col items-center justify-center text-center py-16">
-        <div className="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-primary mb-unit-sm">
-          <span className="material-symbols-outlined text-[28px]">grid_view</span>
-        </div>
-        <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-          Overview Workspace
-        </h2>
-        <p className="font-body-sm text-body-sm text-secondary max-w-md mt-unit-xs">
-          Select a section from the sidebar navigation to view and manage your infrastructure portfolio.
+  return (
+    <div className="flex flex-col w-full gap-unit-md">
+      {/* Overview Page Heading & Subtitle */}
+      <div className="flex flex-col">
+        <h1 className="font-headline-sm text-headline-sm text-on-surface font-semibold leading-tight">
+          Good afternoon, Aman
+        </h1>
+        <p className="font-caption-xs text-caption-xs text-secondary mt-0.5">
+          Here’s what’s happening with your domain portfolio.
         </p>
+      </div>
+
+      {/* 1. Operational Summary Toolbar */}
+      <PortfolioSummaryToolbar />
+
+      {/* 2. 4 Primary Metric Cards */}
+      <OverviewMetricCards metrics={data.metrics} />
+
+      {/* 3. Urgent Attention / Loss Prevention Banner */}
+      <RenewalAttentionBanner data={data.urgentAttention} />
+
+      {/* 4. Portfolio Health Segmented Bar */}
+      <PortfolioHealthMatrix data={data.healthMatrix} />
+
+      {/* 5. Main Data Grid: Upcoming Renewals Table */}
+      <UpcomingRenewalsTable renewals={data.renewals} />
+
+      {/* 6. Bottom Analytics Triplet */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-unit-md">
+        <RenewalForecastChart data={data.forecast} />
+        <TldCompositionCard data={data.tldComposition} />
+        <RegistrarDiversityCard data={data.registrarDiversity} />
       </div>
     </div>
   );
