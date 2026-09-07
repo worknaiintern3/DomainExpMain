@@ -22,35 +22,35 @@ const BOTTOM_NAV_ITEMS: NavItem[] = [
 export const Sidebar: React.FC = () => {
   return (
     <aside
-      className="fixed left-0 top-0 h-full w-sidebar-width bg-inverse-surface text-inverse-on-surface z-50 flex flex-col justify-between select-none border-r border-slate-800/80 shadow-sm"
+      className="fixed left-0 top-0 h-full w-sidebar-width bg-surface-container-lowest text-on-surface z-50 flex flex-col justify-between select-none border-r border-outline-variant shadow-micro"
       aria-label="Sidebar Navigation"
     >
       {/* Top Header & Main Navigation Section */}
       <div className="flex flex-col min-h-0">
         {/* Brand Header */}
-        <div className="h-header-height px-unit-lg flex items-center gap-unit-md border-b border-white/[0.06]">
-          <div className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-white shadow-sm shrink-0">
+        <div className="h-header-height px-unit-lg flex items-center gap-unit-md border-b border-outline-variant/60">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-micro shrink-0">
             <span className="material-symbols-outlined text-[20px]">
               pulse_alert
             </span>
           </div>
-          <span className="font-headline-sm text-headline-sm text-on-primary tracking-tight font-semibold">
+          <span className="font-headline-sm text-headline-sm text-on-surface tracking-tight font-semibold">
             DomainPulse
           </span>
         </div>
 
         {/* Workspace Selector Row */}
         <div className="px-unit-md pt-unit-sm pb-unit-2xs">
-          <div className="flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer text-secondary-fixed-dim hover:text-white border border-white/[0.04] group">
+          <div className="flex items-center justify-between px-unit-sm py-unit-xs rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer text-secondary hover:text-on-surface border border-outline-variant/60 group">
             <div className="flex items-center gap-unit-xs min-w-0">
-              <span className="material-symbols-outlined text-[18px] text-secondary-fixed-dim group-hover:text-white transition-colors">
+              <span className="material-symbols-outlined text-[18px] text-secondary group-hover:text-primary transition-colors">
                 domain
               </span>
-              <span className="font-label-md text-label-md text-white font-medium truncate">
+              <span className="font-label-md text-label-md text-on-surface font-medium truncate">
                 Portfolio Workspace
               </span>
             </div>
-            <span className="material-symbols-outlined text-secondary-fixed-dim group-hover:text-white text-[18px] transition-colors">
+            <span className="material-symbols-outlined text-secondary group-hover:text-on-surface text-[18px] transition-colors">
               unfold_more
             </span>
           </div>
@@ -68,7 +68,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Bottom Pinned Settings & User Profile Section */}
-      <div className="flex flex-col gap-unit-xs px-unit-md pb-unit-md pt-unit-xs border-t border-white/[0.06] bg-inverse-surface shrink-0">
+      <div className="flex flex-col gap-unit-xs px-unit-md pb-unit-md pt-unit-xs border-t border-outline-variant/60 bg-surface-container-lowest shrink-0">
         {/* Settings & Support Links */}
         <nav className="flex flex-col gap-unit-2xs" aria-label="Secondary Navigation">
           {BOTTOM_NAV_ITEMS.map((item) => (
@@ -77,21 +77,21 @@ export const Sidebar: React.FC = () => {
         </nav>
 
         {/* Profile Card Footer */}
-        <div className="flex items-center justify-between p-unit-sm rounded-lg bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer mt-unit-xs group">
+        <div className="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer mt-unit-xs border border-outline-variant/60 group">
           <div className="flex items-center gap-unit-sm min-w-0">
-            <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0 text-white font-mono text-caption-xs font-semibold shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary font-mono text-caption-xs font-semibold shadow-micro">
               AD
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="font-label-md text-label-md text-white font-medium truncate">
+              <span className="font-label-md text-label-md text-on-surface font-semibold truncate">
                 Aman Developer
               </span>
-              <span className="font-caption-xs text-caption-xs text-secondary-fixed-dim truncate">
+              <span className="font-caption-xs text-caption-xs text-secondary truncate">
                 Portfolio Workspace
               </span>
             </div>
           </div>
-          <span className="material-symbols-outlined text-secondary-fixed-dim group-hover:text-white text-[18px] transition-colors">
+          <span className="material-symbols-outlined text-secondary group-hover:text-on-surface text-[18px] transition-colors">
             unfold_more
           </span>
         </div>

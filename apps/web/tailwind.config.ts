@@ -9,23 +9,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#f8f9ff',
+        background: '#f8f9fc',
         'on-background': '#0b1c30',
-        surface: '#f8f9ff',
+        surface: '#f8f9fc',
         'on-surface': '#0b1c30',
-        'on-surface-variant': '#464555',
-        'surface-dim': '#cbdbf5',
-        'surface-bright': '#f8f9ff',
-        'surface-variant': '#d3e4fe',
+        'on-surface-variant': '#475569',
+        'surface-dim': '#e2e8f0',
+        'surface-bright': '#ffffff',
+        'surface-variant': '#f1f5f9',
         'surface-container-lowest': '#ffffff',
-        'surface-container-low': '#eff4ff',
-        'surface-container': '#e5eeff',
-        'surface-container-high': '#dce9ff',
-        'surface-container-highest': '#d3e4fe',
+        'surface-container-low': '#f8fafc',
+        'surface-container': '#f1f5f9',
+        'surface-container-high': '#e2e8f0',
+        'surface-container-highest': '#cbd5e1',
         
-        // Structural chrome / Dark Navy Sidebar
-        'inverse-surface': '#0b0f19',
-        'inverse-on-surface': '#eaf1ff',
+        // Structural chrome / Toast and Modal Backdrops
+        'inverse-surface': '#0f172a',
+        'inverse-on-surface': '#ffffff',
         
         // Primary - Electric Indigo
         primary: '#3525cd',
@@ -41,18 +41,18 @@ const config: Config = {
         // Secondary - Slate / Blue-gray
         secondary: '#565e74',
         'on-secondary': '#ffffff',
-        'secondary-container': '#dae2fd',
-        'on-secondary-container': '#5c647a',
-        'secondary-fixed': '#dae2fd',
-        'secondary-fixed-dim': '#bec6e0',
-        'on-secondary-fixed': '#131b2e',
-        'on-secondary-fixed-variant': '#3f465c',
+        'secondary-container': '#f1f5f9',
+        'on-secondary-container': '#334155',
+        'secondary-fixed': '#f1f5f9',
+        'secondary-fixed-dim': '#cbd5e1',
+        'on-secondary-fixed': '#0f172a',
+        'on-secondary-fixed-variant': '#475569',
         
         // Tertiary - Deep Blue
         tertiary: '#004598',
         'on-tertiary': '#ffffff',
-        'tertiary-container': '#005cc6',
-        'on-tertiary-container': '#cedbff',
+        'tertiary-container': '#e0f2fe',
+        'on-tertiary-container': '#005cc6',
         'tertiary-fixed': '#d8e2ff',
         'tertiary-fixed-dim': '#adc6ff',
         'on-tertiary-fixed': '#001a42',
@@ -70,6 +70,7 @@ const config: Config = {
         'healthy-text': '#065f46',
         'healthy-border': '#a7f3d0',
         
+        // Status Accents (Warning & Critical)
         warning: '#f59e0b',
         'warning-bg': '#fffbeb',
         'warning-text': '#92400e',
@@ -81,9 +82,9 @@ const config: Config = {
         'critical-border': '#fecaca',
         
         // Outlines & Borders
-        outline: '#777587',
-        'outline-variant': '#c7c4d8',
-        'surface-tint': '#4d44e3',
+        outline: '#94a3b8',
+        'outline-variant': '#e2e8f0',
+        'surface-tint': '#3525cd',
       },
       spacing: {
         'sidebar-width': '16rem',

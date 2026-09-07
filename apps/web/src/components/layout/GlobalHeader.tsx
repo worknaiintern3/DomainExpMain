@@ -33,7 +33,7 @@ export const GlobalHeader: React.FC = () => {
   return (
     <>
       <header
-        className="fixed top-0 left-sidebar-width right-0 h-header-height bg-surface/80 backdrop-blur-xl border-b border-outline-variant/40 shadow-micro z-40 px-unit-xl flex items-center justify-between gap-unit-lg"
+        className="fixed top-0 left-sidebar-width right-0 h-header-height bg-surface-container-lowest/90 backdrop-blur-xl border-b border-outline-variant shadow-micro z-40 px-unit-xl flex items-center justify-between gap-unit-lg"
         aria-label="Application Header"
       >
         {/* Left: Breadcrumbs / Section Context */}
@@ -54,16 +54,16 @@ export const GlobalHeader: React.FC = () => {
             onClick={() => setIsSearchOpen(true)}
             className="relative hidden md:flex items-center cursor-pointer w-64 lg:w-72 group"
           >
-            <span className="material-symbols-outlined absolute left-unit-sm text-on-surface-variant text-[18px] pointer-events-none group-hover:text-primary transition-colors">
+            <span className="material-symbols-outlined absolute left-unit-sm text-secondary text-[18px] pointer-events-none group-hover:text-primary transition-colors">
               search
             </span>
             <input
               type="text"
               readOnly
               placeholder="Search domains, servers, websites, emails, IPs..."
-              className="h-9 w-full pl-9 pr-12 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm border border-outline-variant/60 shadow-micro placeholder:text-outline cursor-pointer group-hover:border-primary/50 transition-all focus:outline-none"
+              className="h-9 w-full pl-9 pr-12 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant shadow-micro placeholder:text-secondary cursor-pointer group-hover:border-primary/50 group-hover:bg-surface-container-lowest transition-all focus:outline-none"
             />
-            <span className="absolute right-2 font-caption-xs text-[10px] text-on-surface-variant px-1.5 py-0.5 rounded bg-surface-container font-mono border border-outline-variant/40">
+            <span className="absolute right-2 font-caption-xs text-[10px] text-secondary px-1.5 py-0.5 rounded bg-surface-container font-mono border border-outline-variant">
               ⌘K
             </span>
           </div>
@@ -72,7 +72,7 @@ export const GlobalHeader: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="md:hidden w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors border border-outline-variant/60 shadow-micro"
+            className="md:hidden w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container hover:text-on-surface transition-colors border border-outline-variant shadow-micro"
             aria-label="Open search"
           >
             <span className="material-symbols-outlined text-[20px]">search</span>
@@ -81,7 +81,7 @@ export const GlobalHeader: React.FC = () => {
           {/* Notifications Trigger */}
           <Link
             to="/alerts"
-            className="relative w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors border border-outline-variant/60 shadow-micro group"
+            className="relative w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container hover:text-on-surface transition-colors border border-outline-variant shadow-micro group"
             title="Alerts & Notifications"
           >
             <span className="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">
@@ -93,7 +93,7 @@ export const GlobalHeader: React.FC = () => {
 
           {/* User Profile Avatar */}
           <div
-            className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-mono text-caption-xs font-semibold shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all select-none"
+            className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-mono text-caption-xs font-semibold shadow-micro cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all select-none"
             title="Aman Developer — Portfolio Workspace"
           >
             AD
