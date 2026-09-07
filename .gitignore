@@ -15,6 +15,7 @@ out/
 .env.test.local
 .env.production.local
 *.env.*
+!.env.example
 
 # Vite & build caches
 .vite/

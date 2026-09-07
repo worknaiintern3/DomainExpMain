@@ -9,13 +9,23 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspace=apps/web",
-    "lint": "npm run lint --workspace=apps/web",
+    "dev:api": "npm run dev --workspace=@domainpulse/api",
+    "build": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/api && npm run build --workspace=@domainpulse/web",
+    "typecheck": "npm run build --workspace=@domainpulse/contracts && npm run typecheck --workspace=@domainpulse/api && npm run typecheck --workspace=@domainpulse/web",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
     "preview": "npm run preview --workspace=apps/web"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "node": ">=24.0.0 <25.0.0",
+    "npm": ">=11.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^5.0.0"
   },
   "keywords": [
     "domain-management",
