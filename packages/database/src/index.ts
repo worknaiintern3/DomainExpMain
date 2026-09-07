@@ -24,4 +24,16 @@ export {
   checkDatabaseAvailability,
   type DatabaseAvailability,
 } from './health/database-health';
+export {
+  users,
+  workspaceMembers,
+  workspaceMembershipRoleEnum,
+  workspaces,
+  type NewUser,
+  type NewWorkspace,
+  type NewWorkspaceMember,
+  type User,
+  type Workspace,
+  type WorkspaceMember,
+} from './schema';
 export { runInTransaction } from './transactions/transaction';

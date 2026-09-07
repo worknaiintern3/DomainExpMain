@@ -19,9 +19,10 @@ packages/database   <---  apps/api, future backend workers
 `packages/database`. Transport contracts contain only JSON-safe values and do
 not expose PostgreSQL, Drizzle, Node.js, or internal database types.
 
-Phase 2 intentionally defines no product tables and no RLS policies. User,
-authentication, workspace, membership, tenant-isolation, portfolio,
-relationship, provenance, provider, monitoring, and job schemas are deferred.
+Phase 3 begins with only the global user identity, workspace tenant root, and
+workspace membership bridge. Authentication, sessions, RLS policies,
+portfolio, relationship, provenance, provider, monitoring, and job schemas
+remain deferred.
 
 ## Runtime configuration
 
@@ -118,6 +119,25 @@ username, password, connection URL, driver error, or stack trace.
 These conventions are locked before product schema work so Phase 3 tables are
 consistent from their first reviewed migration.
 
+### Core tenancy schema
+
+- `users` is the global identity record. It stores the supplied email and a
+  separately indexed normalized email constrained to `lower(trim(email))`.
+  It does not store passwords or authentication/session state.
+- `workspaces` is the future tenant and RLS boundary. Its canonical slug is
+  lowercase, hyphen-separated, and unique.
+- `workspace_members` links a user to a workspace through explicit restricted
+  foreign keys. A composite unique index permits only one membership per pair;
+  a user index supports reverse membership lookup.
+- Membership roles are the PostgreSQL enum `owner`, `admin`, and `member`.
+  Membership status is intentionally absent until invitation or suspension
+  semantics are designed; a row currently represents an active membership.
+- Core records use UUID primary keys plus `created_at` and `updated_at`
+  `timestamptz` values. No soft-delete abstraction is introduced.
+
+The membership bridge supplies the explicit `workspace_id` needed by later
+tenant-isolation policies, but this task does not enable or define RLS.
+
 ## Transactions
 
 `DatabaseClient.transaction()` delegates to a real Drizzle transaction and
@@ -138,8 +158,8 @@ npm run db:migrate    # apply reviewed migrations using DATABASE_URL
 ```
 
 There are intentionally no normal `db:push`, `db:drop`, or `db:reset` commands.
-Phase 2 keeps the schema free of tables and the migration journal free of SQL
-entries rather than inventing a table solely to produce a migration.
+The first reviewed migration establishes only `users`, `workspaces`,
+`workspace_members`, their constraints, and the membership-role enum.
 
 Development workflow:
 
@@ -177,8 +197,8 @@ data. Prefer a forward-fix migration when rollback would be destructive.
   HTTP responses.
 - Drizzle and `pg` parameterization are required for values. Raw SQL identifiers
   require an explicit trusted allow-list or a fixed internal constant.
-- PostgreSQL RLS is planned for Phase 3 alongside auth, workspace, membership,
-  and tenant-isolation tables. Fake policies without tenant tables are forbidden.
+- PostgreSQL RLS remains deferred to the dedicated Phase 3 tenant-isolation
+  task. No policy is implied merely by the presence of tenancy tables.
 
 ## Local development and integration testing
 
