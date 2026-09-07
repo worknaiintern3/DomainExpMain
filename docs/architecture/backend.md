@@ -9,6 +9,12 @@ The application begins as two deployment units sharing domain and infrastructure
 - `apps/api`: synchronous HTTP API.
 - `apps/worker`: future PostgreSQL-backed scheduler and job processor.
 
+Server-only PostgreSQL infrastructure lives in `packages/database`. It may be
+consumed by backend processes such as `apps/api`, but never by `apps/web`, a
+future mobile application, or `packages/contracts`. See
+[`database.md`](./database.md) for the connection, migration, and storage
+conventions established in Phase 2.
+
 Microservices are not the default. Modules can be extracted only when operational evidence justifies independent deployment.
 
 ## First-class clients

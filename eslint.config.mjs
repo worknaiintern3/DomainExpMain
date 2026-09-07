@@ -14,7 +14,11 @@ export default tseslint.config(
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
   {
-    files: ['apps/api/**/*.ts', 'packages/contracts/**/*.ts'],
+    files: [
+      'apps/api/**/*.ts',
+      'packages/contracts/**/*.ts',
+      'packages/database/**/*.ts',
+    ],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -29,7 +33,10 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/api/src/**/*.module.ts'],
+    files: [
+      'apps/api/src/**/*.module.ts',
+      'packages/database/src/schema/index.ts',
+    ],
     rules: {
       // Nest modules are intentionally decorator-only classes.
       '@typescript-eslint/no-extraneous-class': 'off',

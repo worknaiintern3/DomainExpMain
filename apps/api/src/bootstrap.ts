@@ -33,7 +33,10 @@ export async function createApplication(): Promise<NestFastifyApplication> {
   const config = app.get(AppConfigService);
 
   app.setGlobalPrefix('api/v1', {
-    exclude: [{ path: 'health', method: RequestMethod.GET }],
+    exclude: [
+      { path: 'health', method: RequestMethod.GET },
+      { path: 'ready', method: RequestMethod.GET },
+    ],
   });
   app.enableCors({
     origin: config.corsOrigins,

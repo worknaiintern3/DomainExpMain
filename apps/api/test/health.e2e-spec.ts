@@ -1,6 +1,7 @@
 import {
   HealthResponseSchema,
   ProblemDetailsSchema,
+  ReadinessResponseSchema,
 } from '@domainpulse/contracts';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { InternalServerErrorException } from '@nestjs/common';
@@ -12,8 +13,13 @@ import { parseEnvironment } from '../src/config/env.schema';
 
 describe('DomainPulse API foundation', () => {
   let app: NestFastifyApplication;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalConnectionTimeout = process.env.DATABASE_CONNECTION_TIMEOUT_MS;
 
   beforeAll(async () => {
+    process.env.DATABASE_URL =
+      'postgresql://phase2_user:phase2_secret@127.0.0.1:1/domainpulse_test';
+    process.env.DATABASE_CONNECTION_TIMEOUT_MS = '100';
     app = await createApplication();
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
@@ -21,6 +27,18 @@ describe('DomainPulse API foundation', () => {
 
   afterAll(async () => {
     await app.close();
+
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    }
+
+    if (originalConnectionTimeout === undefined) {
+      delete process.env.DATABASE_CONNECTION_TIMEOUT_MS;
+    } else {
+      process.env.DATABASE_CONNECTION_TIMEOUT_MS = originalConnectionTimeout;
+    }
   });
 
   it('boots successfully', () => {
@@ -36,6 +54,24 @@ describe('DomainPulse API foundation', () => {
       service: 'domainpulse-api',
     });
     expect(response.headers['x-request-id']).toBeTypeOf('string');
+  });
+
+  it('keeps liveness healthy while returning sanitized database unavailability', async () => {
+    const healthResponse = await app.inject({ method: 'GET', url: '/health' });
+    const readinessResponse = await app.inject({ method: 'GET', url: '/ready' });
+    const readiness = ReadinessResponseSchema.parse(readinessResponse.json());
+
+    expect(healthResponse.statusCode).toBe(200);
+    expect(readinessResponse.statusCode).toBe(503);
+    expect(readiness).toEqual({
+      status: 'not_ready',
+      service: 'domainpulse-api',
+      database: 'unavailable',
+    });
+    expect(readinessResponse.body).not.toContain('phase2_user');
+    expect(readinessResponse.body).not.toContain('phase2_secret');
+    expect(readinessResponse.body).not.toContain('127.0.0.1');
+    expect(readinessResponse.body.toLowerCase()).not.toContain('stack');
   });
 
   it('returns the centralized problem format for an unknown route', async () => {
