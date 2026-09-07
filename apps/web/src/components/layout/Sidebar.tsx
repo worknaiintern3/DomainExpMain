@@ -16,7 +16,7 @@ const MAIN_NAV_ITEMS: NavItem[] = [
 
 const BOTTOM_NAV_ITEMS: NavItem[] = [
   { id: 'settings', label: 'Settings', path: '/settings', icon: 'settings' },
-  { id: 'support', label: 'Help & Support', path: '/support', icon: 'help' },
+  { id: 'support', label: 'Help & Support', path: '/help', icon: 'help' },
 ];
 
 export const Sidebar: React.FC = () => {

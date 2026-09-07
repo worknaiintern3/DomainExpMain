@@ -61,3 +61,19 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Master-detail subtle horizontal tab transition */
+@keyframes helpTabSlideEnter {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-help-tab-enter {
+  animation: helpTabSlideEnter 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

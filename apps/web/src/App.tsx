@@ -46,7 +46,9 @@ export const App: React.FC = () => {
           <Route path="/infrastructure-map" element={<InfrastructureMapPage />} />
           
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/help" element={<SupportPage />} />
           <Route path="/support" element={<SupportPage />} />
+          <Route path="/help-and-support" element={<SupportPage />} />
           
           {/* Catch-all route redirects back to overview */}
           <Route path="*" element={<Navigate to="/overview" replace />} />

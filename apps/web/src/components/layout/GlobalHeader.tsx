@@ -13,7 +13,9 @@ const ROUTE_LABELS: Record<string, string> = {
   '/alerts': 'Alerts & Monitoring',
   '/infrastructure-map': 'Infrastructure Map',
   '/settings': 'Settings',
+  '/help': 'Help & Support',
   '/support': 'Help & Support',
+  '/help-and-support': 'Help & Support',
 };
 
 export const GlobalHeader: React.FC = () => {
