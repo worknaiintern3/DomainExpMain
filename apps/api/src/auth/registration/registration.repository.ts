@@ -1,0 +1,95 @@
+import { passwordCredentials, users } from '@domainpulse/database';
+
+import {
+  RegistrationEmailConflictError,
+  RegistrationPersistenceError,
+} from './registration.errors';
+import type {
+  PersistRegistrationInput,
+  RegisteredUser,
+  RegistrationStore,
+  RegistrationTransactionHost,
+} from './registration.types';
+
+const NORMALIZED_EMAIL_UNIQUE_CONSTRAINT = 'users_normalized_email_unique';
+const POSTGRESQL_UNIQUE_VIOLATION = '23505';
+
+function isNormalizedEmailConflict(error: unknown): boolean {
+  const visited = new Set<object>();
+  let currentError = error;
+
+  while (typeof currentError === 'object' && currentError !== null) {
+    if (visited.has(currentError)) {
+      return false;
+    }
+
+    visited.add(currentError);
+    const errorRecord = currentError as {
+      cause?: unknown;
+      code?: unknown;
+      constraint?: unknown;
+    };
+
+    if (
+      errorRecord.code === POSTGRESQL_UNIQUE_VIOLATION &&
+      errorRecord.constraint === NORMALIZED_EMAIL_UNIQUE_CONSTRAINT
+    ) {
+      return true;
+    }
+
+    currentError = errorRecord.cause;
+  }
+
+  return false;
+}
+
+export class PostgresRegistrationRepository implements RegistrationStore {
+  constructor(private readonly database: RegistrationTransactionHost) {}
+
+  async createRegistration(
+    input: PersistRegistrationInput,
+  ): Promise<RegisteredUser> {
+    try {
+      return await this.database.transaction(async (transaction) => {
+        const [registeredUser] = await transaction
+          .insert(users)
+          .values({
+            ...(input.displayName === undefined
+              ? {}
+              : { displayName: input.displayName }),
+            email: input.email,
+            normalizedEmail: input.normalizedEmail,
+          })
+          .returning({
+            createdAt: users.createdAt,
+            displayName: users.displayName,
+            email: users.email,
+            id: users.id,
+            normalizedEmail: users.normalizedEmail,
+            updatedAt: users.updatedAt,
+          });
+
+        if (!registeredUser) {
+          throw new RegistrationPersistenceError();
+        }
+
+        await transaction.insert(passwordCredentials).values({
+          passwordHash: input.passwordHash,
+          userId: registeredUser.id,
+        });
+
+        return registeredUser;
+      });
+    } catch (error) {
+      if (isNormalizedEmailConflict(error)) {
+        throw new RegistrationEmailConflictError();
+      }
+
+      if (error instanceof RegistrationPersistenceError) {
+        throw error;
+      }
+
+      throw new RegistrationPersistenceError();
+    }
+  }
+}
