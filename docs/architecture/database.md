@@ -19,10 +19,10 @@ packages/database   <---  apps/api, future backend workers
 `packages/database`. Transport contracts contain only JSON-safe values and do
 not expose PostgreSQL, Drizzle, Node.js, or internal database types.
 
-Phase 3 begins with only the global user identity, workspace tenant root, and
-workspace membership bridge. Authentication, sessions, RLS policies,
-portfolio, relationship, provenance, provider, monitoring, and job schemas
-remain deferred.
+Phase 3 begins with the global user identity, workspace tenant root, workspace
+membership bridge, and server-only authentication persistence. Authentication
+flows, token issuance, RLS policies, portfolio, relationship, provenance,
+provider, monitoring, and job schemas remain deferred.
 
 ## Runtime configuration
 
@@ -138,6 +138,22 @@ consistent from their first reviewed migration.
 The membership bridge supplies the explicit `workspace_id` needed by later
 tenant-isolation policies, but this task does not enable or define RLS.
 
+### Authentication persistence
+
+- `password_credentials` is a shared-primary-key extension of `users`, which
+  enforces at most one password credential per user. It stores only a password
+  hash and the time that hash was last changed; raw passwords are never stored.
+- `sessions` stores a UUID session identifier, owning user, unique refresh-token
+  hash, expiry, optional revocation and last-seen instants, and lifecycle
+  timestamps. Raw refresh tokens and access tokens are never stored.
+- Auth-owned rows cascade when their owning user is deleted. This cleanup does
+  not alter the restricted tenant-membership foreign keys.
+- Session indexes support refresh-token lookup, per-user session management,
+  and expiry cleanup. A session expiry must be later than its creation time.
+
+This schema is persistence only. Registration, login, logout, password hashing,
+token signing, token rotation, and authorization remain application-layer work.
+
 ## Transactions
 
 `DatabaseClient.transaction()` delegates to a real Drizzle transaction and
@@ -158,8 +174,9 @@ npm run db:migrate    # apply reviewed migrations using DATABASE_URL
 ```
 
 There are intentionally no normal `db:push`, `db:drop`, or `db:reset` commands.
-The first reviewed migration establishes only `users`, `workspaces`,
-`workspace_members`, their constraints, and the membership-role enum.
+The first reviewed migration establishes `users`, `workspaces`,
+`workspace_members`, their constraints, and the membership-role enum. The next
+reviewed migration adds only password-credential and session persistence.
 
 Development workflow:
 
@@ -193,6 +210,8 @@ data. Prefer a forward-fix migration when rollback would be destructive.
   platform policy. Local plaintext connections remain loopback-only.
 - Credentials are supplied through environment injection or a secret manager,
   never source control.
+- Raw passwords, refresh tokens, and access tokens are never persisted. Only
+  password hashes and refresh-token hashes belong in the database.
 - Connection strings and low-level driver errors are excluded from logs and
   HTTP responses.
 - Drizzle and `pg` parameterization are required for values. Raw SQL identifiers

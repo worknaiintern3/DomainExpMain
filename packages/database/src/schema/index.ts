@@ -1,4 +1,12 @@
 export {
+  passwordCredentials,
+  sessions,
+  type NewPasswordCredential,
+  type NewSession,
+  type PasswordCredential,
+  type Session,
+} from './auth';
+export {
   users,
   workspaceMembers,
   workspaceMembershipRoleEnum,
