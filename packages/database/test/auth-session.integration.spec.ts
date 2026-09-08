@@ -11,6 +11,7 @@ import {
   getDisposableTestConfiguration,
   hasDisposableTestDatabase,
 } from './test-database';
+import { insertTestUser } from './tenancy-test-data';
 
 const describeWithPostgreSql = hasDisposableTestDatabase ? describe : describe.skip;
 
@@ -67,17 +68,10 @@ describeWithPostgreSql(
 
       await expect(
         getClient().transaction(async (transaction) => {
-          const [user] = await transaction
-            .insert(users)
-            .values({
-              email: `auth-${suffix}@example.test`,
-              normalizedEmail: `auth-${suffix}@example.test`,
-            })
-            .returning({ id: users.id });
-
-          if (!user) {
-            throw new Error('Auth persistence user insert did not return an ID');
-          }
+          const user = await insertTestUser(transaction, {
+            email: `auth-${suffix}@example.test`,
+            normalizedEmail: `auth-${suffix}@example.test`,
+          });
 
           const [credential] = await transaction
             .insert(passwordCredentials)
@@ -117,17 +111,10 @@ describeWithPostgreSql(
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
-            const [user] = await transaction
-              .insert(users)
-              .values({
-                email: `credential-${suffix}@example.test`,
-                normalizedEmail: `credential-${suffix}@example.test`,
-              })
-              .returning({ id: users.id });
-
-            if (!user) {
-              throw new Error('Credential uniqueness user insert failed');
-            }
+            const user = await insertTestUser(transaction, {
+              email: `credential-${suffix}@example.test`,
+              normalizedEmail: `credential-${suffix}@example.test`,
+            });
 
             await transaction.insert(passwordCredentials).values({
               passwordHash: `test-password-hash-a-${suffix}`,
@@ -158,17 +145,10 @@ describeWithPostgreSql(
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
-            const [user] = await transaction
-              .insert(users)
-              .values({
-                email: `session-${suffix}@example.test`,
-                normalizedEmail: `session-${suffix}@example.test`,
-              })
-              .returning({ id: users.id });
-
-            if (!user) {
-              throw new Error('Session uniqueness user insert failed');
-            }
+            const user = await insertTestUser(transaction, {
+              email: `session-${suffix}@example.test`,
+              normalizedEmail: `session-${suffix}@example.test`,
+            });
 
             await transaction.insert(sessions).values([
               {
@@ -203,17 +183,10 @@ describeWithPostgreSql(
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
-            const [user] = await transaction
-              .insert(users)
-              .values({
-                email: `blank-hash-${suffix}@example.test`,
-                normalizedEmail: `blank-hash-${suffix}@example.test`,
-              })
-              .returning({ id: users.id });
-
-            if (!user) {
-              throw new Error('Blank hash user insert failed');
-            }
+            const user = await insertTestUser(transaction, {
+              email: `blank-hash-${suffix}@example.test`,
+              normalizedEmail: `blank-hash-${suffix}@example.test`,
+            });
 
             await transaction.insert(passwordCredentials).values({
               passwordHash: '   ',
@@ -226,17 +199,10 @@ describeWithPostgreSql(
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
-            const [user] = await transaction
-              .insert(users)
-              .values({
-                email: `blank-token-${suffix}@example.test`,
-                normalizedEmail: `blank-token-${suffix}@example.test`,
-              })
-              .returning({ id: users.id });
-
-            if (!user) {
-              throw new Error('Blank token user insert failed');
-            }
+            const user = await insertTestUser(transaction, {
+              email: `blank-token-${suffix}@example.test`,
+              normalizedEmail: `blank-token-${suffix}@example.test`,
+            });
 
             await transaction.insert(sessions).values({
               expiresAt: new Date(Date.now() + 60_000),
@@ -250,17 +216,10 @@ describeWithPostgreSql(
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
-            const [user] = await transaction
-              .insert(users)
-              .values({
-                email: `expired-${suffix}@example.test`,
-                normalizedEmail: `expired-${suffix}@example.test`,
-              })
-              .returning({ id: users.id });
-
-            if (!user) {
-              throw new Error('Expired session user insert failed');
-            }
+            const user = await insertTestUser(transaction, {
+              email: `expired-${suffix}@example.test`,
+              normalizedEmail: `expired-${suffix}@example.test`,
+            });
 
             await transaction.insert(sessions).values({
               expiresAt: new Date(0),
@@ -278,17 +237,10 @@ describeWithPostgreSql(
 
       await expect(
         getClient().transaction(async (transaction) => {
-          const [user] = await transaction
-            .insert(users)
-            .values({
-              email: `cascade-${suffix}@example.test`,
-              normalizedEmail: `cascade-${suffix}@example.test`,
-            })
-            .returning({ id: users.id });
-
-          if (!user) {
-            throw new Error('Auth cascade user insert failed');
-          }
+          const user = await insertTestUser(transaction, {
+            email: `cascade-${suffix}@example.test`,
+            normalizedEmail: `cascade-${suffix}@example.test`,
+          });
 
           await transaction.insert(passwordCredentials).values({
             passwordHash: `test-password-hash-${suffix}`,

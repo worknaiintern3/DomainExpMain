@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   check,
   index,
   pgEnum,
@@ -31,10 +32,16 @@ export const users = pgTable(
     email: text('email').notNull(),
     normalizedEmail: text('normalized_email').notNull(),
     displayName: text('display_name'),
+    personalWorkspaceId: uuid('personal_workspace_id')
+      .notNull()
+      .references((): AnyPgColumn => workspaces.id, { onDelete: 'restrict' }),
     ...lifecycleTimestamps(),
   },
   (table) => [
     uniqueIndex('users_normalized_email_unique').on(table.normalizedEmail),
+    uniqueIndex('users_personal_workspace_id_unique').on(
+      table.personalWorkspaceId,
+    ),
     check('users_email_not_blank', sql`length(btrim(${table.email})) > 0`),
     check(
       'users_normalized_email_matches_email',

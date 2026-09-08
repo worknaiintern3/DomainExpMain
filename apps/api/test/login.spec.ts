@@ -3,10 +3,9 @@ import { randomUUID } from 'node:crypto';
 import {
   createDatabaseClient,
   sessions,
-  users,
   type DatabaseClient,
 } from '@domainpulse/database';
-import { eq, like, count } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -24,6 +23,7 @@ import {
 import { RegistrationService } from '../src/auth/registration';
 import { PostgresRegistrationRepository } from '../src/auth/registration';
 import {
+  cleanupRegisteredUsers,
   getDisposableTestConfiguration,
   hasDisposableTestDatabase,
 } from './test-database';
@@ -235,9 +235,7 @@ describeWithPostgreSql(
         return;
       }
 
-      await client.database
-        .delete(users)
-        .where(like(users.normalizedEmail, `${suitePrefix}-%`));
+      await cleanupRegisteredUsers(client, suitePrefix);
       await client.close();
     });
 

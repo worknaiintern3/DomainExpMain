@@ -1,4 +1,11 @@
-import { passwordCredentials, users } from '@domainpulse/database';
+import { randomUUID } from 'node:crypto';
+
+import {
+  passwordCredentials,
+  users,
+  workspaceMembers,
+  workspaces,
+} from '@domainpulse/database';
 
 import {
   RegistrationEmailConflictError,
@@ -13,6 +20,11 @@ import type {
 
 const NORMALIZED_EMAIL_UNIQUE_CONSTRAINT = 'users_normalized_email_unique';
 const POSTGRESQL_UNIQUE_VIOLATION = '23505';
+const PERSONAL_WORKSPACE_NAME = 'Personal Workspace';
+
+function createPersonalWorkspaceSlug(workspaceId: string): string {
+  return `personal-${workspaceId.replaceAll('-', '')}`;
+}
 
 function isNormalizedEmailConflict(error: unknown): boolean {
   const visited = new Set<object>();
@@ -51,6 +63,15 @@ export class PostgresRegistrationRepository implements RegistrationStore {
   ): Promise<RegisteredUser> {
     try {
       return await this.database.transaction(async (transaction) => {
+        const userId = randomUUID();
+        const personalWorkspaceId = randomUUID();
+
+        await transaction.insert(workspaces).values({
+          id: personalWorkspaceId,
+          name: PERSONAL_WORKSPACE_NAME,
+          slug: createPersonalWorkspaceSlug(personalWorkspaceId),
+        });
+
         const [registeredUser] = await transaction
           .insert(users)
           .values({
@@ -58,7 +79,9 @@ export class PostgresRegistrationRepository implements RegistrationStore {
               ? {}
               : { displayName: input.displayName }),
             email: input.email,
+            id: userId,
             normalizedEmail: input.normalizedEmail,
+            personalWorkspaceId,
           })
           .returning({
             createdAt: users.createdAt,
@@ -76,6 +99,12 @@ export class PostgresRegistrationRepository implements RegistrationStore {
         await transaction.insert(passwordCredentials).values({
           passwordHash: input.passwordHash,
           userId: registeredUser.id,
+        });
+
+        await transaction.insert(workspaceMembers).values({
+          role: 'owner',
+          userId: registeredUser.id,
+          workspaceId: personalWorkspaceId,
         });
 
         return registeredUser;

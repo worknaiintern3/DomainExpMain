@@ -1,12 +1,47 @@
 import {
+  workspaceMembers,
+  workspaces,
+  users,
   parseDatabaseEnvironment,
   parseDatabaseUrl,
+  type DatabaseClient,
   type DatabaseConfiguration,
 } from '@domainpulse/database';
+import { inArray, like } from 'drizzle-orm';
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 export const hasDisposableTestDatabase = Boolean(TEST_DATABASE_URL);
+
+export async function cleanupRegisteredUsers(
+  client: DatabaseClient,
+  normalizedEmailPrefix: string,
+): Promise<void> {
+  const registeredUsers = await client.database
+    .select({
+      id: users.id,
+      personalWorkspaceId: users.personalWorkspaceId,
+    })
+    .from(users)
+    .where(like(users.normalizedEmail, `${normalizedEmailPrefix}-%`));
+
+  if (registeredUsers.length === 0) {
+    return;
+  }
+
+  const userIds = registeredUsers.map(({ id }) => id);
+  const personalWorkspaceIds = registeredUsers.map(
+    ({ personalWorkspaceId }) => personalWorkspaceId,
+  );
+
+  await client.database
+    .delete(workspaceMembers)
+    .where(inArray(workspaceMembers.userId, userIds));
+  await client.database.delete(users).where(inArray(users.id, userIds));
+  await client.database
+    .delete(workspaces)
+    .where(inArray(workspaces.id, personalWorkspaceIds));
+}
 
 export function getDisposableTestConfiguration(): DatabaseConfiguration {
   if (!TEST_DATABASE_URL) {

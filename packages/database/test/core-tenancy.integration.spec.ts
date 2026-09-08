@@ -11,6 +11,10 @@ import {
   getDisposableTestConfiguration,
   hasDisposableTestDatabase,
 } from './test-database';
+import {
+  createTestPersonalWorkspace,
+  insertTestUser,
+} from './tenancy-test-data';
 
 const describeWithPostgreSql = hasDisposableTestDatabase ? describe : describe.skip;
 
@@ -68,20 +72,18 @@ describeWithPostgreSql(
 
       await expect(
         activeClient.transaction(async (transaction) => {
+          const workspace = await createTestPersonalWorkspace(transaction);
           const [user] = await transaction
             .insert(users)
             .values({
               email: `Owner-${suffix}@example.test`,
               normalizedEmail: `owner-${suffix}@example.test`,
+              personalWorkspaceId: workspace.id,
             })
             .returning();
-          const [workspace] = await transaction
-            .insert(workspaces)
-            .values({ name: 'Core tenancy probe', slug: `core-${suffix}` })
-            .returning();
 
-          if (!user || !workspace) {
-            throw new Error('Core tenancy inserts did not return their rows');
+          if (!user) {
+            throw new Error('Core tenancy user insert did not return its row');
           }
 
           const [membership] = await transaction
@@ -117,9 +119,19 @@ describeWithPostgreSql(
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
+            const firstWorkspace = await createTestPersonalWorkspace(transaction);
+            const secondWorkspace = await createTestPersonalWorkspace(transaction);
             await transaction.insert(users).values([
-              { email: normalizedEmail, normalizedEmail },
-              { email: normalizedEmail.toUpperCase(), normalizedEmail },
+              {
+                email: normalizedEmail,
+                normalizedEmail,
+                personalWorkspaceId: firstWorkspace.id,
+              },
+              {
+                email: normalizedEmail.toUpperCase(),
+                normalizedEmail,
+                personalWorkspaceId: secondWorkspace.id,
+              },
             ]);
           }),
         '23505',
@@ -128,9 +140,11 @@ describeWithPostgreSql(
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
+            const personalWorkspace = await createTestPersonalWorkspace(transaction);
             await transaction.insert(users).values({
               email: normalizedEmail,
               normalizedEmail: normalizedEmail.toUpperCase(),
+              personalWorkspaceId: personalWorkspace.id,
             });
           }),
         '23514',
@@ -162,27 +176,53 @@ describeWithPostgreSql(
       );
     });
 
+    it('requires one distinct structurally linked personal workspace per user', async () => {
+      const normalizedEmail = `personal-${randomUUID()}@example.test`;
+
+      await expectPostgreSqlError(
+        () =>
+          getClient().transaction(async (transaction) => {
+            await transaction.execute(sql`
+              insert into users (id, email, normalized_email, personal_workspace_id)
+              values (${randomUUID()}, ${normalizedEmail}, ${normalizedEmail}, null)
+            `);
+          }),
+        '23502',
+      );
+
+      await expectPostgreSqlError(
+        () =>
+          getClient().transaction(async (transaction) => {
+            const personalWorkspace =
+              await createTestPersonalWorkspace(transaction);
+            await transaction.insert(users).values([
+              {
+                email: normalizedEmail,
+                normalizedEmail,
+                personalWorkspaceId: personalWorkspace.id,
+              },
+              {
+                email: `second-${normalizedEmail}`,
+                normalizedEmail: `second-${normalizedEmail}`,
+                personalWorkspaceId: personalWorkspace.id,
+              },
+            ]);
+          }),
+        '23505',
+      );
+    });
+
     it('enforces one membership per user and workspace', async () => {
       const suffix = randomUUID();
 
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
-            const [user] = await transaction
-              .insert(users)
-              .values({
-                email: `member-${suffix}@example.test`,
-                normalizedEmail: `member-${suffix}@example.test`,
-              })
-              .returning({ id: users.id });
-            const [workspace] = await transaction
-              .insert(workspaces)
-              .values({ name: 'Membership probe', slug: `membership-${suffix}` })
-              .returning({ id: workspaces.id });
-
-            if (!user || !workspace) {
-              throw new Error('Membership probe inserts did not return their IDs');
-            }
+            const user = await insertTestUser(transaction, {
+              email: `member-${suffix}@example.test`,
+              normalizedEmail: `member-${suffix}@example.test`,
+            });
+            const workspace = await createTestPersonalWorkspace(transaction);
 
             await transaction.insert(workspaceMembers).values({
               role: 'owner',
@@ -216,21 +256,11 @@ describeWithPostgreSql(
       await expectPostgreSqlError(
         () =>
           getClient().transaction(async (transaction) => {
-            const [user] = await transaction
-              .insert(users)
-              .values({
-                email: `role-${suffix}@example.test`,
-                normalizedEmail: `role-${suffix}@example.test`,
-              })
-              .returning({ id: users.id });
-            const [workspace] = await transaction
-              .insert(workspaces)
-              .values({ name: 'Role probe', slug: `role-${suffix}` })
-              .returning({ id: workspaces.id });
-
-            if (!user || !workspace) {
-              throw new Error('Role probe inserts did not return their IDs');
-            }
+            const user = await insertTestUser(transaction, {
+              email: `role-${suffix}@example.test`,
+              normalizedEmail: `role-${suffix}@example.test`,
+            });
+            const workspace = await createTestPersonalWorkspace(transaction);
 
             await transaction.execute(sql`
               insert into workspace_members (id, workspace_id, user_id, role)

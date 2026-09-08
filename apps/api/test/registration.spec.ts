@@ -4,9 +4,11 @@ import {
   createDatabaseClient,
   passwordCredentials,
   users,
+  workspaceMembers,
+  workspaces,
   type DatabaseClient,
 } from '@domainpulse/database';
-import { count, eq, like } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -21,6 +23,7 @@ import {
   type RegistrationStore,
 } from '../src/auth/registration';
 import {
+  cleanupRegisteredUsers,
   getDisposableTestConfiguration,
   hasDisposableTestDatabase,
 } from './test-database';
@@ -97,13 +100,11 @@ describeWithPostgreSql(
         return;
       }
 
-      await client.database
-        .delete(users)
-        .where(like(users.normalizedEmail, `${suitePrefix}-%`));
+      await cleanupRegisteredUsers(client, suitePrefix);
       await client.close();
     });
 
-    it('creates the user and password credential atomically', async () => {
+    it('atomically creates the user, credential, personal workspace, and owner membership', async () => {
       const activeClient = getClient();
       const repository = new PostgresRegistrationRepository(activeClient);
       const service = new RegistrationService(repository);
@@ -118,6 +119,26 @@ describeWithPostgreSql(
         .select()
         .from(passwordCredentials)
         .where(eq(passwordCredentials.userId, registeredUser.id));
+      const [persistedUser] = await activeClient.database
+        .select({ personalWorkspaceId: users.personalWorkspaceId })
+        .from(users)
+        .where(eq(users.id, registeredUser.id));
+      const [personalWorkspace] = await activeClient.database
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.id, persistedUser?.personalWorkspaceId ?? ''));
+      const [ownerMembership] = await activeClient.database
+        .select()
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.userId, registeredUser.id),
+            eq(
+              workspaceMembers.workspaceId,
+              persistedUser?.personalWorkspaceId ?? '',
+            ),
+          ),
+        );
 
       expect(registeredUser).toMatchObject({
         displayName: 'Integration User',
@@ -128,6 +149,15 @@ describeWithPostgreSql(
       await expect(
         verifyPassword(password, credential?.passwordHash ?? ''),
       ).resolves.toBe(true);
+      expect(personalWorkspace).toMatchObject({
+        id: persistedUser?.personalWorkspaceId,
+        name: 'Personal Workspace',
+      });
+      expect(ownerMembership).toMatchObject({
+        role: 'owner',
+        userId: registeredUser.id,
+        workspaceId: persistedUser?.personalWorkspaceId,
+      });
     });
 
     it('maps authoritative normalized-email conflicts to a safe error', async () => {
@@ -164,9 +194,26 @@ describeWithPostgreSql(
         .from(passwordCredentials)
         .innerJoin(users, eq(passwordCredentials.userId, users.id))
         .where(eq(users.normalizedEmail, email));
+      const [workspaceCount] = await activeClient.database
+        .select({ value: count() })
+        .from(workspaces)
+        .innerJoin(users, eq(users.personalWorkspaceId, workspaces.id))
+        .where(eq(users.normalizedEmail, email));
+      const [membershipCount] = await activeClient.database
+        .select({ value: count() })
+        .from(workspaceMembers)
+        .innerJoin(users, eq(workspaceMembers.userId, users.id))
+        .where(
+          and(
+            eq(users.normalizedEmail, email),
+            eq(workspaceMembers.workspaceId, users.personalWorkspaceId),
+          ),
+        );
 
       expect(userCount?.value).toBe(1);
       expect(credentialCount?.value).toBe(1);
+      expect(workspaceCount?.value).toBe(1);
+      expect(membershipCount?.value).toBe(1);
     });
 
     it('rolls back the user insert when credential persistence fails', async () => {
@@ -176,6 +223,12 @@ describeWithPostgreSql(
         new PostgresRegistrationRepository(activeClient),
         () => Promise.resolve('   '),
       );
+      const [workspaceCountBefore] = await activeClient.database
+        .select({ value: count() })
+        .from(workspaces);
+      const [membershipCountBefore] = await activeClient.database
+        .select({ value: count() })
+        .from(workspaceMembers);
 
       await expect(
         service.register({
@@ -188,8 +241,16 @@ describeWithPostgreSql(
         .select({ value: count() })
         .from(users)
         .where(eq(users.normalizedEmail, email));
+      const [workspaceCountAfter] = await activeClient.database
+        .select({ value: count() })
+        .from(workspaces);
+      const [membershipCountAfter] = await activeClient.database
+        .select({ value: count() })
+        .from(workspaceMembers);
 
       expect(userCount?.value).toBe(0);
+      expect(workspaceCountAfter?.value).toBe(workspaceCountBefore?.value);
+      expect(membershipCountAfter?.value).toBe(membershipCountBefore?.value);
     });
   },
 );

@@ -123,7 +123,9 @@ consistent from their first reviewed migration.
 
 - `users` is the global identity record. It stores the supplied email and a
   separately indexed normalized email constrained to `lower(trim(email))`.
-  It does not store passwords or authentication/session state.
+  Its required, unique `personal_workspace_id` foreign key structurally names
+  exactly one personal workspace without relying on names, slugs, roles, or
+  membership ordering. It does not store passwords or authentication state.
 - `workspaces` is the future tenant and RLS boundary. Its canonical slug is
   lowercase, hyphen-separated, and unique.
 - `workspace_members` links a user to a workspace through explicit restricted
@@ -137,6 +139,14 @@ consistent from their first reviewed migration.
 
 The membership bridge supplies the explicit `workspace_id` needed by later
 tenant-isolation policies, but this task does not enable or define RLS.
+
+Registration generates non-PII UUID identifiers and creates the personal
+workspace, user, password credential, and owner membership in one transaction.
+The personal workspace slug is derived only from its random UUID. Existing
+users are backfilled transactionally by migration `0002`: each receives one
+new random UUID workspace with a collision-resistant, deterministically
+UUID-derived non-PII slug and an owner membership before
+`personal_workspace_id` becomes required and unique.
 
 ### Authentication persistence
 

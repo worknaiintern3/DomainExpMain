@@ -15,6 +15,13 @@
       "when": 1788779449701,
       "tag": "0001_auth_session_persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788852620540,
+      "tag": "0002_personal_workspace_invariant",
+      "breakpoints": true
     }
   ]
 }
