@@ -15,11 +15,19 @@ describe('DomainPulse API foundation', () => {
   let app: NestFastifyApplication;
   const originalDatabaseUrl = process.env.DATABASE_URL;
   const originalConnectionTimeout = process.env.DATABASE_CONNECTION_TIMEOUT_MS;
+  const originalJwtAudience = process.env.JWT_ACCESS_TOKEN_AUDIENCE;
+  const originalJwtIssuer = process.env.JWT_ACCESS_TOKEN_ISSUER;
+  const originalJwtSecret = process.env.JWT_ACCESS_TOKEN_SECRET;
 
   beforeAll(async () => {
     process.env.DATABASE_URL =
       'postgresql://phase2_user:phase2_secret@127.0.0.1:1/domainpulse_test';
     process.env.DATABASE_CONNECTION_TIMEOUT_MS = '100';
+    process.env.JWT_ACCESS_TOKEN_AUDIENCE = 'domainpulse-test-clients';
+    process.env.JWT_ACCESS_TOKEN_ISSUER = 'domainpulse-test-api';
+    process.env.JWT_ACCESS_TOKEN_SECRET = Buffer.from(
+      Array.from({ length: 32 }, (_, index) => index + 1),
+    ).toString('base64url');
     app = await createApplication();
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
@@ -38,6 +46,24 @@ describe('DomainPulse API foundation', () => {
       delete process.env.DATABASE_CONNECTION_TIMEOUT_MS;
     } else {
       process.env.DATABASE_CONNECTION_TIMEOUT_MS = originalConnectionTimeout;
+    }
+
+    if (originalJwtAudience === undefined) {
+      delete process.env.JWT_ACCESS_TOKEN_AUDIENCE;
+    } else {
+      process.env.JWT_ACCESS_TOKEN_AUDIENCE = originalJwtAudience;
+    }
+
+    if (originalJwtIssuer === undefined) {
+      delete process.env.JWT_ACCESS_TOKEN_ISSUER;
+    } else {
+      process.env.JWT_ACCESS_TOKEN_ISSUER = originalJwtIssuer;
+    }
+
+    if (originalJwtSecret === undefined) {
+      delete process.env.JWT_ACCESS_TOKEN_SECRET;
+    } else {
+      process.env.JWT_ACCESS_TOKEN_SECRET = originalJwtSecret;
     }
   });
 

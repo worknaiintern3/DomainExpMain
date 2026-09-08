@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 
+import { AuthModule } from './auth/auth.module';
 import { ProblemDetailsFilter } from './common/http/problem-details.filter';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
@@ -8,7 +9,13 @@ import { HealthModule } from './health/health.module';
 import { ReadinessModule } from './readiness/readiness.module';
 
 @Module({
-  imports: [ConfigModule, DatabaseModule, HealthModule, ReadinessModule],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    AuthModule,
+    HealthModule,
+    ReadinessModule,
+  ],
   providers: [
     {
       provide: APP_FILTER,
