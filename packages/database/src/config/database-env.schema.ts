@@ -56,11 +56,14 @@ export class DatabaseConfigurationError extends Error {
   }
 }
 
-export function parseDatabaseUrl(value: string): string {
+export function parseDatabaseUrl(
+  value: string,
+  fieldName = 'DATABASE_URL',
+): string {
   const result = PostgreSqlUrlSchema.safeParse(value);
 
   if (!result.success) {
-    throw new DatabaseConfigurationError(['DATABASE_URL']);
+    throw new DatabaseConfigurationError([fieldName]);
   }
 
   return result.data;

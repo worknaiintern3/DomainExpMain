@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createDatabaseClient } from '../src/client/database-client';
 import {
   parseDatabaseEnvironment,
+  parseDatabaseUrl,
   sanitizeDatabaseConfiguration,
 } from '../src/config/database-env.schema';
 import { checkDatabaseAvailability } from '../src/health/database-health';
@@ -35,6 +36,15 @@ describe('database environment configuration', () => {
       expect(serialized).not.toContain('private-password');
       expect(serialized).not.toContain(invalidUrl);
     }
+  });
+
+  it('identifies an invalid migration URL without echoing its value', () => {
+    expect(() =>
+      parseDatabaseUrl(
+        'invalid-migration-url',
+        'MIGRATION_DATABASE_URL',
+      ),
+    ).toThrow('Invalid database configuration (MIGRATION_DATABASE_URL)');
   });
 
   it('validates and normalizes controlled pool settings', () => {

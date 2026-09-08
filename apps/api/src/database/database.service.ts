@@ -37,6 +37,20 @@ export class DatabaseService implements OnApplicationShutdown {
     return this.client.transaction(operation);
   }
 
+  withUserContext<T>(
+    userId: string,
+    operation: DatabaseTransactionOperation<T>,
+  ): Promise<T> {
+    return this.client.withUserContext(userId, operation);
+  }
+
+  withWorkspaceContext<T>(
+    workspaceId: string,
+    operation: DatabaseTransactionOperation<T>,
+  ): Promise<T> {
+    return this.client.withWorkspaceContext(workspaceId, operation);
+  }
+
   async onApplicationShutdown(): Promise<void> {
     await this.client.close();
   }

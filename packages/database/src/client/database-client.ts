@@ -3,6 +3,10 @@ import { Pool } from 'pg';
 
 import * as schema from '../schema';
 import { runInTransaction } from '../transactions/transaction';
+import {
+  withUserContext,
+  withWorkspaceContext,
+} from '../transactions/workspace-context';
 import type {
   CreateDatabaseClientOptions,
   DatabaseClient,
@@ -53,6 +57,26 @@ export function createDatabaseClient(
       }
 
       return runInTransaction(database, operation);
+    },
+    withUserContext<T>(
+      userId: string,
+      operation: DatabaseTransactionOperation<T>,
+    ): Promise<T> {
+      if (closed) {
+        return Promise.reject(new DatabaseUnavailableError());
+      }
+
+      return withUserContext(database, userId, operation);
+    },
+    withWorkspaceContext<T>(
+      workspaceId: string,
+      operation: DatabaseTransactionOperation<T>,
+    ): Promise<T> {
+      if (closed) {
+        return Promise.reject(new DatabaseUnavailableError());
+      }
+
+      return withWorkspaceContext(database, workspaceId, operation);
     },
     async close(): Promise<void> {
       if (closed) {

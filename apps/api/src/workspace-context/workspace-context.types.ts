@@ -1,4 +1,7 @@
-import type { Database, WorkspaceMember } from '@domainpulse/database';
+import type {
+  UserTransactionHost,
+  WorkspaceMember,
+} from '@domainpulse/database';
 
 import type { AuthenticatedPrincipal } from '../auth/access-token';
 
@@ -23,6 +26,4 @@ export interface WorkspaceContextStore {
   ) => Promise<ResolvedWorkspaceMembership | undefined>;
 }
 
-export interface WorkspaceContextDatabaseHost {
-  readonly database: Database;
-}
+export type WorkspaceContextDatabaseHost = UserTransactionHost;

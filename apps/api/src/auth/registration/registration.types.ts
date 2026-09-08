@@ -1,4 +1,4 @@
-import type { DatabaseTransactionOperation } from '@domainpulse/database';
+import type { WorkspaceTransactionHost } from '@domainpulse/database';
 
 export interface RegisterUserInput {
   readonly displayName?: string;
@@ -26,8 +26,6 @@ export interface RegistrationStore {
   createRegistration(input: PersistRegistrationInput): Promise<RegisteredUser>;
 }
 
-export interface RegistrationTransactionHost {
-  transaction<T>(operation: DatabaseTransactionOperation<T>): Promise<T>;
-}
+export type RegistrationTransactionHost = WorkspaceTransactionHost;
 
 export type RegistrationPasswordHasher = (password: string) => Promise<string>;

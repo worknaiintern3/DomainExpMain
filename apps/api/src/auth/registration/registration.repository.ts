@@ -61,54 +61,57 @@ export class PostgresRegistrationRepository implements RegistrationStore {
   async createRegistration(
     input: PersistRegistrationInput,
   ): Promise<RegisteredUser> {
+    const userId = randomUUID();
+    const personalWorkspaceId = randomUUID();
+
     try {
-      return await this.database.transaction(async (transaction) => {
-        const userId = randomUUID();
-        const personalWorkspaceId = randomUUID();
-
-        await transaction.insert(workspaces).values({
-          id: personalWorkspaceId,
-          name: PERSONAL_WORKSPACE_NAME,
-          slug: createPersonalWorkspaceSlug(personalWorkspaceId),
-        });
-
-        const [registeredUser] = await transaction
-          .insert(users)
-          .values({
-            ...(input.displayName === undefined
-              ? {}
-              : { displayName: input.displayName }),
-            email: input.email,
-            id: userId,
-            normalizedEmail: input.normalizedEmail,
-            personalWorkspaceId,
-          })
-          .returning({
-            createdAt: users.createdAt,
-            displayName: users.displayName,
-            email: users.email,
-            id: users.id,
-            normalizedEmail: users.normalizedEmail,
-            updatedAt: users.updatedAt,
+      return await this.database.withWorkspaceContext(
+        personalWorkspaceId,
+        async (transaction) => {
+          await transaction.insert(workspaces).values({
+            id: personalWorkspaceId,
+            name: PERSONAL_WORKSPACE_NAME,
+            slug: createPersonalWorkspaceSlug(personalWorkspaceId),
           });
 
-        if (!registeredUser) {
-          throw new RegistrationPersistenceError();
-        }
+          const [registeredUser] = await transaction
+            .insert(users)
+            .values({
+              ...(input.displayName === undefined
+                ? {}
+                : { displayName: input.displayName }),
+              email: input.email,
+              id: userId,
+              normalizedEmail: input.normalizedEmail,
+              personalWorkspaceId,
+            })
+            .returning({
+              createdAt: users.createdAt,
+              displayName: users.displayName,
+              email: users.email,
+              id: users.id,
+              normalizedEmail: users.normalizedEmail,
+              updatedAt: users.updatedAt,
+            });
 
-        await transaction.insert(passwordCredentials).values({
-          passwordHash: input.passwordHash,
-          userId: registeredUser.id,
-        });
+          if (!registeredUser) {
+            throw new RegistrationPersistenceError();
+          }
 
-        await transaction.insert(workspaceMembers).values({
-          role: 'owner',
-          userId: registeredUser.id,
-          workspaceId: personalWorkspaceId,
-        });
+          await transaction.insert(passwordCredentials).values({
+            passwordHash: input.passwordHash,
+            userId: registeredUser.id,
+          });
 
-        return registeredUser;
-      });
+          await transaction.insert(workspaceMembers).values({
+            role: 'owner',
+            userId: registeredUser.id,
+            workspaceId: personalWorkspaceId,
+          });
+
+          return registeredUser;
+        },
+      );
     } catch (error) {
       if (isNormalizedEmailConflict(error)) {
         throw new RegistrationEmailConflictError();

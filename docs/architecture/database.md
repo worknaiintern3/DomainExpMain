@@ -19,10 +19,10 @@ packages/database   <---  apps/api, future backend workers
 `packages/database`. Transport contracts contain only JSON-safe values and do
 not expose PostgreSQL, Drizzle, Node.js, or internal database types.
 
-Phase 3 begins with the global user identity, workspace tenant root, workspace
-membership bridge, and server-only authentication persistence. Authentication
-flows, token issuance, RLS policies, portfolio, relationship, provenance,
-provider, monitoring, and job schemas remain deferred.
+Phase 3 establishes the global user identity, workspace tenant root, workspace
+membership bridge, server-only authentication persistence, and PostgreSQL RLS
+for workspace visibility. Portfolio, relationship, provenance, provider,
+monitoring, and job schemas remain deferred.
 
 ## Runtime configuration
 
@@ -50,6 +50,9 @@ errors, metrics labels, or client responses.
 `TEST_DATABASE_URL` is separate and optional. It is used only by real database
 integration tests. Tests refuse URLs whose database name does not clearly
 contain a `test` segment and refuse a value equal to `DATABASE_URL`.
+The role-provisioning RLS suite instead requires a distinct privileged
+`RLS_TEST_DATABASE_URL`; it skips independently and never falls back to either
+ordinary test or runtime configuration.
 
 ## Connection lifecycle
 
@@ -70,9 +73,10 @@ event so they cannot become an unhandled process error or leak driver details.
 No connection is created per request.
 
 The package exposes controlled access to the Drizzle database, pool, `ping`,
-`transaction`, and idempotent `close` operations. Direct pool access is for
-infrastructure needs such as migrations and diagnostics; application data
-access should normally use typed Drizzle queries and repository boundaries.
+`transaction`, transaction-local `withWorkspaceContext`, and idempotent `close`
+operations. Direct pool access is for infrastructure needs such as migrations
+and diagnostics; application data access should normally use typed Drizzle
+queries and repository boundaries.
 
 ## Liveness and readiness
 
@@ -137,8 +141,13 @@ consistent from their first reviewed migration.
 - Core records use UUID primary keys plus `created_at` and `updated_at`
   `timestamptz` values. No soft-delete abstraction is introduced.
 
-The membership bridge supplies the explicit `workspace_id` needed by later
-tenant-isolation policies, but this task does not enable or define RLS.
+RLS protects `workspaces` and `workspace_members` for the non-owner runtime
+role. The authenticated membership resolver uses a narrow transaction-local
+user context that can see only the principal's own membership rows; an explicit
+candidate workspace remains a query predicate until membership succeeds.
+Authentication and identity bootstrap tables remain outside workspace RLS to
+avoid a circular dependency. See `database-roles.md` for the role and policy
+runbook.
 
 Registration generates non-PII UUID identifiers and creates the personal
 workspace, user, password credential, and owner membership in one transaction.
@@ -168,9 +177,11 @@ token signing, token rotation, and authorization remain application-layer work.
 
 `DatabaseClient.transaction()` delegates to a real Drizzle transaction and
 passes a transaction-scoped database object to the operation. Successful
-callbacks commit; thrown errors roll back and propagate. Future compound writes
-such as canonical entity + relationship + provenance + audit event must share
-one transaction callback. Phase 2 contains no product transactions.
+callbacks commit; thrown errors roll back and propagate.
+`withWorkspaceContext()` additionally validates a workspace UUID and uses
+transaction-local `set_config(..., true)` before invoking its callback. Commit
+and rollback both prevent context from leaking through pooled connections.
+Future compound tenant writes must use this scoped callback.
 
 ## Migration workflow
 
@@ -180,7 +191,7 @@ Schema source is `packages/database/src/schema/`. Generated SQL is written to
 ```text
 npm run db:generate   # generate SQL from Drizzle schema changes
 npm run db:check      # verify migration history consistency
-npm run db:migrate    # apply reviewed migrations using DATABASE_URL
+npm run db:migrate    # apply reviewed migrations using MIGRATION_DATABASE_URL
 ```
 
 There are intentionally no normal `db:push`, `db:drop`, or `db:reset` commands.
@@ -214,8 +225,8 @@ data. Prefer a forward-fix migration when rollback would be destructive.
 
 ## Security rules
 
-- Runtime credentials follow least privilege; a separate migration role may
-  own DDL permissions.
+- Runtime credentials follow least privilege and use a non-owner role with
+  `NOBYPASSRLS`; a separate migration role owns DDL permissions.
 - Production connections require PostgreSQL TLS according to the hosting
   platform policy. Local plaintext connections remain loopback-only.
 - Credentials are supplied through environment injection or a secret manager,
@@ -226,8 +237,8 @@ data. Prefer a forward-fix migration when rollback would be destructive.
   HTTP responses.
 - Drizzle and `pg` parameterization are required for values. Raw SQL identifiers
   require an explicit trusted allow-list or a fixed internal constant.
-- PostgreSQL RLS remains deferred to the dedicated Phase 3 tenant-isolation
-  task. No policy is implied merely by the presence of tenancy tables.
+- Workspace-scoped repositories use transaction-local context and RLS; plain
+  persistent `SET` is prohibited on pooled connections.
 
 ## Local development and integration testing
 

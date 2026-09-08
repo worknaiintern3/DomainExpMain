@@ -2,7 +2,7 @@ import { defineConfig } from 'drizzle-kit';
 
 import { parseDatabaseUrl } from './src/config/database-env.schema';
 
-const databaseUrl = process.env.DATABASE_URL;
+const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL;
 
 export default defineConfig({
   dialect: 'postgresql',
@@ -11,7 +11,14 @@ export default defineConfig({
   casing: 'snake_case',
   strict: true,
   verbose: true,
-  ...(databaseUrl
-    ? { dbCredentials: { url: parseDatabaseUrl(databaseUrl) } }
+  ...(migrationDatabaseUrl
+    ? {
+        dbCredentials: {
+          url: parseDatabaseUrl(
+            migrationDatabaseUrl,
+            'MIGRATION_DATABASE_URL',
+          ),
+        },
+      }
     : {}),
 });

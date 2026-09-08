@@ -13,6 +13,8 @@ export type {
   DatabaseTransaction,
   DatabaseTransactionOperation,
   SanitizedDatabaseConfiguration,
+  UserTransactionHost,
+  WorkspaceTransactionHost,
 } from './client/database-types';
 export {
   DatabaseConfigurationError,
@@ -43,3 +45,11 @@ export {
   type WorkspaceMember,
 } from './schema';
 export { runInTransaction } from './transactions/transaction';
+export {
+  InvalidUserDatabaseContextError,
+  InvalidWorkspaceDatabaseContextError,
+  setUserContext,
+  setWorkspaceContext,
+  withUserContext,
+  withWorkspaceContext,
+} from './transactions/workspace-context';

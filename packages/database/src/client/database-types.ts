@@ -45,5 +45,27 @@ export interface DatabaseClient extends DatabasePingClient {
   readonly database: Database;
   readonly pool: Pool;
   transaction<T>(operation: DatabaseTransactionOperation<T>): Promise<T>;
+  withUserContext<T>(
+    userId: string,
+    operation: DatabaseTransactionOperation<T>,
+  ): Promise<T>;
+  withWorkspaceContext<T>(
+    workspaceId: string,
+    operation: DatabaseTransactionOperation<T>,
+  ): Promise<T>;
   close(): Promise<void>;
+}
+
+export interface UserTransactionHost {
+  withUserContext<T>(
+    userId: string,
+    operation: DatabaseTransactionOperation<T>,
+  ): Promise<T>;
+}
+
+export interface WorkspaceTransactionHost {
+  withWorkspaceContext<T>(
+    workspaceId: string,
+    operation: DatabaseTransactionOperation<T>,
+  ): Promise<T>;
 }
