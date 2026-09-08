@@ -21,8 +21,9 @@ not expose PostgreSQL, Drizzle, Node.js, or internal database types.
 
 Phase 3 establishes the global user identity, workspace tenant root, workspace
 membership bridge, server-only authentication persistence, and PostgreSQL RLS
-for workspace visibility. Portfolio, relationship, provenance, provider,
-monitoring, and job schemas remain deferred.
+for workspace visibility. Phase 4 adds the core portfolio inventory schema.
+Generic relationships, monitoring, provider connections, retrieved snapshots,
+and job schemas remain deferred.
 
 ## Runtime configuration
 
@@ -173,6 +174,32 @@ UUID-derived non-PII slug and an owner membership before
 This schema is persistence only. Registration, login, logout, password hashing,
 token signing, token rotation, and authorization remain application-layer work.
 
+### Core portfolio schema
+
+The workspace-owned portfolio roots are `projects`, `email_accounts`,
+`provider_accounts`, `domains`, `servers`, `cloud_resources`, and
+`website_applications`. Every row has a UUID primary key, a restricted workspace
+foreign key, explicit inventory state and provenance, lifecycle timestamps, and
+a unique `(workspace_id, id)` key. Structural references use that composite key
+so the database rejects cross-workspace mappings even independently of RLS.
+
+Provider accounts identify an inventory account and may map to an email account;
+they do not represent API credentials or synchronization state. Domains may map
+registrar and DNS providers. Servers and cloud resources may map providers, while
+website applications may map one primary domain and one project. Projects do not
+directly own domains, servers, or cloud resources; shared mappings remain deferred
+to the future relationship model.
+
+Normalized project names and email addresses are unique within a workspace.
+Canonical domain names are separately stored as application-produced lowercase
+ASCII/IDNA values without whitespace or a trailing dot and are workspace-unique.
+Nullable domain `auto_renew` deliberately distinguishes enabled, disabled, and
+unknown. External provider/resource identifiers are unique only when known.
+
+All seven tables use fail-closed workspace RLS. `updated_at` receives an insert
+default only; until a deliberate trigger convention exists, future mutation
+repositories must explicitly set it whenever they update a row.
+
 ## Transactions
 
 `DatabaseClient.transaction()` delegates to a real Drizzle transaction and
@@ -195,9 +222,10 @@ npm run db:migrate    # apply reviewed migrations using MIGRATION_DATABASE_URL
 ```
 
 There are intentionally no normal `db:push`, `db:drop`, or `db:reset` commands.
-The first reviewed migration establishes `users`, `workspaces`,
-`workspace_members`, their constraints, and the membership-role enum. The next
-reviewed migration adds only password-credential and session persistence.
+The reviewed migration sequence establishes core tenancy, authentication
+persistence, the personal-workspace invariant, workspace RLS, and then the core
+portfolio schema. Migration `0004` creates all seven portfolio tables and enables
+their RLS policies in the same migration.
 
 Development workflow:
 

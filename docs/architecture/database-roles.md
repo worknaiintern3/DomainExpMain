@@ -16,8 +16,9 @@ must prove the runtime login owns no protected table and has no bypass flag.
 
 ## Current protected and bootstrap tables
 
-RLS is enabled on `workspaces` and `workspace_members`. Workspace policies
-require their workspace key to equal `domainpulse.current_workspace_id()`.
+RLS is enabled on `workspaces`, `workspace_members`, and all seven core portfolio
+tables. Workspace policies require their workspace key to equal
+`domainpulse.current_workspace_id()`.
 Membership SELECT additionally permits only rows belonging to
 `domainpulse.current_user_id()` when no workspace context is active; this is
 the narrow bootstrap path. The helpers return `NULL` for absent, empty, or
@@ -81,6 +82,15 @@ GRANT SELECT, INSERT ON users, password_credentials TO :"runtime_role";
 GRANT SELECT, INSERT, UPDATE ON sessions TO :"runtime_role";
 GRANT SELECT, INSERT, UPDATE, DELETE ON workspaces, workspace_members
   TO :"runtime_role";
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+  projects,
+  email_accounts,
+  provider_accounts,
+  domains,
+  servers,
+  cloud_resources,
+  website_applications
+  TO :"runtime_role";
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public, domainpulse FROM :"runtime_role";
 ```
@@ -99,11 +109,21 @@ WHERE rolname IN ('replace_me_runtime_role', 'replace_me_migration_role');
 SELECT schemaname, tablename, tableowner, rowsecurity
 FROM pg_catalog.pg_tables
 WHERE schemaname = 'public'
-  AND tablename IN ('workspaces', 'workspace_members');
+  AND tablename IN (
+    'workspaces',
+    'workspace_members',
+    'projects',
+    'email_accounts',
+    'provider_accounts',
+    'domains',
+    'servers',
+    'cloud_resources',
+    'website_applications'
+  );
 ```
 
 The runtime row must have every capability flag shown as false, must not match
-either `tableowner`, and both protected tables must report RLS enabled.
+any `tableowner`, and every protected table must report RLS enabled.
 
 The PostgreSQL RLS suite uses only `RLS_TEST_DATABASE_URL`, which must identify
 a dedicated disposable database whose login can create roles. It never falls
@@ -135,5 +155,6 @@ CREATE POLICY example_delete ON example FOR DELETE
   USING (workspace_id = domainpulse.current_workspace_id());
 ```
 
-The migration that adds a future table must also grant only its required DML
-privileges to the runtime role and include real non-owner cross-tenant tests.
+The role-provisioning runbook must grant only each table's required DML
+privileges, while migrations remain role-name agnostic. Every protected table
+also requires real non-owner cross-tenant tests.
