@@ -27,7 +27,12 @@ export {
   type DatabaseAvailability,
 } from './health/database-health';
 export {
+  archiveStoredInventoryRelationship,
+  createStoredInventoryRelationship,
+  getStoredInventoryRelationship,
   InventoryNodeNotFoundError,
+  InvalidInventoryRelationshipError,
+  InventoryRelationshipSemanticConflictError,
   listApplicationDomains,
   listApplicationsHostedOn,
   listConnectedInventoryEntities,
@@ -38,6 +43,10 @@ export {
   listInboundInventoryRelationships,
   listOutboundInventoryRelationships,
   listProjectResources,
+  listStoredInventoryRelationships,
+  StoredInventoryRelationshipNotFoundError,
+  updateStoredInventoryRelationship,
+  validateInventoryRelationshipDefinition,
   type AssociatedInventoryEntity,
   type ConnectableEntityKind,
   type DependencySourceKind,
@@ -50,6 +59,12 @@ export {
   type InventoryGraphRelationship,
   type InventoryRelationshipDirection,
   type InventoryRelationshipQueryOptions,
+  type CreateStoredInventoryRelationshipInput,
+  type InventoryRelationshipCursorPosition,
+  type ListStoredInventoryRelationshipsInput,
+  type StoredInventoryRelationship,
+  type StoredInventoryRelationshipPage,
+  type UpdateStoredInventoryRelationshipInput,
 } from './queries/inventory-graph';
 export {
   applicationKindEnum,

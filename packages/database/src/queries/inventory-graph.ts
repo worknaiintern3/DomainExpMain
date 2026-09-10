@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 
@@ -56,6 +56,49 @@ export interface InventoryRelationshipQueryOptions {
   readonly includeArchived?: boolean;
 }
 
+export interface StoredInventoryRelationship {
+  readonly id: string;
+  readonly source: InventoryEntityReference;
+  readonly relationshipType: InfrastructureRelationshipType;
+  readonly target: InventoryEntityReference;
+  readonly inventoryState: InventoryRelationship['inventoryState'];
+  readonly provenance: InventoryRelationship['provenance'];
+  readonly notes: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+export interface InventoryRelationshipCursorPosition {
+  readonly createdAt: string;
+  readonly id: string;
+}
+
+export interface CreateStoredInventoryRelationshipInput {
+  readonly source: InventoryEntityReference;
+  readonly relationshipType: InfrastructureRelationshipType;
+  readonly target: InventoryEntityReference;
+  readonly notes?: string | null | undefined;
+}
+
+export interface UpdateStoredInventoryRelationshipInput {
+  readonly inventoryState?: InventoryRelationship['inventoryState'] | undefined;
+  readonly notes?: string | null | undefined;
+}
+
+export interface ListStoredInventoryRelationshipsInput {
+  readonly cursor?: InventoryRelationshipCursorPosition | undefined;
+  readonly includeArchived: boolean;
+  readonly limit: number;
+  readonly relationshipType?: InfrastructureRelationshipType | undefined;
+  readonly source?: InventoryEntityReference | undefined;
+  readonly target?: InventoryEntityReference | undefined;
+}
+
+export interface StoredInventoryRelationshipPage {
+  readonly items: readonly StoredInventoryRelationship[];
+  readonly nextCursor: InventoryRelationshipCursorPosition | null;
+}
+
 export interface AssociatedInventoryEntity extends InventoryEntityReference {
   readonly associationSources: readonly InventoryAssociationSource[];
 }
@@ -66,6 +109,33 @@ export class InventoryNodeNotFoundError extends Error {
   constructor() {
     super('Inventory entity was not found');
     this.name = 'InventoryNodeNotFoundError';
+  }
+}
+
+export class InvalidInventoryRelationshipError extends Error {
+  readonly code = 'INVALID_INVENTORY_RELATIONSHIP';
+
+  constructor() {
+    super('Invalid inventory relationship');
+    this.name = 'InvalidInventoryRelationshipError';
+  }
+}
+
+export class InventoryRelationshipSemanticConflictError extends Error {
+  readonly code = 'INVENTORY_RELATIONSHIP_SEMANTIC_CONFLICT';
+
+  constructor() {
+    super('Relationship duplicates a primary structural association');
+    this.name = 'InventoryRelationshipSemanticConflictError';
+  }
+}
+
+export class StoredInventoryRelationshipNotFoundError extends Error {
+  readonly code = 'STORED_INVENTORY_RELATIONSHIP_NOT_FOUND';
+
+  constructor() {
+    super('Inventory relationship was not found');
+    this.name = 'StoredInventoryRelationshipNotFoundError';
   }
 }
 
@@ -485,4 +555,388 @@ export async function listConnectedInventoryEntities(
     'CONNECTED_TO',
   );
   return [...outbound, ...inbound];
+}
+
+const relationshipKinds: Readonly<
+  Record<
+    InfrastructureRelationshipType,
+    readonly (readonly [GraphEntityKind, GraphEntityKind])[]
+  >
+> = {
+  GROUPS: [
+    ['PROJECT', 'DOMAIN'],
+    ['PROJECT', 'SERVER'],
+    ['PROJECT', 'CLOUD_RESOURCE'],
+    ['PROJECT', 'WEBSITE_APPLICATION'],
+  ],
+  HOSTED_ON: [
+    ['WEBSITE_APPLICATION', 'SERVER'],
+    ['WEBSITE_APPLICATION', 'CLOUD_RESOURCE'],
+  ],
+  USES_DOMAIN: [['WEBSITE_APPLICATION', 'DOMAIN']],
+  DEPENDS_ON: [
+    ['WEBSITE_APPLICATION', 'DOMAIN'],
+    ['WEBSITE_APPLICATION', 'WEBSITE_APPLICATION'],
+    ['WEBSITE_APPLICATION', 'SERVER'],
+    ['WEBSITE_APPLICATION', 'CLOUD_RESOURCE'],
+    ['SERVER', 'DOMAIN'],
+    ['SERVER', 'WEBSITE_APPLICATION'],
+    ['SERVER', 'SERVER'],
+    ['SERVER', 'CLOUD_RESOURCE'],
+    ['CLOUD_RESOURCE', 'DOMAIN'],
+    ['CLOUD_RESOURCE', 'WEBSITE_APPLICATION'],
+    ['CLOUD_RESOURCE', 'SERVER'],
+    ['CLOUD_RESOURCE', 'CLOUD_RESOURCE'],
+  ],
+  ROUTES_TO: [
+    ['DOMAIN', 'WEBSITE_APPLICATION'],
+    ['DOMAIN', 'SERVER'],
+    ['DOMAIN', 'CLOUD_RESOURCE'],
+  ],
+  CONNECTED_TO: [
+    ['SERVER', 'SERVER'],
+    ['SERVER', 'CLOUD_RESOURCE'],
+    ['CLOUD_RESOURCE', 'SERVER'],
+    ['CLOUD_RESOURCE', 'CLOUD_RESOURCE'],
+  ],
+};
+
+export function validateInventoryRelationshipDefinition(
+  input: CreateStoredInventoryRelationshipInput,
+): void {
+  if (
+    input.source.entityKind === input.target.entityKind &&
+    input.source.entityId === input.target.entityId
+  ) {
+    throw new InvalidInventoryRelationshipError();
+  }
+
+  const allowed = relationshipKinds[input.relationshipType].some(
+    ([sourceKind, targetKind]) =>
+      sourceKind === input.source.entityKind &&
+      targetKind === input.target.entityKind,
+  );
+  if (!allowed) {
+    throw new InvalidInventoryRelationshipError();
+  }
+}
+
+function toStoredRelationship(row: {
+  readonly createdAt: Date;
+  readonly id: string;
+  readonly inventoryState: InventoryRelationship['inventoryState'];
+  readonly notes: string | null;
+  readonly provenance: InventoryRelationship['provenance'];
+  readonly relationshipType: InfrastructureRelationshipType;
+  readonly sourceEntityId: string;
+  readonly sourceEntityKind: GraphEntityKind;
+  readonly targetEntityId: string;
+  readonly targetEntityKind: GraphEntityKind;
+  readonly updatedAt: Date;
+}): StoredInventoryRelationship {
+  return {
+    createdAt: row.createdAt,
+    id: row.id,
+    inventoryState: row.inventoryState,
+    notes: row.notes,
+    provenance: row.provenance,
+    relationshipType: row.relationshipType,
+    source: {
+      entityId: row.sourceEntityId,
+      entityKind: row.sourceEntityKind,
+    },
+    target: {
+      entityId: row.targetEntityId,
+      entityKind: row.targetEntityKind,
+    },
+    updatedAt: row.updatedAt,
+  };
+}
+
+const storedRelationshipSelection = {
+  createdAt: inventoryRelationships.createdAt,
+  id: inventoryRelationships.id,
+  inventoryState: inventoryRelationships.inventoryState,
+  notes: inventoryRelationships.notes,
+  provenance: inventoryRelationships.provenance,
+  relationshipType: inventoryRelationships.relationshipType,
+  sourceEntityId: relationshipSourceNode.entityId,
+  sourceEntityKind: relationshipSourceNode.entityKind,
+  targetEntityId: relationshipTargetNode.entityId,
+  targetEntityKind: relationshipTargetNode.entityKind,
+  updatedAt: inventoryRelationships.updatedAt,
+};
+
+function preciseRelationshipCursorTimestamp() {
+  return sql<string>`to_char(${inventoryRelationships.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
+}
+
+function relationshipCursorCondition(
+  cursor: InventoryRelationshipCursorPosition | undefined,
+) {
+  return cursor
+    ? sql`(${inventoryRelationships.createdAt}, ${inventoryRelationships.id}) < (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`
+    : undefined;
+}
+
+async function selectStoredInventoryRelationship(
+  transaction: DatabaseTransaction,
+  relationshipId: string,
+): Promise<StoredInventoryRelationship | undefined> {
+  const [row] = await transaction
+    .select(storedRelationshipSelection)
+    .from(inventoryRelationships)
+    .innerJoin(
+      relationshipSourceNode,
+      and(
+        eq(
+          relationshipSourceNode.workspaceId,
+          inventoryRelationships.workspaceId,
+        ),
+        eq(relationshipSourceNode.nodeId, inventoryRelationships.sourceNodeId),
+        eq(relationshipSourceNode.entityKind, inventoryRelationships.sourceKind),
+      ),
+    )
+    .innerJoin(
+      relationshipTargetNode,
+      and(
+        eq(
+          relationshipTargetNode.workspaceId,
+          inventoryRelationships.workspaceId,
+        ),
+        eq(relationshipTargetNode.nodeId, inventoryRelationships.targetNodeId),
+        eq(relationshipTargetNode.entityKind, inventoryRelationships.targetKind),
+      ),
+    )
+    .where(
+      and(
+        eq(inventoryRelationships.workspaceId, currentWorkspaceId),
+        eq(inventoryRelationships.id, relationshipId),
+      ),
+    )
+    .limit(1);
+
+  return row ? toStoredRelationship(row) : undefined;
+}
+
+export async function getStoredInventoryRelationship(
+  transaction: DatabaseTransaction,
+  relationshipId: string,
+): Promise<StoredInventoryRelationship> {
+  const relationship = await selectStoredInventoryRelationship(
+    transaction,
+    relationshipId,
+  );
+  if (!relationship) {
+    throw new StoredInventoryRelationshipNotFoundError();
+  }
+  return relationship;
+}
+
+async function enforcePrimaryStructuralRelationshipLocks(
+  transaction: DatabaseTransaction,
+  input: CreateStoredInventoryRelationshipInput,
+): Promise<void> {
+  if (
+    input.relationshipType === 'GROUPS' &&
+    input.source.entityKind === 'PROJECT' &&
+    input.target.entityKind === 'WEBSITE_APPLICATION'
+  ) {
+    const [primaryProject] = await transaction
+      .select({ id: websiteApplications.id })
+      .from(websiteApplications)
+      .where(
+        and(
+          eq(websiteApplications.workspaceId, currentWorkspaceId),
+          eq(websiteApplications.id, input.target.entityId),
+          eq(websiteApplications.projectId, input.source.entityId),
+        ),
+      )
+      .limit(1);
+    if (primaryProject) {
+      throw new InventoryRelationshipSemanticConflictError();
+    }
+  }
+
+  if (
+    input.relationshipType === 'USES_DOMAIN' &&
+    input.source.entityKind === 'WEBSITE_APPLICATION' &&
+    input.target.entityKind === 'DOMAIN'
+  ) {
+    const [primaryDomain] = await transaction
+      .select({ id: websiteApplications.id })
+      .from(websiteApplications)
+      .where(
+        and(
+          eq(websiteApplications.workspaceId, currentWorkspaceId),
+          eq(websiteApplications.id, input.source.entityId),
+          eq(websiteApplications.primaryDomainId, input.target.entityId),
+        ),
+      )
+      .limit(1);
+    if (primaryDomain) {
+      throw new InventoryRelationshipSemanticConflictError();
+    }
+  }
+}
+
+export async function createStoredInventoryRelationship(
+  transaction: DatabaseTransaction,
+  input: CreateStoredInventoryRelationshipInput,
+): Promise<StoredInventoryRelationship> {
+  validateInventoryRelationshipDefinition(input);
+  const source = await resolveInventoryNode(
+    transaction,
+    input.source.entityKind,
+    input.source.entityId,
+  );
+  const target = await resolveInventoryNode(
+    transaction,
+    input.target.entityKind,
+    input.target.entityId,
+  );
+  await enforcePrimaryStructuralRelationshipLocks(transaction, input);
+
+  const [canonicalSource, canonicalTarget] =
+    input.relationshipType === 'CONNECTED_TO' && source.nodeId > target.nodeId
+      ? [target, source]
+      : [source, target];
+  const [created] = await transaction
+    .insert(inventoryRelationships)
+    .values({
+      inventoryState: 'TRACKED',
+      notes: input.notes,
+      provenance: 'USER_MAPPED',
+      relationshipType: input.relationshipType,
+      sourceKind: canonicalSource.entityKind,
+      sourceNodeId: canonicalSource.nodeId,
+      targetKind: canonicalTarget.entityKind,
+      targetNodeId: canonicalTarget.nodeId,
+      workspaceId: currentWorkspaceId,
+    })
+    .returning({ id: inventoryRelationships.id });
+  if (!created) {
+    throw new Error('Inventory relationship insert returned no record');
+  }
+  return getStoredInventoryRelationship(transaction, created.id);
+}
+
+export async function listStoredInventoryRelationships(
+  transaction: DatabaseTransaction,
+  input: ListStoredInventoryRelationshipsInput,
+): Promise<StoredInventoryRelationshipPage> {
+  const rows = await transaction
+    .select({
+      ...storedRelationshipSelection,
+      cursorCreatedAt: preciseRelationshipCursorTimestamp(),
+    })
+    .from(inventoryRelationships)
+    .innerJoin(
+      relationshipSourceNode,
+      and(
+        eq(
+          relationshipSourceNode.workspaceId,
+          inventoryRelationships.workspaceId,
+        ),
+        eq(relationshipSourceNode.nodeId, inventoryRelationships.sourceNodeId),
+        eq(relationshipSourceNode.entityKind, inventoryRelationships.sourceKind),
+      ),
+    )
+    .innerJoin(
+      relationshipTargetNode,
+      and(
+        eq(
+          relationshipTargetNode.workspaceId,
+          inventoryRelationships.workspaceId,
+        ),
+        eq(relationshipTargetNode.nodeId, inventoryRelationships.targetNodeId),
+        eq(relationshipTargetNode.entityKind, inventoryRelationships.targetKind),
+      ),
+    )
+    .where(
+      and(
+        eq(inventoryRelationships.workspaceId, currentWorkspaceId),
+        input.includeArchived
+          ? undefined
+          : eq(inventoryRelationships.inventoryState, 'TRACKED'),
+        input.relationshipType
+          ? eq(inventoryRelationships.relationshipType, input.relationshipType)
+          : undefined,
+        input.source
+          ? and(
+              eq(relationshipSourceNode.entityKind, input.source.entityKind),
+              eq(relationshipSourceNode.entityId, input.source.entityId),
+            )
+          : undefined,
+        input.target
+          ? and(
+              eq(relationshipTargetNode.entityKind, input.target.entityKind),
+              eq(relationshipTargetNode.entityId, input.target.entityId),
+            )
+          : undefined,
+        relationshipCursorCondition(input.cursor),
+      ),
+    )
+    .orderBy(
+      desc(inventoryRelationships.createdAt),
+      desc(inventoryRelationships.id),
+    )
+    .limit(input.limit + 1);
+
+  const hasNextPage = rows.length > input.limit;
+  const pageRows = hasNextPage ? rows.slice(0, input.limit) : rows;
+  const last = pageRows.at(-1);
+  return {
+    items: pageRows.map(toStoredRelationship),
+    nextCursor:
+      hasNextPage && last
+        ? { createdAt: last.cursorCreatedAt, id: last.id }
+        : null,
+  };
+}
+
+export async function updateStoredInventoryRelationship(
+  transaction: DatabaseTransaction,
+  relationshipId: string,
+  input: UpdateStoredInventoryRelationshipInput,
+): Promise<StoredInventoryRelationship> {
+  const [updated] = await transaction
+    .update(inventoryRelationships)
+    .set({
+      ...('notes' in input ? { notes: input.notes } : {}),
+      ...(input.inventoryState === undefined
+        ? {}
+        : { inventoryState: input.inventoryState }),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(inventoryRelationships.workspaceId, currentWorkspaceId),
+        eq(inventoryRelationships.id, relationshipId),
+      ),
+    )
+    .returning({ id: inventoryRelationships.id });
+  if (!updated) {
+    throw new StoredInventoryRelationshipNotFoundError();
+  }
+  return getStoredInventoryRelationship(transaction, updated.id);
+}
+
+export async function archiveStoredInventoryRelationship(
+  transaction: DatabaseTransaction,
+  relationshipId: string,
+): Promise<void> {
+  const [archived] = await transaction
+    .update(inventoryRelationships)
+    .set({ inventoryState: 'ARCHIVED', updatedAt: new Date() })
+    .where(
+      and(
+        eq(inventoryRelationships.workspaceId, currentWorkspaceId),
+        eq(inventoryRelationships.id, relationshipId),
+      ),
+    )
+    .returning({ id: inventoryRelationships.id });
+  if (!archived) {
+    throw new StoredInventoryRelationshipNotFoundError();
+  }
 }

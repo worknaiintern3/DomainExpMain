@@ -74,3 +74,20 @@ export {
   type UpdateProviderAccountRequest,
   type UpdateServerRequest,
 } from './inventory/inventory.schemas';
+export {
+  CreateInventoryRelationshipRequestSchema,
+  InventoryEntityReferenceSchema,
+  InventoryGraphEntityKindSchema,
+  InventoryRelationshipCollectionResponseSchema,
+  InventoryRelationshipListQuerySchema,
+  InventoryRelationshipResponseSchema,
+  InventoryRelationshipTypeSchema,
+  UpdateInventoryRelationshipRequestSchema,
+  type CreateInventoryRelationshipRequest,
+  type InventoryEntityReference,
+  type InventoryGraphEntityKind,
+  type InventoryRelationshipListQuery,
+  type InventoryRelationshipResponse,
+  type InventoryRelationshipType,
+  type UpdateInventoryRelationshipRequest,
+} from './inventory/relationship.schemas';
