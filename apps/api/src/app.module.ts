@@ -6,6 +6,7 @@ import { ProblemDetailsFilter } from './common/http/problem-details.filter';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { ReadinessModule } from './readiness/readiness.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { ReadinessModule } from './readiness/readiness.module';
     AuthModule,
     HealthModule,
     ReadinessModule,
+    InventoryModule,
   ],
   providers: [
     {

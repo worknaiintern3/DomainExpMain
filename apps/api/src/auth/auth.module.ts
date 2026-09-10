@@ -101,6 +101,6 @@ import {
     },
     AccessTokenGuard,
   ],
-  exports: [AccessTokenGuard],
+  exports: [AccessTokenGuard, AccessTokenService],
 })
 export class AuthModule {}

@@ -13,6 +13,16 @@ import {
 import { AppConfigService } from './config/config.module';
 import { parseEnvironment } from './config/env.schema';
 
+export const API_CORS_ALLOWED_HEADERS = [
+  'Accept',
+  'Authorization',
+  'Content-Type',
+  'Idempotency-Key',
+  'If-Match',
+  'X-Request-Id',
+  'X-Workspace-Id',
+] as const;
+
 export async function createApplication(): Promise<NestFastifyApplication> {
   const environment = parseEnvironment(process.env);
   const nestOptions: NestApplicationOptions =
@@ -42,14 +52,7 @@ export async function createApplication(): Promise<NestFastifyApplication> {
     origin: config.corsOrigins,
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Accept',
-      'Authorization',
-      'Content-Type',
-      'Idempotency-Key',
-      'If-Match',
-      'X-Request-Id',
-    ],
+    allowedHeaders: [...API_CORS_ALLOWED_HEADERS],
     exposedHeaders: ['ETag', 'Location', 'X-Request-Id'],
     maxAge: 86_400,
   });
