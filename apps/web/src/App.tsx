@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
+import { AuthProvider } from './lib/auth/AuthContext';
+import { ProtectedRoute } from './lib/auth/ProtectedRoute';
 
 // Page route components
 import { OverviewPage } from './pages/OverviewPage';
@@ -18,14 +20,18 @@ import { AlertsPage } from './pages/AlertsPage';
 import { InfrastructureMapPage } from './pages/InfrastructureMapPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SupportPage } from './pages/SupportPage';
+import { LoginPage } from './pages/LoginPage';
 
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route path="/" element={<Navigate to="/overview" replace />} />
-          <Route path="/overview" element={<OverviewPage />} />
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<Navigate to="/overview" replace />} />
+              <Route path="/overview" element={<OverviewPage />} />
           
           <Route path="/domains" element={<DomainsPage />} />
           <Route path="/domains/:domainId" element={<DomainDetailPage />} />
@@ -52,8 +58,10 @@ export const App: React.FC = () => {
           
           {/* Catch-all route redirects back to overview */}
           <Route path="*" element={<Navigate to="/overview" replace />} />
-        </Route>
-      </Routes>
+            </Route>
+          </Route>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 };
