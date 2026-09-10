@@ -22,8 +22,9 @@ not expose PostgreSQL, Drizzle, Node.js, or internal database types.
 Phase 3 establishes the global user identity, workspace tenant root, workspace
 membership bridge, server-only authentication persistence, and PostgreSQL RLS
 for workspace visibility. Phase 4 adds the core portfolio inventory schema.
-Generic relationships, monitoring, provider connections, retrieved snapshots,
-and job schemas remain deferred.
+Phase 5 adds the internal inventory-node registry and flexible relationship
+graph. Monitoring, provider connections, retrieved snapshots, and job schemas
+remain deferred.
 
 ## Runtime configuration
 
@@ -200,6 +201,29 @@ All seven tables use fail-closed workspace RLS. `updated_at` receives an insert
 default only; until a deliberate trigger convention exists, future mutation
 repositories must explicitly set it whenever they update a row.
 
+### Inventory relationship graph
+
+`inventory_nodes` assigns a separate internal graph UUID to each Project,
+Domain, Server, CloudResource, and WebsiteApplication. The public entity UUID
+remains unchanged, and EmailAccount and ProviderAccount are intentionally not
+graph nodes. Existing records are backfilled; hardened entity triggers create
+and remove nodes atomically for later inserts and hard deletes. Entity `id` and
+`workspace_id` are immutable once created.
+
+`inventory_relationships` stores workspace-owned canonical edges between
+nodes. Composite endpoint foreign keys include workspace, node ID, and entity
+kind, so normal database constraints reject missing, mistyped, and cross-tenant
+endpoints even for schema-owner operations. The finite relationship-kind matrix,
+self-edge prohibition, symmetric `CONNECTED_TO` ordering, provenance subset,
+and canonical uniqueness are database constraints rather than application-only
+rules.
+
+Only one directed edge is stored; inverse labels are derived by graph queries.
+Relationship archival preserves canonical identity for restoration. Entity
+archival preserves its node and edges, while a successful hard delete removes
+the node and cascades flexible edges. Existing Phase 4 structural foreign keys
+remain authoritative and are not duplicated into the graph.
+
 ## Transactions
 
 `DatabaseClient.transaction()` delegates to a real Drizzle transaction and
@@ -223,9 +247,10 @@ npm run db:migrate    # apply reviewed migrations using MIGRATION_DATABASE_URL
 
 There are intentionally no normal `db:push`, `db:drop`, or `db:reset` commands.
 The reviewed migration sequence establishes core tenancy, authentication
-persistence, the personal-workspace invariant, workspace RLS, and then the core
-portfolio schema. Migration `0004` creates all seven portfolio tables and enables
-their RLS policies in the same migration.
+persistence, the personal-workspace invariant, workspace RLS, the core portfolio
+schema, and then the inventory relationship graph. Migration `0005` backfills
+and protects graph nodes before creating canonical graph edges and their RLS
+policies.
 
 Development workflow:
 

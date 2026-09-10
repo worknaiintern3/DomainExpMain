@@ -36,6 +36,13 @@
       "when": 1788864988639,
       "tag": "0004_core_portfolio",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788870760576,
+      "tag": "0005_inventory_graph",
+      "breakpoints": true
     }
   ]
 }

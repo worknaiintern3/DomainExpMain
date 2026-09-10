@@ -7,6 +7,16 @@ export {
   type Session,
 } from './auth';
 export {
+  graphEntityKindEnum,
+  infrastructureRelationshipTypeEnum,
+  inventoryNodes,
+  inventoryRelationships,
+  type InventoryNode,
+  type InventoryRelationship,
+  type NewInventoryNode,
+  type NewInventoryRelationship,
+} from './graph';
+export {
   applicationKindEnum,
   cloudResources,
   domains,

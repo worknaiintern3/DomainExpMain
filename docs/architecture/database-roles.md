@@ -16,9 +16,9 @@ must prove the runtime login owns no protected table and has no bypass flag.
 
 ## Current protected and bootstrap tables
 
-RLS is enabled on `workspaces`, `workspace_members`, and all seven core portfolio
-tables. Workspace policies require their workspace key to equal
-`domainpulse.current_workspace_id()`.
+RLS is enabled on `workspaces`, `workspace_members`, all seven core portfolio
+tables, `inventory_nodes`, and `inventory_relationships`. Workspace policies
+require their workspace key to equal `domainpulse.current_workspace_id()`.
 Membership SELECT additionally permits only rows belonging to
 `domainpulse.current_user_id()` when no workspace context is active; this is
 the narrow bootstrap path. The helpers return `NULL` for absent, empty, or
@@ -91,6 +91,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   cloud_resources,
   website_applications
   TO :"runtime_role";
+GRANT SELECT ON inventory_nodes TO :"runtime_role";
+GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_relationships
+  TO :"runtime_role";
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public, domainpulse FROM :"runtime_role";
 ```
@@ -118,12 +121,22 @@ WHERE schemaname = 'public'
     'domains',
     'servers',
     'cloud_resources',
-    'website_applications'
+    'website_applications',
+    'inventory_nodes',
+    'inventory_relationships'
   );
 ```
 
 The runtime row must have every capability flag shown as false, must not match
 any `tableowner`, and every protected table must report RLS enabled.
+
+The runtime role receives SELECT only on `inventory_nodes`; it receives no
+direct node INSERT, UPDATE, or DELETE privilege. Migration-owner,
+schema-qualified `SECURITY DEFINER` trigger functions maintain nodes after
+portfolio entity inserts and deletes. Their search path is fixed and PUBLIC
+execution is revoked. The runtime role receives normal DML privileges on
+`inventory_relationships`, whose RLS and composite endpoint foreign keys remain
+authoritative.
 
 The PostgreSQL RLS suite uses only `RLS_TEST_DATABASE_URL`, which must identify
 a dedicated disposable database whose login can create roles. It never falls
