@@ -91,3 +91,23 @@ export {
   type InventoryRelationshipType,
   type UpdateInventoryRelationshipRequest,
 } from './inventory/relationship.schemas';
+export {
+  InventoryAssociatedEntityCollectionResponseSchema,
+  InventoryAssociatedEntityResponseSchema,
+  InventoryAssociationSourceSchema,
+  InventoryConnectionParamsSchema,
+  InventoryDependencySourceParamsSchema,
+  InventoryDependencyTargetParamsSchema,
+  InventoryEntityReferenceCollectionResponseSchema,
+  InventoryGraphEntityParamsSchema,
+  InventoryGraphReadQuerySchema,
+  InventoryImmediateRelationshipCollectionResponseSchema,
+  InventoryImmediateRelationshipResponseSchema,
+  type InventoryAssociatedEntityResponse,
+  type InventoryConnectionParams,
+  type InventoryDependencySourceParams,
+  type InventoryDependencyTargetParams,
+  type InventoryGraphEntityParams,
+  type InventoryGraphReadQuery,
+  type InventoryImmediateRelationshipResponse,
+} from './inventory/read-model.schemas';

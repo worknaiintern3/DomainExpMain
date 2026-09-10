@@ -12,6 +12,9 @@ import { InventoryService } from './inventory.service';
 import { PostgresInventoryRepository } from './inventory.repository';
 import { ProjectsController } from './projects/projects.controller';
 import { ProviderAccountsController } from './provider-accounts/provider-accounts.controller';
+import { InventoryReadModelsController } from './read-models/inventory-read-models.controller';
+import { PostgresInventoryReadModelRepository } from './read-models/inventory-read-models.repository';
+import { InventoryReadModelService } from './read-models/inventory-read-models.service';
 import { InventoryRelationshipsController } from './relationships/relationships.controller';
 import { PostgresInventoryRelationshipRepository } from './relationships/relationships.repository';
 import { InventoryRelationshipService } from './relationships/relationships.service';
@@ -28,6 +31,7 @@ import { ServersController } from './servers/servers.controller';
     CloudResourcesController,
     ApplicationsController,
     InventoryRelationshipsController,
+    InventoryReadModelsController,
   ],
   providers: [
     {
@@ -53,6 +57,18 @@ import { ServersController } from './servers/servers.controller';
       inject: [PostgresInventoryRelationshipRepository],
       useFactory: (repository: PostgresInventoryRelationshipRepository) =>
         new InventoryRelationshipService(repository),
+    },
+    {
+      provide: PostgresInventoryReadModelRepository,
+      inject: [DatabaseService],
+      useFactory: (database: DatabaseService) =>
+        new PostgresInventoryReadModelRepository(database),
+    },
+    {
+      provide: InventoryReadModelService,
+      inject: [PostgresInventoryReadModelRepository],
+      useFactory: (repository: PostgresInventoryReadModelRepository) =>
+        new InventoryReadModelService(repository),
     },
   ],
 })
