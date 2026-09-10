@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database",
-    "dev": "tsx watch src/main.ts",
+    "predev": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database && tsc -p tsconfig.build.json",
+    "dev": "node --watch dist/main.js",
+    "dev:watch": "tsc -p tsconfig.build.json --watch",
     "prebuild": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",

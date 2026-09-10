@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, HttpAdapterHost } from '@nestjs/core';
 
 import { AuthModule } from './auth/auth.module';
 import { ProblemDetailsFilter } from './common/http/problem-details.filter';
@@ -20,8 +20,15 @@ import { ReadinessModule } from './readiness/readiness.module';
   ],
   providers: [
     {
+      // Explicit injection: the dev runtime (tsx watch) does not emit
+      // decorator parameter metadata, so useClass would construct the
+      // filter with an undefined HttpAdapterHost and crash every handled
+      // error into a 500. Matches the inject + useFactory convention used
+      // by the other constructor-dependent providers in this repository.
       provide: APP_FILTER,
-      useClass: ProblemDetailsFilter,
+      inject: [HttpAdapterHost],
+      useFactory: (adapterHost: HttpAdapterHost) =>
+        new ProblemDetailsFilter(adapterHost),
     },
   ],
 })
