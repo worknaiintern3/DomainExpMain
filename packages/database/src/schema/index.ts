@@ -54,3 +54,18 @@ export {
   type Workspace,
   type WorkspaceMember,
 } from './tenancy';
+export {
+  domainDnsMetadata,
+  domainMetadataAttemptStatusEnum,
+  domainRdapMetadata,
+  domainTlsMetadata,
+  type DomainDnsDsRecord,
+  type DomainDnsMetadata,
+  type DomainDnsMxRecord,
+  type DomainDnsRecordErrors,
+  type DomainRdapMetadata,
+  type DomainTlsMetadata,
+  type NewDomainDnsMetadata,
+  type NewDomainRdapMetadata,
+  type NewDomainTlsMetadata,
+} from './metadata';

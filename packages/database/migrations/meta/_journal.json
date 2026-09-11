@@ -43,6 +43,13 @@
       "when": 1788870760576,
       "tag": "0005_inventory_graph",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789119489677,
+      "tag": "0006_domain_metadata",
+      "breakpoints": true
     }
   ]
 }

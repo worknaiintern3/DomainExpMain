@@ -125,3 +125,18 @@ export {
   withUserContext,
   withWorkspaceContext,
 } from './transactions/workspace-context';
+export {
+  domainDnsMetadata,
+  domainMetadataAttemptStatusEnum,
+  domainRdapMetadata,
+  domainTlsMetadata,
+  type DomainDnsDsRecord,
+  type DomainDnsMetadata,
+  type DomainDnsMxRecord,
+  type DomainDnsRecordErrors,
+  type DomainRdapMetadata,
+  type DomainTlsMetadata,
+  type NewDomainDnsMetadata,
+  type NewDomainRdapMetadata,
+  type NewDomainTlsMetadata,
+} from './schema/metadata';
