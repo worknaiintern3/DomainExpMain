@@ -50,6 +50,13 @@
       "when": 1789119489677,
       "tag": "0006_domain_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789121537907,
+      "tag": "0007_metadata_provenance_nullable",
+      "breakpoints": true
     }
   ]
 }

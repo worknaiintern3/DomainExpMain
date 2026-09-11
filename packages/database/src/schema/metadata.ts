@@ -64,9 +64,7 @@ export const domainRdapMetadata = pgTable(
   {
     ...metadataAttemptColumns(),
 
-    provenance: recordProvenanceEnum('provenance')
-      .default('RDAP_RETRIEVED')
-      .notNull(),
+    provenance: recordProvenanceEnum('provenance'),
 
     registrarName: text('registrar_name'),
     registrarIanaId: text('registrar_iana_id'),
@@ -164,9 +162,7 @@ export const domainDnsMetadata = pgTable(
   {
     ...metadataAttemptColumns(),
 
-    provenance: recordProvenanceEnum('provenance')
-      .default('DNS_RETRIEVED')
-      .notNull(),
+    provenance: recordProvenanceEnum('provenance'),
 
     aRecords: text('a_records')
       .array()
@@ -261,9 +257,7 @@ export const domainTlsMetadata = pgTable(
   {
     ...metadataAttemptColumns(),
 
-    provenance: recordProvenanceEnum('provenance')
-      .default('SSL_RETRIEVED')
-      .notNull(),
+    provenance: recordProvenanceEnum('provenance'),
 
     subjectCommonName: text('subject_common_name'),
     issuerCommonName: text('issuer_common_name'),
