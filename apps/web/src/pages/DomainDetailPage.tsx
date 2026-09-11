@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/api/client';
 import { archiveInventory, getInventory, updateInventory } from '@/api/inventory';
+import { getDomainMetadata, refreshDomainMetadata } from '@/api/metadata';
 import { getImmediateRelationships } from '@/api/read-models';
-import type { Domain } from '@/api/types';
+import type { Domain, DomainMetadataResponse } from '@/api/types';
 import { Button } from '@/components/common/Button';
 import { EntityAssociations } from '@/components/integration/EntityAssociations';
 import {
@@ -13,6 +14,7 @@ import {
   StatePanel,
 } from '@/components/integration/InventoryWorkspace';
 import { domainConfiguration } from '@/features/integration/resource-configs';
+import { DomainMetadataSection } from '@/features/domain-details/components/DomainMetadataSection';
 import { useProviderLabels } from '@/features/provider-accounts/useProviderLabels';
 
 const formatDate = (value: string | null, includeTime = false) => value
@@ -36,6 +38,12 @@ export const DomainDetailPage: React.FC = () => {
   const [editing, setEditing] = useState(false);
   const [changingState, setChangingState] = useState(false);
   const generationRef = useRef(0);
+  const metadataGenerationRef = useRef(0);
+  const [metadata, setMetadata] = useState<DomainMetadataResponse | null>(null);
+  const [metadataLoading, setMetadataLoading] = useState(true);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
+  const [refreshingMetadata, setRefreshingMetadata] = useState(false);
 
   useEffect(() => {
     const generation = ++generationRef.current;
@@ -57,6 +65,34 @@ export const DomainDetailPage: React.FC = () => {
       generationRef.current += 1;
     };
   }, [domainId]);
+
+  const loadMetadata = useCallback((signal?: AbortSignal) => {
+    const generation = ++metadataGenerationRef.current;
+    setMetadata(null);
+    setMetadataLoading(true);
+    setMetadataError(null);
+    setMetadataNotice(null);
+    return getDomainMetadata(domainId, signal)
+      .then((result) => {
+        if (generation === metadataGenerationRef.current) setMetadata(result);
+      })
+      .catch((requestError: unknown) => {
+        if (signal?.aborted || generation !== metadataGenerationRef.current) return;
+        setMetadataError(requestError instanceof Error ? requestError.message : 'Retrieved metadata could not be loaded.');
+      })
+      .finally(() => {
+        if (generation === metadataGenerationRef.current) setMetadataLoading(false);
+      });
+  }, [domainId]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadMetadata(controller.signal);
+    return () => {
+      controller.abort();
+      metadataGenerationRef.current += 1;
+    };
+  }, [loadMetadata]);
 
   const providerLabels = useProviderLabels([
     domain?.registrarProviderAccountId,
@@ -84,6 +120,27 @@ export const DomainDetailPage: React.FC = () => {
       setError(requestError instanceof Error ? requestError.message : 'The domain could not be updated.');
     } finally {
       setChangingState(false);
+    }
+  };
+
+  const refreshMetadata = async () => {
+    if (refreshingMetadata || !metadata?.canRefresh) return;
+    setRefreshingMetadata(true);
+    setMetadataError(null);
+    setMetadataNotice(null);
+    try {
+      const response = await refreshDomainMetadata(domainId);
+      setMetadata(response.metadata);
+      const incomplete = Object.entries(response.results)
+        .filter(([, result]) => result.status !== 'SUCCESS')
+        .map(([source, result]) => `${source.toUpperCase()}: ${result.errorCode?.split('_').join(' ').toLowerCase() ?? result.status.toLowerCase()}`);
+      setMetadataNotice(incomplete.length > 0
+        ? `Refresh completed with source issues. ${incomplete.join('; ')}.`
+        : 'Metadata refresh completed.');
+    } catch (requestError) {
+      setMetadataError(requestError instanceof Error ? requestError.message : 'Metadata could not be refreshed.');
+    } finally {
+      setRefreshingMetadata(false);
     }
   };
 
@@ -134,6 +191,16 @@ export const DomainDetailPage: React.FC = () => {
         <div className="flex flex-col gap-unit-lg xl:col-span-2">
           <EntityAssociations title="Immediate inventory relationships" sources={associationSources} />
 
+          <DomainMetadataSection
+            error={metadataError}
+            loading={metadataLoading}
+            metadata={metadata}
+            notice={metadataNotice}
+            onRefresh={() => void refreshMetadata()}
+            onRetry={() => void loadMetadata()}
+            refreshing={refreshingMetadata}
+          />
+
           <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-unit-lg shadow-sm">
             <div className="mb-unit-md flex items-center gap-unit-sm"><span className="material-symbols-outlined flex size-9 items-center justify-center rounded-lg bg-primary/10 text-[20px] text-primary">assignment</span><div><h2 className="text-headline-sm font-semibold">Registration metadata</h2><p className="text-caption-xs text-secondary">Direct values stored on this domain record</p></div></div>
             <dl className="grid grid-cols-1 gap-unit-sm md:grid-cols-2">
@@ -155,7 +222,7 @@ export const DomainDetailPage: React.FC = () => {
             <dl className="mt-unit-md flex flex-col gap-unit-sm text-body-sm"><div><dt className="text-caption-xs uppercase text-secondary">Created</dt><dd className="mt-1">{formatDate(domain.createdAt, true)}</dd></div><div><dt className="text-caption-xs uppercase text-secondary">Updated</dt><dd className="mt-1">{formatDate(domain.updatedAt, true)}</dd></div><div><dt className="text-caption-xs uppercase text-secondary">Provenance</dt><dd className="mt-1">{domain.provenance.split('_').join(' ')}</dd></div></dl>
           </section>
           <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-unit-lg shadow-sm"><h2 className="text-headline-sm font-semibold">Notes</h2><p className="mt-unit-sm whitespace-pre-wrap text-body-sm leading-relaxed text-secondary">{domain.notes || 'No notes have been recorded.'}</p></section>
-          <section className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-unit-lg"><div className="flex gap-unit-sm"><span className="material-symbols-outlined text-primary">visibility_off</span><div><h2 className="text-label-lg font-semibold">Unavailable telemetry</h2><p className="mt-unit-xs text-caption-xs leading-relaxed text-secondary">DNS records, nameservers, DNSSEC, RDAP/WHOIS, TLS certificates, uptime, health, pricing, and renewal cost are not provided by the current API and are intentionally not shown.</p></div></div></section>
+          <section className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-unit-lg"><div className="flex gap-unit-sm"><span className="material-symbols-outlined text-primary">visibility_off</span><div><h2 className="text-label-lg font-semibold">Unavailable telemetry</h2><p className="mt-unit-xs text-caption-xs leading-relaxed text-secondary">Uptime, live health, pricing, renewal cost, traffic, and utilization are not provided by the current API and are intentionally not shown.</p></div></div></section>
         </aside>
       </div>
 

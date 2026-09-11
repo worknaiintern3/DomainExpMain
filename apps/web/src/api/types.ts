@@ -77,6 +77,69 @@ export interface Domain extends InventoryMetadata {
   registrarProviderAccountId: string | null;
 }
 
+export type DomainMetadataAttemptStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED';
+
+export interface DomainMetadataAttempt {
+  lastAttemptStatus: DomainMetadataAttemptStatus;
+  lastAttemptedAt: string;
+  lastErrorCode: string | null;
+  provenance: 'RDAP_RETRIEVED' | 'DNS_RETRIEVED' | 'SSL_RETRIEVED' | null;
+  retrievedAt: string | null;
+}
+
+export interface DomainRdapMetadata extends DomainMetadataAttempt {
+  changedAt: string | null;
+  expiresAt: string | null;
+  nameservers: string[];
+  registeredAt: string | null;
+  registrarIanaId: string | null;
+  registrarName: string | null;
+  secureDnsDelegationSigned: boolean | null;
+  sourceUrl: string | null;
+  statuses: string[];
+}
+
+export interface DomainDnsMetadata extends DomainMetadataAttempt {
+  aRecords: string[];
+  aaaaRecords: string[];
+  cnameRecords: string[];
+  dsRecords: Array<{ algorithm: number; digest: string; digestType: number; keyTag: number }>;
+  mxRecords: Array<{ exchange: string; priority: number }>;
+  nsRecords: string[];
+  recordErrors: Record<string, string>;
+  txtRecordCount: number;
+}
+
+export interface DomainTlsMetadata extends DomainMetadataAttempt {
+  fingerprint256: string | null;
+  issuerCommonName: string | null;
+  issuerOrganization: string | null;
+  serialNumber: string | null;
+  subjectAltNames: string[];
+  subjectCommonName: string | null;
+  validFrom: string | null;
+  validTo: string | null;
+}
+
+export interface DomainMetadataResponse {
+  canRefresh: boolean;
+  dns: DomainDnsMetadata | null;
+  domainId: string;
+  rdap: DomainRdapMetadata | null;
+  tls: DomainTlsMetadata | null;
+}
+
+export type DomainMetadataSource = 'rdap' | 'dns' | 'tls';
+
+export interface RefreshDomainMetadataResponse {
+  domainId: string;
+  metadata: DomainMetadataResponse;
+  results: Partial<Record<DomainMetadataSource, {
+    errorCode: string | null;
+    status: DomainMetadataAttemptStatus;
+  }>>;
+}
+
 export interface Server extends InventoryMetadata {
   hostname: string | null;
   name: string;
