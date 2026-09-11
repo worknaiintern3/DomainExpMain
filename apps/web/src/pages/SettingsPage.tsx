@@ -179,6 +179,11 @@ export const SettingsPage: React.FC = () => {
         densityLabel={settings.appearance.density}
       />
 
+      <aside className="mt-unit-md rounded-lg border border-primary/25 bg-primary/5 px-unit-base py-unit-sm text-body-sm text-on-surface" role="note">
+        <strong>Local interface preview.</strong>{' '}
+        These settings, imports, backups, alerts, pricing, and delivery controls are not connected to a backend preferences service and affect only this demo session.
+      </aside>
+
       {/* Settings Layout Body */}
       <div className="flex flex-col lg:flex-row gap-unit-lg mt-unit-lg items-start">
         {/* Left Column: Category Navigation Rail */}

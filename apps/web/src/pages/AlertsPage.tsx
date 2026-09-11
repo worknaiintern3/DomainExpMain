@@ -211,6 +211,10 @@ export const AlertsPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-unit-lg pb-unit-2xl">
+      <aside className="rounded-lg border border-primary/25 bg-primary/5 px-unit-base py-unit-sm text-body-sm text-on-surface" role="note">
+        <strong>Future capability · demonstration data only.</strong>{' '}
+        These alerts, health indicators, monitoring coverage, and rules are not produced by live DomainPulse monitoring.
+      </aside>
       {/* 1. Header with Operational View Controller */}
       <AlertsHeader
         viewMode={viewMode}

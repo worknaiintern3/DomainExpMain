@@ -151,6 +151,10 @@ export const PricingPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-unit-md w-full pb-unit-2xl">
+      <aside className="rounded-lg border border-primary/25 bg-primary/5 px-unit-base py-unit-sm text-body-sm text-on-surface" role="note">
+        <strong>Future capability · reference data only.</strong>{' '}
+        This screen is not connected to registrar or hosting-provider pricing APIs. Verify every price with the provider before acting.
+      </aside>
       {/* 1. TOP REFERENCE DISCLAIMER BANNER */}
       <PricingDisclaimer />
 

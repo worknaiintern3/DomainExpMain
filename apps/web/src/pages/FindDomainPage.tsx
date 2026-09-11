@@ -154,6 +154,10 @@ export const FindDomainPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-unit-md w-full pb-unit-2xl">
+      <aside className="rounded-lg border border-primary/25 bg-primary/5 px-unit-base py-unit-sm text-body-sm text-on-surface" role="note">
+        <strong>Future capability · demonstration data only.</strong>{' '}
+        Domain availability, registrar quotes, inspections, suggestions, and the watchlist on this screen are not connected to live provider services.
+      </aside>
       {/* Header with Title, State Switcher and Watchlist Button */}
       <FindDomainHeader
         searchState={searchState}
