@@ -17,8 +17,9 @@ must prove the runtime login owns no protected table and has no bypass flag.
 ## Current protected and bootstrap tables
 
 RLS is enabled on `workspaces`, `workspace_members`, all seven core portfolio
-tables, `inventory_nodes`, and `inventory_relationships`. Workspace policies
-require their workspace key to equal `domainpulse.current_workspace_id()`.
+tables, `inventory_nodes`, `inventory_relationships`, the three domain metadata
+tables, and the four monitoring/alert tables. Workspace policies require their
+workspace key to equal `domainpulse.current_workspace_id()`.
 Membership SELECT additionally permits only rows belonging to
 `domainpulse.current_user_id()` when no workspace context is active; this is
 the narrow bootstrap path. The helpers return `NULL` for absent, empty, or
@@ -123,7 +124,14 @@ WHERE schemaname = 'public'
     'cloud_resources',
     'website_applications',
     'inventory_nodes',
-    'inventory_relationships'
+    'inventory_relationships',
+    'domain_rdap_metadata',
+    'domain_dns_metadata',
+    'domain_tls_metadata',
+    'monitoring_targets',
+    'monitoring_runs',
+    'alert_rules',
+    'alert_events'
   );
 ```
 
@@ -148,6 +156,28 @@ isolation, bootstrap membership isolation, cross-workspace
 INSERT/UPDATE/DELETE denial, allowed same-workspace writes, missing/invalid
 context failure, and context cleanup on commit, rollback, and reuse of the same
 physical pooled session. The test role and its grants are removed afterward.
+
+## Future cross-workspace monitoring claims
+
+Phase 9B deliberately provides no direct cross-workspace claim operation and
+no worker grant. A `NOBYPASSRLS` worker cannot safely discover due rows by
+cycling caller-supplied workspace contexts, and it must never receive
+`BYPASSRLS`, table ownership, or the migration-owner role.
+
+`monitoring_runs.run_metadata` and `alert_events.evidence` are reserved for
+small, normalized, non-secret facts. Writers must never place raw DNS TXT
+values, RDAP documents, HTTP bodies, PEM material, private keys, tokens,
+credentials, or connection details in either JSON object.
+
+The worker phase must add a separately reviewed, narrowly scoped
+`SECURITY DEFINER` claim function owned by the migration owner. It must use a
+fixed `pg_catalog` search path with every application object schema-qualified,
+static SQL, `FOR UPDATE SKIP LOCKED`, deterministic due ordering, and atomic
+lease/state transitions. It must return only the identifiers and normalized
+fields needed to execute a claim. `PUBLIC` execution must be revoked and
+`EXECUTE` granted only to the dedicated worker role. The worker remains a
+non-owner `NOBYPASSRLS` role for every ordinary table query. No such function
+is created until the worker contract and retry/lease behavior are implemented.
 
 ## Future workspace-scoped tables
 

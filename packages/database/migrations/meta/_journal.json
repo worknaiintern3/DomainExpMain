@@ -57,6 +57,13 @@
       "when": 1789121537907,
       "tag": "0007_metadata_provenance_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789191941398,
+      "tag": "0008_monitoring_foundation",
+      "breakpoints": true
     }
   ]
 }

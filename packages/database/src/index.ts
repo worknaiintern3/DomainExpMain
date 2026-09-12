@@ -140,3 +140,23 @@ export {
   type NewDomainRdapMetadata,
   type NewDomainTlsMetadata,
 } from './schema/metadata';
+export {
+  alertEventStatusEnum,
+  alertEvents,
+  alertRuleKeyEnum,
+  alertRules,
+  alertSeverityEnum,
+  monitoringResultStatusEnum,
+  monitoringRunStatusEnum,
+  monitoringRuns,
+  monitoringRunTriggerEnum,
+  monitoringTargets,
+  type AlertEvent,
+  type AlertRule,
+  type MonitoringRun,
+  type MonitoringTarget,
+  type NewAlertEvent,
+  type NewAlertRule,
+  type NewMonitoringRun,
+  type NewMonitoringTarget,
+} from './schema/monitoring';
