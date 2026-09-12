@@ -85,11 +85,24 @@ export const MonitoringTargetResponseSchema = z
     { message: 'Last run time and status must be present together' },
   );
 
-export const MonitoringTargetCollectionResponseSchema = z
+export const MonitoringTargetNotConfiguredResponseSchema = z
   .object({
-    items: z.array(MonitoringTargetResponseSchema),
+    configured: z.literal(false),
+    domainId: z.uuid(),
   })
   .strict();
+
+export const MonitoringTargetConfiguredResponseSchema = z
+  .object({
+    configured: z.literal(true),
+    target: MonitoringTargetResponseSchema,
+  })
+  .strict();
+
+export const MonitoringTargetApiResponseSchema = z.union([
+  MonitoringTargetNotConfiguredResponseSchema,
+  MonitoringTargetConfiguredResponseSchema,
+]);
 
 export const MonitoringRunResponseSchema = z
   .object({
@@ -225,6 +238,71 @@ export const AlertEventCollectionResponseSchema = z
   })
   .strict();
 
+export const ManualMonitoringRunRequestSchema = z
+  .object({
+    idempotencyKey: z.string().min(1).max(256),
+  })
+  .strict();
+
+export const ManualMonitoringRunResponseSchema = z
+  .object({
+    id: z.uuid(),
+    status: z.literal('QUEUED'),
+    trigger: z.literal('MANUAL'),
+    message: z.string(),
+  })
+  .strict();
+
+export const UpdateAlertRuleRequestSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    severity: AlertSeveritySchema.optional(),
+    thresholdDays: PostgreSqlIntegerSchema.nullable().optional(),
+    thresholdCount: z.number().int().min(1).max(2_147_483_647).nullable().optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one alert rule field is required',
+  })
+  .superRefine((value, context) => {
+    // Threshold validation will be done at service layer with rule key context
+    if (value.thresholdDays !== undefined && value.thresholdDays !== null && value.thresholdDays < 0) {
+      context.addIssue({ code: 'custom', message: 'thresholdDays must be non-negative' });
+    }
+    if (value.thresholdCount !== undefined && value.thresholdCount !== null && value.thresholdCount < 1) {
+      context.addIssue({ code: 'custom', message: 'thresholdCount must be positive' });
+    }
+  });
+
+export const AlertAcknowledgeResponseSchema = z
+  .object({
+    id: z.uuid(),
+    status: z.literal('ACKNOWLEDGED'),
+    acknowledgedAt: z.iso.datetime({ offset: true }),
+    acknowledgedByUserId: z.uuid(),
+  })
+  .strict();
+
+export const AlertsListQuerySchema = z
+  .object({
+    cursor: z.string().min(1).max(2_048).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    status: AlertEventStatusSchema.optional(),
+    severity: AlertSeveritySchema.optional(),
+    ruleKey: AlertRuleKeySchema.optional(),
+    domainId: z.uuid().optional(),
+  })
+  .strict();
+
+export const MonitoringRunsListQuerySchema = z
+  .object({
+    cursor: z.string().min(1).max(2_048).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    status: MonitoringRunStatusSchema.optional(),
+    trigger: MonitoringRunTriggerSchema.optional(),
+  })
+  .strict();
+
 export type MonitoringResultStatus = z.infer<
   typeof MonitoringResultStatusSchema
 >;
@@ -242,8 +320,34 @@ export type UpdateMonitoringTargetRequest = z.infer<
 export type MonitoringTargetResponse = z.infer<
   typeof MonitoringTargetResponseSchema
 >;
+export type MonitoringTargetNotConfiguredResponse = z.infer<
+  typeof MonitoringTargetNotConfiguredResponseSchema
+>;
+export type MonitoringTargetConfiguredResponse = z.infer<
+  typeof MonitoringTargetConfiguredResponseSchema
+>;
+export type MonitoringTargetApiResponse = z.infer<
+  typeof MonitoringTargetApiResponseSchema
+>;
 export type MonitoringRunResponse = z.infer<
   typeof MonitoringRunResponseSchema
 >;
 export type AlertRuleResponse = z.infer<typeof AlertRuleResponseSchema>;
 export type AlertEventResponse = z.infer<typeof AlertEventResponseSchema>;
+export type ManualMonitoringRunRequest = z.infer<
+  typeof ManualMonitoringRunRequestSchema
+>;
+export type ManualMonitoringRunResponse = z.infer<
+  typeof ManualMonitoringRunResponseSchema
+>;
+export type UpdateAlertRuleRequest = z.infer<
+  typeof UpdateAlertRuleRequestSchema
+>;
+export type AlertRuleUpdateInput = z.infer<
+  typeof UpdateAlertRuleRequestSchema
+>;
+export type AlertAcknowledgeResponse = z.infer<
+  typeof AlertAcknowledgeResponseSchema
+>;
+export type AlertsListQuery = z.infer<typeof AlertsListQuerySchema>;
+export type MonitoringRunsListQuery = z.infer<typeof MonitoringRunsListQuerySchema>;
