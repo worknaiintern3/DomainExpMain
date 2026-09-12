@@ -8,6 +8,8 @@ import { PostgresMetadataRepository } from '../../api/src/metadata/metadata.repo
 import { RdapClient } from '../../api/src/metadata/rdap/rdap.client';
 import { TlsClient } from '../../api/src/metadata/tls/tls.client';
 import { parseWorkerEnvironment } from './config/worker-env';
+import { AlertEvaluator } from './alerts/alert-evaluator';
+import { PostgresAlertRepository } from './alerts/alert-repository';
 import { MetadataMonitoringExecutor } from './monitoring/monitoring.executor';
 import { PostgresMonitoringRepository } from './monitoring/monitoring.repository';
 import type { WorkerLogEvent, WorkerLogger } from './monitoring/monitoring.types';
@@ -39,6 +41,8 @@ async function main(): Promise<void> {
     executor,
     workerConfiguration,
     new JsonWorkerLogger(),
+    undefined,
+    new AlertEvaluator(new PostgresAlertRepository(database)),
   );
   const shutdown = (): void => {
     void worker.stop();

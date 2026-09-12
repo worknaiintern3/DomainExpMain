@@ -1,5 +1,9 @@
 import type { WorkerConfiguration } from '../config/worker-env';
 import type {
+  AlertEvaluationHooks,
+  ChangeBaseline,
+} from '../alerts/alert.types';
+import type {
   ClaimedMonitoringRun,
   MonitoringExecutionResult,
   MonitoringQueueStore,
@@ -49,6 +53,7 @@ export class MonitoringWorker {
     private readonly configuration: WorkerConfiguration,
     private readonly logger: WorkerLogger,
     private readonly clock: MonitoringWorkerClock = systemClock,
+    private readonly alertEvaluator?: AlertEvaluationHooks,
   ) {}
 
   start(): Promise<void> {
@@ -128,11 +133,17 @@ export class MonitoringWorker {
 
   private async processRun(run: ClaimedMonitoringRun): Promise<void> {
     let result: MonitoringExecutionResult;
+    let domainAvailable = false;
+    let alertBaseline: ChangeBaseline | null = null;
     try {
       const domain = await this.store.findDomain(run);
-      result = domain
-        ? await this.executor.execute(run, domain)
-        : unavailableDomain(this.clock.now());
+      if (!domain) {
+        result = unavailableDomain(this.clock.now());
+      } else {
+        domainAvailable = true;
+        alertBaseline = await this.captureAlertBaseline(run);
+        result = await this.executor.execute(run, domain);
+      }
     } catch {
       result = unexpectedFailure(this.clock.now());
     }
@@ -142,9 +153,41 @@ export class MonitoringWorker {
         result,
         this.configuration.maxRetries,
       );
-      if (!finalized) this.logger.info({ event: 'monitoring_run_lease_lost' });
+      if (!finalized) {
+        this.logger.info({ event: 'monitoring_run_lease_lost' });
+        return;
+      }
     } catch {
       this.logger.error({ event: 'monitoring_run_finalize_failed' });
+      return;
+    }
+    if (domainAvailable) {
+      await this.evaluateAlerts(run, result, alertBaseline);
+    }
+  }
+
+  private async captureAlertBaseline(
+    run: ClaimedMonitoringRun,
+  ): Promise<ChangeBaseline | null> {
+    if (!this.alertEvaluator) return null;
+    try {
+      return await this.alertEvaluator.captureBaseline(run);
+    } catch {
+      this.logger.error({ event: 'monitoring_alert_baseline_failed' });
+      return null;
+    }
+  }
+
+  private async evaluateAlerts(
+    run: ClaimedMonitoringRun,
+    result: MonitoringExecutionResult,
+    baseline: ChangeBaseline | null,
+  ): Promise<void> {
+    if (!this.alertEvaluator) return;
+    try {
+      await this.alertEvaluator.evaluateAfterRun(run, result, baseline);
+    } catch {
+      this.logger.error({ event: 'monitoring_alert_evaluation_failed' });
     }
   }
 
