@@ -64,6 +64,13 @@
       "when": 1789191941398,
       "tag": "0008_monitoring_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789194197178,
+      "tag": "0009_monitoring_worker_functions",
+      "breakpoints": true
     }
   ]
 }

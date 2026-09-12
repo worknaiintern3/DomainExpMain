@@ -157,27 +157,75 @@ INSERT/UPDATE/DELETE denial, allowed same-workspace writes, missing/invalid
 context failure, and context cleanup on commit, rollback, and reuse of the same
 physical pooled session. The test role and its grants are removed afterward.
 
-## Future cross-workspace monitoring claims
+## Monitoring worker role and cross-workspace queue functions
 
-Phase 9B deliberately provides no direct cross-workspace claim operation and
-no worker grant. A `NOBYPASSRLS` worker cannot safely discover due rows by
-cycling caller-supplied workspace contexts, and it must never receive
-`BYPASSRLS`, table ownership, or the migration-owner role.
+Phase 9C uses a dedicated login that remains a non-owner `NOBYPASSRLS` role.
+It receives no global table-reading capability. Migration 0009 installs three
+role-agnostic, migration-owner `SECURITY DEFINER` functions for the narrow
+global operations: schedule due targets, claim queued runs, and recover
+expired leases. Each function uses static schema-qualified SQL, a fixed
+`pg_catalog` search path, bounded arguments, deterministic ordering,
+`FOR UPDATE SKIP LOCKED`, and minimal identifier-only return columns. PUBLIC
+execution is revoked in the migration.
+
+Provision the role outside migrations, then explicitly grant only the worker
+surface. Replace the variables before running this as an administrator:
+
+```sql
+\set worker_role 'replace_me_worker_role'
+\set database_name 'replace_me_database'
+
+SELECT format(
+  'CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS',
+  :'worker_role'
+)
+WHERE NOT EXISTS (
+  SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'worker_role'
+) \gexec
+
+ALTER ROLE :"worker_role"
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+GRANT CONNECT ON DATABASE :"database_name" TO :"worker_role";
+GRANT USAGE ON SCHEMA public, domainpulse TO :"worker_role";
+GRANT EXECUTE ON FUNCTION domainpulse.current_workspace_id()
+  TO :"worker_role";
+GRANT EXECUTE ON FUNCTION
+  domainpulse.schedule_due_monitoring_runs(timestamp with time zone, integer),
+  domainpulse.claim_monitoring_runs(timestamp with time zone, integer, integer),
+  domainpulse.reclaim_expired_monitoring_runs(timestamp with time zone, integer, integer)
+  TO :"worker_role";
+
+GRANT SELECT ON domains TO :"worker_role";
+GRANT SELECT, INSERT, UPDATE ON monitoring_targets, monitoring_runs
+  TO :"worker_role";
+GRANT SELECT, INSERT, UPDATE ON
+  domain_rdap_metadata,
+  domain_dns_metadata,
+  domain_tls_metadata
+  TO :"worker_role";
+REVOKE CREATE ON SCHEMA public, domainpulse FROM :"worker_role";
+```
+
+The worker `DATABASE_URL` authenticates only as this dedicated role. The
+worker checks on startup that the current identity is neither superuser nor
+`BYPASSRLS` and owns none of the tenant tables it accesses. Never grant it
+alert-table privileges, DELETE, table ownership, membership in the migration
+role, or broader function execution. Tenant domain lookup, metadata writes,
+run finalization, target updates, and retry insertion all execute inside
+`withWorkspaceContext(workspaceId)` and remain subject to RLS.
 
 `monitoring_runs.run_metadata` and `alert_events.evidence` are reserved for
 small, normalized, non-secret facts. Writers must never place raw DNS TXT
 values, RDAP documents, HTTP bodies, PEM material, private keys, tokens,
 credentials, or connection details in either JSON object.
 
-The worker phase must add a separately reviewed, narrowly scoped
-`SECURITY DEFINER` claim function owned by the migration owner. It must use a
-fixed `pg_catalog` search path with every application object schema-qualified,
-static SQL, `FOR UPDATE SKIP LOCKED`, deterministic due ordering, and atomic
-lease/state transitions. It must return only the identifiers and normalized
-fields needed to execute a claim. `PUBLIC` execution must be revoked and
-`EXECUTE` granted only to the dedicated worker role. The worker remains a
-non-owner `NOBYPASSRLS` role for every ordinary table query. No such function
-is created until the worker contract and retry/lease behavior are implemented.
+Scheduling advances the regular cadence independently of retry availability.
+On completion, SUCCESS resets `consecutive_failures`; PARTIAL and FAILED both
+increment it, so the field consistently represents consecutive non-successful
+runs. An expired RUNNING lease is finalized as FAILED with
+`WORKER_LEASE_EXPIRED`, then creates a deduplicated retry when allowed. Retry
+attempts 2, 3, and 4 become available after exactly 5, 20, and 60 minutes;
+there are at most three retries after the original attempt.
 
 ## Future workspace-scoped tables
 
