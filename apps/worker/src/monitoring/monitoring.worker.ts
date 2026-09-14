@@ -10,6 +10,7 @@ import type {
   MonitoringRunExecutor,
   WorkerLogger,
 } from './monitoring.types';
+import { canRetry } from './retry-policy';
 
 export interface MonitoringWorkerClock {
   readonly now: () => Date;
@@ -46,6 +47,9 @@ export class MonitoringWorker {
   private runPromise: Promise<void> | undefined;
   private stopping = false;
   private wakePoll: (() => void) | undefined;
+  private lastMaintenanceAt = 0;
+  private consecutiveFailures = 0;
+  private maintenanceRunning = false;
 
   constructor(
     private readonly store: MonitoringQueueStore,
@@ -97,6 +101,26 @@ export class MonitoringWorker {
     const runs = await this.store.claim(now, claimLimit, this.configuration.leaseMs);
     if (runs.length > 0) this.logger.info({ count: runs.length, event: 'monitoring_runs_claimed' });
     await this.processBounded(runs);
+    if (this.shouldStop()) return;
+
+    // Maintenance: retention cleanup, bounded, not overlapping
+    const maintenanceInterval = this.configuration.maintenanceIntervalMs;
+    if (!this.maintenanceRunning && this.store.cleanupOldTerminalRuns && now.getTime() - this.lastMaintenanceAt >= maintenanceInterval) {
+      this.maintenanceRunning = true;
+      this.lastMaintenanceAt = now.getTime();
+      try {
+        const cleaned = await this.store.cleanupOldTerminalRuns(
+          now,
+          this.configuration.retentionDays,
+          this.configuration.retentionBatchSize,
+        );
+        if (cleaned > 0) this.logger.info({ count: cleaned, event: 'monitoring_maintenance_cleanup' });
+      } catch {
+        this.logger.error({ event: 'monitoring_maintenance_failed' });
+      } finally {
+        this.maintenanceRunning = false;
+      }
+    }
   }
 
   private async runLoop(): Promise<void> {
@@ -105,10 +129,12 @@ export class MonitoringWorker {
     while (!this.stopping) {
       try {
         await this.runOnce();
+        this.consecutiveFailures = 0;
       } catch {
+        this.consecutiveFailures += 1;
         this.logger.error({ event: 'monitoring_worker_cycle_failed' });
       }
-      await this.waitForPoll();
+      await this.waitForPollWithBackoff();
     }
     this.logger.info({ event: 'monitoring_worker_stopped' });
   }
@@ -157,6 +183,10 @@ export class MonitoringWorker {
         this.logger.info({ event: 'monitoring_run_lease_lost' });
         return;
       }
+      this.logger.info({ count: 1, event: 'monitoring_run_completed' });
+      if (canRetry(run.attemptNo, this.configuration.maxRetries, result.retryable)) {
+        this.logger.info({ count: 1, event: 'monitoring_retry_scheduled' });
+      }
     } catch {
       this.logger.error({ event: 'monitoring_run_finalize_failed' });
       return;
@@ -191,10 +221,14 @@ export class MonitoringWorker {
     }
   }
 
-  private async waitForPoll(): Promise<void> {
+  private async waitForPollWithBackoff(): Promise<void> {
     if (this.stopping) return;
+    const base = this.configuration.pollIntervalMs;
+    const backoff = this.consecutiveFailures > 0
+      ? Math.min(base * Math.pow(2, Math.min(this.consecutiveFailures, 4)), 300_000)
+      : base;
     await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, this.configuration.pollIntervalMs);
+      const timer = setTimeout(resolve, backoff);
       this.wakePoll = () => {
         clearTimeout(timer);
         resolve();

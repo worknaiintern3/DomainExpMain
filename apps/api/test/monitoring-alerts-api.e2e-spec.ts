@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Module } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { APP_FILTER, HttpAdapterHost, NestFactory } from '@nestjs/core';
 import {
   FastifyAdapter,
   type NestFastifyApplication,
@@ -12,6 +12,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 
 import { AccessTokenService } from '../src/auth/access-token';
+import { ProblemDetailsFilter } from '../src/common/http/problem-details.filter';
 import { AlertsController, AlertRulesController, MonitoringController } from '../src/monitoring/monitoring.controller';
 import {
   AlertAcknowledgeForbiddenError,
@@ -543,6 +544,11 @@ void productionAlertRulesGuards;
     { provide: WorkspaceContextService, useValue: { resolve: resolveWorkspace } },
     { provide: 'FAKE_ACCESS', useValue: fakeAccessTokenGuard },
     { provide: 'FAKE_WORKSPACE', useValue: fakeWorkspaceGuard },
+    {
+      provide: APP_FILTER,
+      inject: [HttpAdapterHost],
+      useFactory: (adapterHost: HttpAdapterHost) => new ProblemDetailsFilter(adapterHost),
+    },
   ],
 })
 class TestMonitoringModule {}
@@ -807,8 +813,11 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       const response = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'test-key-' + randomUUID() },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': `test-key-${randomUUID()}`,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(response.statusCode).toBe(202);
       const body = response.json() as { status: string; trigger: string };
@@ -823,18 +832,54 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       const response = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': memberWorkspaceId },
-        payload: { idempotencyKey: 'member-key' },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': 'member-key',
+          'x-workspace-id': memberWorkspaceId,
+        },
       });
       expect(response.statusCode).toBe(403);
+    });
+
+    it('requires a valid Idempotency-Key header and ignores body-only transport', async () => {
+      const callsBefore = mockMonitoringService.enqueueManualRun.mock.calls.length;
+      const missing = await app.inject({
+        method: 'POST',
+        url: `/api/v1/domains/${domainId}/monitoring/runs`,
+        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
+      });
+      const invalid = await app.inject({
+        method: 'POST',
+        url: `/api/v1/domains/${domainId}/monitoring/runs`,
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': 'x'.repeat(257),
+          'x-workspace-id': ownerWorkspaceId,
+        },
+      });
+      const bodyOnly = await app.inject({
+        method: 'POST',
+        url: `/api/v1/domains/${domainId}/monitoring/runs`,
+        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
+        payload: { idempotencyKey: `body-only-${randomUUID()}` },
+      });
+
+      for (const response of [missing, invalid, bodyOnly]) {
+        expect(response.statusCode).toBe(400);
+        expect(response.json()).toMatchObject({ status: 400, title: 'Bad Request' });
+      }
+      expect(mockMonitoringService.enqueueManualRun.mock.calls).toHaveLength(callsBefore);
     });
 
     it('archived/disabled/unconfigured behavior', async () => {
       const archived = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${archivedDomainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'archived-key' },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': 'archived-key',
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect([409, 404]).toContain(archived.statusCode);
 
@@ -848,8 +893,11 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       const disabled = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'disabled-key' },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': 'disabled-key',
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(disabled.statusCode).toBe(409);
       // re-enable for further tests
@@ -863,8 +911,11 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       const unconfigured = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${unconfiguredDomainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'unconfigured-key' },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': 'unconfigured-key',
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(unconfigured.statusCode).toBe(404);
     });
@@ -874,14 +925,20 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       const first = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: key },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': key,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       const second = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: key },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': key,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(first.json().id).toBe(second.json().id);
       expect(first.statusCode).toBe(202);
@@ -892,14 +949,20 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       const first = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'idem-diff-1-' + randomUUID() },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': `idem-diff-1-${randomUUID()}`,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       const second = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'idem-diff-2-' + randomUUID() },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': `idem-diff-2-${randomUUID()}`,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(first.json().id).not.toBe(second.json().id);
     });
@@ -910,14 +973,20 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
         app.inject({
           method: 'POST',
           url: `/api/v1/domains/${domainId}/monitoring/runs`,
-          headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-          payload: { idempotencyKey: key },
+          headers: {
+            authorization: `Bearer ${token}`,
+            'idempotency-key': key,
+            'x-workspace-id': ownerWorkspaceId,
+          },
         }),
         app.inject({
           method: 'POST',
           url: `/api/v1/domains/${domainId}/monitoring/runs`,
-          headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-          payload: { idempotencyKey: key },
+          headers: {
+            authorization: `Bearer ${token}`,
+            'idempotency-key': key,
+            'x-workspace-id': ownerWorkspaceId,
+          },
         }),
       ]);
       expect(a.json().id).toBe(b.json().id);
@@ -932,8 +1001,11 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'next-run-unchanged-' + randomUUID() },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': `next-run-unchanged-${randomUUID()}`,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(configuredTarget?.nextRunAt?.toISOString()).toBe(before);
     });
@@ -944,15 +1016,21 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'no-network-' + randomUUID() },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': `no-network-${randomUUID()}`,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(mockMonitoringService.enqueueManualRun.mock.calls.length).toBe(callsBefore + 1);
       const response = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: 'raw-key-test-' + randomUUID() },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': `raw-key-test-${randomUUID()}`,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(response.body).not.toContain('raw-key-test');
     });
@@ -1397,8 +1475,11 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: rawKey },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': rawKey,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       // check idempotencyMap stores hashed key not raw
       const hashedExists = Array.from(idempotencyMap.keys()).some((k) => k.includes(rawKey));
@@ -1407,8 +1488,11 @@ describe('Phase 9E monitoring + alert REST APIs', () => {
       const resp = await app.inject({
         method: 'POST',
         url: `/api/v1/domains/${domainId}/monitoring/runs`,
-        headers: { authorization: `Bearer ${token}`, 'x-workspace-id': ownerWorkspaceId },
-        payload: { idempotencyKey: rawKey },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'idempotency-key': rawKey,
+          'x-workspace-id': ownerWorkspaceId,
+        },
       });
       expect(resp.body).not.toContain(rawKey);
     });

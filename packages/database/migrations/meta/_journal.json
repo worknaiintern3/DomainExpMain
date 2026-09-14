@@ -71,6 +71,13 @@
       "when": 1789194197178,
       "tag": "0009_monitoring_worker_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789366872295,
+      "tag": "0010_monitoring_retention",
+      "breakpoints": true
     }
   ]
 }

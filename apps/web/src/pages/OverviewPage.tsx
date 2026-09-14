@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { listInventory } from '@/api/inventory';
+import { listAlerts } from '@/api/monitoring';
 import { useAuth } from '@/auth/AuthContext';
 
 interface OverviewSummary {
@@ -18,6 +19,7 @@ export const OverviewPage: React.FC = () => {
   const [summaries, setSummaries] = useState<OverviewSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openAlerts, setOpenAlerts] = useState<{ count: number; hasMore: boolean } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -56,6 +58,19 @@ export const OverviewPage: React.FC = () => {
     };
 
     void load();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void listAlerts({ status: 'OPEN', limit: 1 }, controller.signal)
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setOpenAlerts({ count: page.items.length, hasMore: page.nextCursor !== null });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setOpenAlerts(null);
+      });
     return () => controller.abort();
   }, []);
 
@@ -133,8 +148,21 @@ export const OverviewPage: React.FC = () => {
         </section>
       )}
 
+      {openAlerts !== null && (
+        <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4 shadow-sm" aria-label="Alerts summary">
+          <div className="flex items-center justify-between">
+            <h2 className="font-title-md text-title-md font-semibold">Alerts</h2>
+            <Link to="/alerts" className="text-caption-xs font-semibold text-primary hover:underline">View alerts</Link>
+          </div>
+          <p className="mt-2 text-body-sm text-secondary">
+            {openAlerts.count === 0 && !openAlerts.hasMore ? 'No open alerts.' : openAlerts.hasMore ? `At least ${openAlerts.count} open alert${openAlerts.count === 1 ? '' : 's'} — more available.` : `${openAlerts.count} open alert${openAlerts.count === 1 ? '' : 's'}.`}
+          </p>
+          <p className="mt-1 text-caption-xs text-secondary">Counts are bounded and derived from actual alert data, not synthetic health.</p>
+        </section>
+      )}
+
       <aside className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-body-sm text-secondary">
-        Renewal, health, pricing, DNS, TLS, monitoring, and billing analytics are not connected yet. No operational status is inferred on this overview.
+        Renewal, pricing, DNS, TLS, and billing analytics are not connected yet. No operational status is inferred on this overview.
       </aside>
     </div>
   );

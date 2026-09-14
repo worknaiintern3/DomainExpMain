@@ -15,8 +15,11 @@ const configuration: WorkerConfiguration = {
   claimBatchSize: 10,
   concurrency: 2,
   leaseMs: 300_000,
+  maintenanceIntervalMs: 60 * 60 * 1000,
   maxRetries: 3,
   pollIntervalMs: 300_000,
+  retentionBatchSize: 100,
+  retentionDays: 30,
 };
 
 function claimedRun(index: number): ClaimedMonitoringRun {
@@ -47,6 +50,7 @@ function store(runs: readonly ClaimedMonitoringRun[] = []): MonitoringQueueStore
   return {
     assertSafeRuntimeRole: vi.fn(async () => undefined),
     claim: vi.fn(async () => runs),
+    cleanupOldTerminalRuns: vi.fn(async () => 0),
     close: vi.fn(async () => undefined),
     finalize: vi.fn(async () => true),
     findDomain: vi.fn(async () => ({ normalizedDomainName: 'example.com' })),

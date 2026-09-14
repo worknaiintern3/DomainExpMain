@@ -270,10 +270,15 @@ export class MonitoringController {
   async enqueueManualRun(
     @Req() request: WorkspaceContextRequest,
     @Param() params: unknown,
-    @Body() body: unknown,
   ): Promise<ManualMonitoringRunResponse> {
     const { domainId } = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
-    const { idempotencyKey } = parseOrBadRequest(ManualMonitoringRunRequestSchema, body, 'Invalid manual run request');
+    const rawHeader = request.headers['idempotency-key'];
+    const headerValue = typeof rawHeader === 'string' ? rawHeader : rawHeader?.[0];
+    const { idempotencyKey } = parseOrBadRequest(
+      ManualMonitoringRunRequestSchema,
+      { idempotencyKey: headerValue },
+      'Invalid Idempotency-Key',
+    );
     const result = await executeMonitoringOperation(() =>
       this.service.enqueueManualRun(getPrincipal(request), domainId, idempotencyKey),
     );

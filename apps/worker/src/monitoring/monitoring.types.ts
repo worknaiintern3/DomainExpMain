@@ -28,6 +28,7 @@ export interface MonitoringExecutionResult {
 export interface MonitoringQueueStore {
   assertSafeRuntimeRole(): Promise<void>;
   claim(now: Date, limit: number, leaseMs: number): Promise<readonly ClaimedMonitoringRun[]>;
+  cleanupOldTerminalRuns?(now: Date, retentionDays: number, batchSize: number): Promise<number>;
   close(): Promise<void>;
   finalize(
     run: ClaimedMonitoringRun,

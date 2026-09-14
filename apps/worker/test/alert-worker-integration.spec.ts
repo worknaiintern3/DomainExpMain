@@ -30,8 +30,11 @@ const configuration: WorkerConfiguration = {
   claimBatchSize: 10,
   concurrency: 1,
   leaseMs: 300_000,
+  maintenanceIntervalMs: 60 * 60 * 1000,
   maxRetries: 3,
   pollIntervalMs: 300_000,
+  retentionBatchSize: 100,
+  retentionDays: 30,
 };
 
 function claimedRun(): ClaimedMonitoringRun {

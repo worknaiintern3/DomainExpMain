@@ -181,6 +181,9 @@ export const monitoringRuns = pgTable(
       table.domainId,
       table.createdAt,
     ),
+    index('monitoring_runs_retention_idx')
+      .on(table.status, table.finishedAt)
+      .where(sql`${table.status} in ('SUCCESS', 'PARTIAL', 'FAILED')`),
     foreignKey({
       columns: [table.workspaceId, table.targetId, table.domainId],
       foreignColumns: [

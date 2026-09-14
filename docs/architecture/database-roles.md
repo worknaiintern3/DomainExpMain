@@ -192,7 +192,8 @@ GRANT EXECUTE ON FUNCTION domainpulse.current_workspace_id()
 GRANT EXECUTE ON FUNCTION
   domainpulse.schedule_due_monitoring_runs(timestamp with time zone, integer),
   domainpulse.claim_monitoring_runs(timestamp with time zone, integer, integer),
-  domainpulse.reclaim_expired_monitoring_runs(timestamp with time zone, integer, integer)
+  domainpulse.reclaim_expired_monitoring_runs(timestamp with time zone, integer, integer),
+  domainpulse.cleanup_old_terminal_monitoring_runs(timestamp with time zone, integer)
   TO :"worker_role";
 
 GRANT SELECT ON domains TO :"worker_role";

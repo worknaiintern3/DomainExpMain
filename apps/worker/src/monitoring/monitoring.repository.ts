@@ -32,6 +32,10 @@ interface RecoveredRow {
   readonly runId: string;
 }
 
+interface RetentionRow {
+  readonly deletedCount: number;
+}
+
 interface RuntimeRoleRow {
   readonly bypassRls: boolean;
   readonly ownsProtectedTable: boolean;
@@ -136,6 +140,20 @@ export class PostgresMonitoringRepository implements MonitoringQueueStore {
       [now, limit, maxRetries],
     );
     return result.rowCount ?? result.rows.length;
+  }
+
+  async cleanupOldTerminalRuns(
+    now: Date,
+    retentionDays: number,
+    batchSize: number,
+  ): Promise<number> {
+    const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+    const result = await this.client.pool.query<RetentionRow>(
+      `select domainpulse.cleanup_old_terminal_monitoring_runs($1, $2)
+         as "deletedCount"`,
+      [cutoff, batchSize],
+    );
+    return result.rows[0]?.deletedCount ?? 0;
   }
 
   async findDomain(

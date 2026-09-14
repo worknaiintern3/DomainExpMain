@@ -15,6 +15,7 @@ import {
 } from '@/components/integration/InventoryWorkspace';
 import { domainConfiguration } from '@/features/integration/resource-configs';
 import { DomainMetadataSection } from '@/features/domain-details/components/DomainMetadataSection';
+import { DomainMonitoringSection } from '@/features/monitoring/components/DomainMonitoringSection';
 import { useProviderLabels } from '@/features/provider-accounts/useProviderLabels';
 
 const formatDate = (value: string | null, includeTime = false) => value
@@ -200,6 +201,8 @@ export const DomainDetailPage: React.FC = () => {
             onRetry={() => void loadMetadata()}
             refreshing={refreshingMetadata}
           />
+
+          <DomainMonitoringSection domainId={domainId} inventoryState={domain.inventoryState} />
 
           <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-unit-lg shadow-sm">
             <div className="mb-unit-md flex items-center gap-unit-sm"><span className="material-symbols-outlined flex size-9 items-center justify-center rounded-lg bg-primary/10 text-[20px] text-primary">assignment</span><div><h2 className="text-headline-sm font-semibold">Registration metadata</h2><p className="text-caption-xs text-secondary">Direct values stored on this domain record</p></div></div>

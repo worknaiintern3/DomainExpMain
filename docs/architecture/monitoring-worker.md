@@ -25,6 +25,13 @@ Recovery atomically marks expired RUNNING rows FAILED and conditionally adds a
 deduplicated retry. All selectors use deterministic ordering and
 `FOR UPDATE SKIP LOCKED` for multi-worker safety.
 
+Migration 0010 registers the terminal-run retention index and a fourth narrow
+worker function. The retention function deletes a deterministic, locked batch
+of old SUCCESS, PARTIAL, or FAILED runs across workspaces. It cannot delete
+QUEUED or RUNNING work and does not access targets, alerts, domains, or current
+metadata. PUBLIC execution is revoked and deployment grants its exact signature
+only to the dedicated worker role, preserving the non-owner NOBYPASSRLS model.
+
 These functions return only run, workspace, target, and domain identifiers,
 plus the attempt/key/lease fields required after claim. PUBLIC execution is
 revoked. Deployment grants their exact signatures only to the dedicated
