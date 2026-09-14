@@ -51,6 +51,17 @@ export {
   type ProviderConnection,
 } from './provider-connections';
 export {
+  providerResourceLinks,
+  providerResourceLinkStatusEnum,
+  providerSyncRuns,
+  providerSyncRunStatusEnum,
+  providerSyncRunTriggerEnum,
+  type NewProviderResourceLink,
+  type NewProviderSyncRun,
+  type ProviderResourceLink,
+  type ProviderSyncRun,
+} from './provider-sync';
+export {
   users,
   workspaceMembers,
   workspaceMembershipRoleEnum,

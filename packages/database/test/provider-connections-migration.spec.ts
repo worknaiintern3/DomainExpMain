@@ -25,10 +25,16 @@ describe('provider connections migration', () => {
   });
 
   it('registers 0011 immediately after 0010 with generated snapshot metadata', async () => {
-    expect(journal.entries.at(-1)).toMatchObject({
+    const migrationIndex = journal.entries.findIndex(
+      ({ tag }) => tag === '0011_provider_connections',
+    );
+    expect(journal.entries[migrationIndex]).toMatchObject({
       idx: 11,
       tag: '0011_provider_connections',
     });
+    expect(journal.entries[migrationIndex - 1]?.tag).toBe(
+      '0010_monitoring_retention',
+    );
     await expect(
       readFile(resolve('migrations/meta/0011_snapshot.json'), 'utf8'),
     ).resolves.toContain('provider_connections');

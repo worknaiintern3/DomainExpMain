@@ -69,6 +69,9 @@ export const providerConnections = pgTable(
     syncStatus: providerConnectionSyncStatusEnum('sync_status')
       .default('IDLE')
       .notNull(),
+    syncIntervalMinutes: integer('sync_interval_minutes')
+      .default(1_440)
+      .notNull(),
     lastSyncAt: timestamp('last_sync_at', {
       mode: 'date',
       withTimezone: true,
@@ -115,6 +118,10 @@ export const providerConnections = pgTable(
     check(
       'provider_connections_credential_mask_display',
       sql`length(btrim(${table.credentialMask})) > 0 and char_length(${table.credentialMask}) <= 255`,
+    ),
+    check(
+      'provider_connections_sync_interval_bounds',
+      sql`${table.syncIntervalMinutes} between 60 and 10080`,
     ),
     check(
       'provider_connections_error_code_canonical',

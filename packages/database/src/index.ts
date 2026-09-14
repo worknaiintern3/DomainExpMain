@@ -178,3 +178,14 @@ export {
   type NewMonitoringRun,
   type NewMonitoringTarget,
 } from './schema/monitoring';
+export {
+  providerResourceLinks,
+  providerResourceLinkStatusEnum,
+  providerSyncRuns,
+  providerSyncRunStatusEnum,
+  providerSyncRunTriggerEnum,
+  type NewProviderResourceLink,
+  type NewProviderSyncRun,
+  type ProviderResourceLink,
+  type ProviderSyncRun,
+} from './schema/provider-sync';

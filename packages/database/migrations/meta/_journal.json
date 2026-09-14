@@ -85,6 +85,13 @@
       "when": 1789374633042,
       "tag": "0011_provider_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789384661641,
+      "tag": "0012_provider_sync_runtime",
+      "breakpoints": true
     }
   ]
 }

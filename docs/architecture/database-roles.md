@@ -17,8 +17,9 @@ must prove the runtime login owns no protected table and has no bypass flag.
 ## Current protected and bootstrap tables
 
 RLS is enabled on `workspaces`, `workspace_members`, all seven core portfolio
-tables, `provider_connections`, `inventory_nodes`, `inventory_relationships`, the three domain metadata
-tables, and the four monitoring/alert tables. Workspace policies require their
+tables, `provider_connections`, `provider_sync_runs`, `provider_resource_links`,
+`inventory_nodes`, `inventory_relationships`, the three domain metadata tables,
+and the four monitoring/alert tables. Workspace policies require their
 workspace key to equal `domainpulse.current_workspace_id()`.
 Membership SELECT additionally permits only rows belonging to
 `domainpulse.current_user_id()` when no workspace context is active; this is
@@ -122,6 +123,8 @@ WHERE schemaname = 'public'
     'email_accounts',
     'provider_accounts',
     'provider_connections',
+    'provider_sync_runs',
+    'provider_resource_links',
     'domains',
     'servers',
     'cloud_resources',
@@ -196,7 +199,10 @@ GRANT EXECUTE ON FUNCTION
   domainpulse.schedule_due_monitoring_runs(timestamp with time zone, integer),
   domainpulse.claim_monitoring_runs(timestamp with time zone, integer, integer),
   domainpulse.reclaim_expired_monitoring_runs(timestamp with time zone, integer, integer),
-  domainpulse.cleanup_old_terminal_monitoring_runs(timestamp with time zone, integer)
+  domainpulse.cleanup_old_terminal_monitoring_runs(timestamp with time zone, integer),
+  domainpulse.schedule_due_provider_sync_runs(timestamp with time zone, integer),
+  domainpulse.claim_provider_sync_runs(timestamp with time zone, integer, integer),
+  domainpulse.reclaim_expired_provider_sync_runs(timestamp with time zone, integer, integer)
   TO :"worker_role";
 
 GRANT SELECT ON domains TO :"worker_role";
@@ -214,11 +220,13 @@ The worker `DATABASE_URL` authenticates only as this dedicated role. The
 worker checks on startup that the current identity is neither superuser nor
 `BYPASSRLS` and owns none of the tenant tables it accesses. Never grant it
 alert-table privileges, DELETE, table ownership, membership in the migration
-role, or broader function execution. Phase 10B grants the worker no
-`provider_connections` table privileges yet. The shared server-side crypto in
-`@domainpulse/database` is available to API and future worker code; a future
-provider-sync phase may grant only the minimum DB capability needed for the
-dedicated provider-sync worker path, and nothing broader. Tenant domain lookup, metadata writes,
+role, or broader function execution. Phase 10C grants only the three provider
+sync queue functions above; their `SECURITY DEFINER` implementations require no
+direct global table privilege. It still grants no `provider_connections`,
+`provider_sync_runs`, or `provider_resource_links` table privileges to the
+worker. The shared server-side crypto in `@domainpulse/database` is available
+to API and future worker code; the provider runtime phase must grant only the
+tenant-scoped table capabilities it actually uses, and nothing broader. Tenant domain lookup, metadata writes,
 run finalization, target updates, and retry insertion all execute inside
 `withWorkspaceContext(workspaceId)` and remain subject to RLS.
 
