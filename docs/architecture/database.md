@@ -205,8 +205,9 @@ scheduling, claiming, and expired-lease recovery are limited to three
 PUBLIC-revoked, bounded `SECURITY DEFINER` functions for the dedicated worker.
 
 Normalized project names and email addresses are unique within a workspace.
-Canonical domain names are separately stored as application-produced lowercase
-ASCII/IDNA values without whitespace or a trailing dot and are workspace-unique.
+Canonical domain names are separately stored as shared server-normalized
+lowercase ASCII/IDNA values without whitespace or a trailing dot and are
+workspace-unique.
 Nullable domain `auto_renew` deliberately distinguishes enabled, disabled, and
 unknown. External provider/resource identifiers are unique only when known.
 

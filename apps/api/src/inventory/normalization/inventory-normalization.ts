@@ -1,11 +1,11 @@
 import { isIP } from 'node:net';
-import { domainToASCII } from 'node:url';
+
+import {
+  InvalidDomainNameError,
+  normalizeDomainName as normalizeCanonicalDomainName,
+} from '@domainpulse/database';
 
 import { InvalidInventoryInputError } from '../inventory.errors';
-
-const DOMAIN_LABEL_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
-const MAX_DOMAIN_LENGTH = 253;
-const MAX_DOMAIN_LABEL_LENGTH = 63;
 
 export interface NormalizedEmail {
   readonly email: string;
@@ -39,40 +39,14 @@ export function normalizeProjectName(name: string): NormalizedProjectName {
 }
 
 export function normalizeDomainName(domainName: string): NormalizedDomainName {
-  const cleanedDomainName = domainName.trim().replace(/\.$/u, '');
-  if (
-    cleanedDomainName.length === 0 ||
-    cleanedDomainName.includes('*') ||
-    /\s/u.test(cleanedDomainName)
-  ) {
-    throw new InvalidInventoryInputError();
-  }
-
-  let asciiDomainName: string;
   try {
-    asciiDomainName = domainToASCII(cleanedDomainName).toLowerCase();
-  } catch {
-    throw new InvalidInventoryInputError();
+    return normalizeCanonicalDomainName(domainName);
+  } catch (error) {
+    if (error instanceof InvalidDomainNameError) {
+      throw new InvalidInventoryInputError();
+    }
+    throw error;
   }
-
-  const labels = asciiDomainName.split('.');
-  if (
-    asciiDomainName.length === 0 ||
-    asciiDomainName.length > MAX_DOMAIN_LENGTH ||
-    labels.some(
-      (label) =>
-        label.length === 0 ||
-        label.length > MAX_DOMAIN_LABEL_LENGTH ||
-        !DOMAIN_LABEL_PATTERN.test(label),
-    )
-  ) {
-    throw new InvalidInventoryInputError();
-  }
-
-  return {
-    domainName: cleanedDomainName,
-    normalizedDomainName: asciiDomainName,
-  };
 }
 
 export function normalizeOptionalHostname(

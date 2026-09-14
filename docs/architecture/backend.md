@@ -53,7 +53,10 @@ Inventory lifecycle, relationship mapping coverage, monitoring configuration, an
 
 ## Integrations, jobs, and secrets
 
-Provider implementations will conform to a capability-based adapter contract. Provider-specific authentication, payloads, errors, and normalization remain behind that boundary.
+Provider implementations conform to a capability-based adapter contract.
+Provider-specific authentication, payloads, errors, and normalization remain
+behind that boundary; the concrete runtime rules are documented in
+[`provider-integrations.md`](./provider-integrations.md).
 
 The initial job system will use PostgreSQL with a separately deployed worker, durable leases, retries, deduplication, and idempotent handlers. Redis is not a Phase 1 dependency and is added only if demonstrated workload requirements justify it.
 

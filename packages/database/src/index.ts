@@ -45,6 +45,11 @@ export {
   type DatabaseAvailability,
 } from './health/database-health';
 export {
+  InvalidDomainNameError,
+  normalizeDomainName,
+  type NormalizedDomainName,
+} from './normalization/domain-name';
+export {
   archiveStoredInventoryRelationship,
   createStoredInventoryRelationship,
   getStoredInventoryRelationship,
@@ -178,6 +183,14 @@ export {
   type NewMonitoringRun,
   type NewMonitoringTarget,
 } from './schema/monitoring';
+export {
+  providerConnectionAuthTypeEnum,
+  providerConnections,
+  providerConnectionSyncStatusEnum,
+  providerConnectionValidationStatusEnum,
+  type NewProviderConnection,
+  type ProviderConnection,
+} from './schema/provider-connections';
 export {
   providerResourceLinks,
   providerResourceLinkStatusEnum,
