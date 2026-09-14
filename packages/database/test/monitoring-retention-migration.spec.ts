@@ -25,7 +25,7 @@ describe('monitoring retention migration', () => {
   });
 
   it('registers 0010 immediately after 0009 with generated snapshot metadata', async () => {
-    expect(journal.entries.at(-1)).toMatchObject({
+    expect(journal.entries.find((entry) => entry.idx === 10)).toMatchObject({
       idx: 10,
       tag: '0010_monitoring_retention',
     });

@@ -78,6 +78,13 @@
       "when": 1789366872295,
       "tag": "0010_monitoring_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789374633042,
+      "tag": "0011_provider_connections",
+      "breakpoints": true
     }
   ]
 }

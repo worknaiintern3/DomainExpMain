@@ -133,6 +133,20 @@ export {
   type RefreshDomainMetadataResponse,
 } from './metadata/domain-metadata.schemas';
 export {
+  CreateProviderConnectionRequestSchema,
+  ProviderConnectionAuthTypeSchema,
+  ProviderConnectionResponseSchema,
+  ProviderConnectionSyncStatusSchema,
+  ProviderConnectionValidationStatusSchema,
+  UpdateProviderConnectionCredentialRequestSchema,
+  type CreateProviderConnectionRequest,
+  type ProviderConnectionAuthType,
+  type ProviderConnectionResponse,
+  type ProviderConnectionSyncStatus,
+  type ProviderConnectionValidationStatus,
+  type UpdateProviderConnectionCredentialRequest,
+} from './provider-connections/provider-connections.schemas';
+export {
   AlertEventCollectionResponseSchema,
   AlertEventResponseSchema,
   AlertEventStatusSchema,

@@ -185,7 +185,12 @@ a unique `(workspace_id, id)` key. Structural references use that composite key
 so the database rejects cross-workspace mappings even independently of RLS.
 
 Provider accounts identify an inventory account and may map to an email account;
-they do not represent API credentials or synchronization state. Domains may map
+they do not represent API credentials or synchronization state. Encrypted
+provider credentials live only in the workspace-scoped `provider_connections`
+table (one connection per provider account, AES-256-GCM envelope with
+workspace, connection, and key-version binding, fail-closed workspace RLS).
+Plaintext credentials are never stored, never returned through API responses,
+and are decrypted in memory only during validation/sync. Domains may map
 registrar and DNS providers. Servers and cloud resources may map providers, while
 website applications may map one primary domain and one project. Projects do not
 directly own domains, servers, or cloud resources; shared mappings remain deferred

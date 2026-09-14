@@ -23,6 +23,24 @@ export {
   sanitizeDatabaseConfiguration,
 } from './config/database-env.schema';
 export {
+  buildProviderCredentialAad,
+  decryptProviderCredential,
+  encryptProviderCredential,
+  parseProviderCredentialEncryptionEnvironment,
+  ProviderCredentialCryptoError,
+  type EncryptedProviderCredential,
+  type ProviderCredentialIdentity,
+  type ProviderCredentialKeyStore,
+} from './crypto/provider-credential-crypto';
+export {
+  PROVIDER_CREDENTIAL_AAD_PREFIX,
+  PROVIDER_CREDENTIAL_AUTH_TAG_BYTES,
+  PROVIDER_CREDENTIAL_IV_BYTES,
+  PROVIDER_CREDENTIAL_KEY_BYTES,
+  PROVIDER_CREDENTIAL_MAX_KEY_VERSION,
+  PROVIDER_CREDENTIAL_MAX_PLAINTEXT_BYTES,
+} from './crypto/provider-credential-crypto.constants';
+export {
   checkDatabaseAvailability,
   type DatabaseAvailability,
 } from './health/database-health';

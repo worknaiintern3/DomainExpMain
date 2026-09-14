@@ -43,6 +43,14 @@ export {
   type WebsiteApplication,
 } from './portfolio';
 export {
+  providerConnectionAuthTypeEnum,
+  providerConnections,
+  providerConnectionSyncStatusEnum,
+  providerConnectionValidationStatusEnum,
+  type NewProviderConnection,
+  type ProviderConnection,
+} from './provider-connections';
+export {
   users,
   workspaceMembers,
   workspaceMembershipRoleEnum,
