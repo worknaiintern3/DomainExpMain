@@ -229,13 +229,13 @@ describeWithPrivilegedPostgreSql(
         await adminClient.database.delete(workspaces).where(eq(workspaces.id, workspaceId));
       }
       if (runtimeRoleCreated) {
-        await adminClient.pool.query(`revoke ${runtimeRoleIdentifier} from current_user`);
         await adminClient.pool.query(`drop owned by ${runtimeRoleIdentifier}`);
+        await adminClient.pool.query(`revoke ${runtimeRoleIdentifier} from current_user`);
         await adminClient.pool.query(`drop role ${runtimeRoleIdentifier}`);
       }
       if (workerRoleCreated) {
-        await adminClient.pool.query(`revoke ${workerRoleIdentifier} from current_user`);
         await adminClient.pool.query(`drop owned by ${workerRoleIdentifier}`);
+        await adminClient.pool.query(`revoke ${workerRoleIdentifier} from current_user`);
         await adminClient.pool.query(`drop role ${workerRoleIdentifier}`);
       }
       await adminClient.close();

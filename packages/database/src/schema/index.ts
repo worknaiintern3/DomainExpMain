@@ -45,6 +45,7 @@ export {
 export {
   providerConnectionAuthTypeEnum,
   providerConnections,
+  providerConnectionStatusEnum,
   providerConnectionSyncStatusEnum,
   providerConnectionValidationStatusEnum,
   type NewProviderConnection,

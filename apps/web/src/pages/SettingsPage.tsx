@@ -14,6 +14,7 @@ import {
   AlertsTab,
   PricingTab,
   AppearanceTab,
+  IntegrationsTab,
   DataManagementTab,
   ResetConfirmModal,
   ImportDataModal,
@@ -250,6 +251,8 @@ export const SettingsPage: React.FC = () => {
               isSaving={saveState === 'saving'}
             />
           )}
+
+          {activeCategory === 'integrations' && <IntegrationsTab />}
 
           {activeCategory === 'data-management' && (
             <DataManagementTab

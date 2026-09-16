@@ -25,7 +25,7 @@ describe('provider sync runtime migration', () => {
   });
 
   it('registers 0012 immediately after 0011 with generated snapshot metadata', async () => {
-    expect(journal.entries.at(-1)).toMatchObject({
+    expect(journal.entries.find((entry) => entry.idx === 12)).toMatchObject({
       idx: 12,
       tag: '0012_provider_sync_runtime',
     });

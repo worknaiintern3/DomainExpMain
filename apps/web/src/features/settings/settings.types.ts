@@ -5,6 +5,7 @@ export type SettingsCategory =
   | 'alerts'
   | 'pricing'
   | 'appearance'
+  | 'integrations'
   | 'data-management';
 
 export type SaveState = 'saved' | 'unsaved' | 'saving' | 'error';

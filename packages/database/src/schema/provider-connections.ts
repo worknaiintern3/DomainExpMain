@@ -32,6 +32,17 @@ export const providerConnectionSyncStatusEnum = pgEnum(
 );
 
 /**
+ * Phase 10E: whether the connection is active or has been soft-disconnected.
+ * Soft disconnect preserves the row (and all sync/inventory history) but
+ * clears the encrypted credential envelope, so `CONNECTED` requires the full
+ * envelope and `DISCONNECTED` requires it to be entirely absent.
+ */
+export const providerConnectionStatusEnum = pgEnum(
+  'provider_connection_status',
+  ['CONNECTED', 'DISCONNECTED'],
+);
+
+/**
  * Workspace-owned encrypted provider credentials.
  *
  * `provider_accounts` remains pure inventory identity and never stores secrets.
@@ -51,10 +62,12 @@ export const providerConnections = pgTable(
       .references(() => workspaces.id, { onDelete: 'restrict' }),
     providerAccountId: uuid('provider_account_id').notNull(),
     authType: providerConnectionAuthTypeEnum('auth_type').notNull(),
-    encryptedCiphertext: text('encrypted_ciphertext').notNull(),
-    encryptionIv: text('encryption_iv').notNull(),
-    encryptionAuthTag: text('encryption_auth_tag').notNull(),
-    keyVersion: integer('key_version').notNull(),
+    // Nullable: cleared together on soft disconnect. See
+    // provider_connections_status_credential_consistent below.
+    encryptedCiphertext: text('encrypted_ciphertext'),
+    encryptionIv: text('encryption_iv'),
+    encryptionAuthTag: text('encryption_auth_tag'),
+    keyVersion: integer('key_version'),
     credentialMask: text('credential_mask').notNull(),
     validationStatus: providerConnectionValidationStatusEnum(
       'validation_status',
@@ -77,6 +90,13 @@ export const providerConnections = pgTable(
       withTimezone: true,
     }),
     nextSyncAt: timestamp('next_sync_at', {
+      mode: 'date',
+      withTimezone: true,
+    }),
+    connectionStatus: providerConnectionStatusEnum('connection_status')
+      .default('CONNECTED')
+      .notNull(),
+    disconnectedAt: timestamp('disconnected_at', {
       mode: 'date',
       withTimezone: true,
     }),
@@ -146,6 +166,28 @@ export const providerConnections = pgTable(
           ${table.validationStatus} = 'INVALID'
           and ${table.lastValidatedAt} is not null
           and ${table.validationErrorCode} is not null
+        )
+      `,
+    ),
+    check(
+      'provider_connections_status_credential_consistent',
+      sql`
+        (
+          ${table.connectionStatus} = 'CONNECTED'
+          and ${table.encryptedCiphertext} is not null
+          and ${table.encryptionIv} is not null
+          and ${table.encryptionAuthTag} is not null
+          and ${table.keyVersion} is not null
+          and ${table.disconnectedAt} is null
+        )
+        or
+        (
+          ${table.connectionStatus} = 'DISCONNECTED'
+          and ${table.encryptedCiphertext} is null
+          and ${table.encryptionIv} is null
+          and ${table.encryptionAuthTag} is null
+          and ${table.keyVersion} is null
+          and ${table.disconnectedAt} is not null
         )
       `,
     ),

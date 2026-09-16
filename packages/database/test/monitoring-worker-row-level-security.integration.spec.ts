@@ -106,8 +106,8 @@ describeWithPrivilegedPostgreSql(
         await adminClient.database.delete(workspaces).where(eq(workspaces.id, workspaceId));
       }
       if (workerRoleCreated) {
-        await adminClient.pool.query(`revoke ${workerRoleIdentifier} from current_user`);
         await adminClient.pool.query(`drop owned by ${workerRoleIdentifier}`);
+        await adminClient.pool.query(`revoke ${workerRoleIdentifier} from current_user`);
         await adminClient.pool.query(`drop role ${workerRoleIdentifier}`);
       }
       await adminClient.close();

@@ -1,0 +1,108 @@
+import { randomUUID } from 'node:crypto';
+
+import { providerConnections, providerSyncRuns } from '@domainpulse/database';
+import { describe, expect, it, vi } from 'vitest';
+
+import { InvalidProviderAccountError } from '../src/provider-connections/provider-connections.errors';
+import {
+  PostgresProviderConnectionsRepository,
+  type ProviderConnectionsDatabaseHost,
+} from '../src/provider-connections/provider-connections.repository';
+
+const workspaceId = randomUUID();
+const providerAccountId = randomUUID();
+const connectionId = randomUUID();
+const now = new Date('2036-02-03T04:05:06.000Z');
+
+/**
+ * A minimal fake Drizzle transaction supporting exactly the chains
+ * `createConnection` uses: one `select().from().where().limit()` lookup of
+ * the provider account, and `insert(<table>).values().returning()` for the
+ * connection row and the INITIAL sync run row.
+ */
+function fakeTransaction(options: {
+  accountRow?: { label: string; providerKey: string };
+  insertedConnectionId?: string;
+}) {
+  return {
+    insert: vi.fn().mockImplementation((table: unknown) => ({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue(
+          table === providerConnections
+            ? [{ id: options.insertedConnectionId ?? connectionId }]
+            : table === providerSyncRuns
+              ? [{ id: randomUUID() }]
+              : [],
+        ),
+      }),
+    })),
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(options.accountRow ? [options.accountRow] : []),
+        }),
+      }),
+    }),
+  };
+}
+
+function hostReturning(transaction: ReturnType<typeof fakeTransaction>): ProviderConnectionsDatabaseHost {
+  return {
+    withWorkspaceContext: vi.fn(async (_workspaceId: string, operation: (tx: unknown) => Promise<unknown>) =>
+      operation(transaction)),
+  } as unknown as ProviderConnectionsDatabaseHost;
+}
+
+const createInput = {
+  authType: 'CLOUDFLARE_API_TOKEN' as const,
+  credentialMask: '••••1234',
+  encryptedCiphertext: 'ZmFrZQ==',
+  encryptionAuthTag: 'ZmFrZWZha2VmYWtlZmFrZQ==',
+  encryptionIv: 'ZmFrZWZha2VmYWs=',
+  id: connectionId,
+  keyVersion: 1,
+  providerAccountId,
+  validatedAt: now,
+};
+
+describe('PostgresProviderConnectionsRepository.createConnection', () => {
+  it('rejects when the provider account does not exist (or belongs to another workspace)', async () => {
+    const transaction = fakeTransaction({});
+    const repository = new PostgresProviderConnectionsRepository(hostReturning(transaction));
+
+    await expect(
+      repository.createConnection(workspaceId, createInput, now),
+    ).rejects.toBeInstanceOf(InvalidProviderAccountError);
+    // Never inserts a connection row for an account it couldn't validate.
+    expect(transaction.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a provider account that is not a Cloudflare account', async () => {
+    const transaction = fakeTransaction({ accountRow: { label: 'AWS prod', providerKey: 'aws' } });
+    const repository = new PostgresProviderConnectionsRepository(hostReturning(transaction));
+
+    await expect(
+      repository.createConnection(workspaceId, createInput, now),
+    ).rejects.toBeInstanceOf(InvalidProviderAccountError);
+    expect(transaction.insert).not.toHaveBeenCalled();
+  });
+
+  it('succeeds for a valid, workspace-owned Cloudflare provider account', async () => {
+    const transaction = fakeTransaction({
+      accountRow: { label: 'Cloudflare - primary', providerKey: 'cloudflare' },
+    });
+    const repository = new PostgresProviderConnectionsRepository(hostReturning(transaction));
+
+    const result = await repository.createConnection(workspaceId, createInput, now);
+
+    expect(result).toMatchObject({
+      id: connectionId,
+      providerAccountLabel: 'Cloudflare - primary',
+      providerType: 'cloudflare',
+    });
+    // Inserts both the connection row and the INITIAL sync run.
+    expect(transaction.insert).toHaveBeenCalledTimes(2);
+    expect(transaction.insert).toHaveBeenCalledWith(providerConnections);
+    expect(transaction.insert).toHaveBeenCalledWith(providerSyncRuns);
+  });
+});

@@ -182,12 +182,10 @@ describeWithPrivilegedPostgreSql(
         .where(eq(workspaces.id, workspaceBId));
 
       if (runtimeRoleCreated) {
+        await adminClient.pool.query(`drop owned by ${runtimeRoleIdentifier}`);
         await adminClient.pool.query(
           `revoke ${runtimeRoleIdentifier} from current_user`,
         );
-      }
-      if (runtimeRoleCreated) {
-        await adminClient.pool.query(`drop owned by ${runtimeRoleIdentifier}`);
         await adminClient.pool.query(`drop role ${runtimeRoleIdentifier}`);
       }
       await adminClient.close();

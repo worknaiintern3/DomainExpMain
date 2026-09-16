@@ -9,6 +9,7 @@ export * from './components/tabs/DomainDiscoveryTab';
 export * from './components/tabs/AlertsTab';
 export * from './components/tabs/PricingTab';
 export * from './components/tabs/AppearanceTab';
+export * from './components/tabs/IntegrationsTab';
 export * from './components/tabs/DataManagementTab';
 export * from './components/modals/ResetConfirmModal';
 export * from './components/modals/ImportDataModal';
