@@ -229,4 +229,101 @@ describeWithPostgres('provider domain reconciliation — real PostgreSQL', () =>
       eq(domains.workspaceId, workspaceId),
     )).toHaveLength(2);
   });
+
+  it('two concurrent syncs racing to create the same resource link never duplicate the row', async () => {
+    const at = new Date('2026-09-16T00:00:00.000Z');
+    const raceDiscovery = discovery([
+      {
+        canonicalDomain: 'race.example',
+        dnsHostedByProvider: true,
+        externalResourceId: 'cloudflare-zone-race',
+        providerStatus: 'active',
+      },
+    ]);
+
+    const results = await Promise.all([
+      getReconciler().reconcile({
+        connectionId,
+        discovery: raceDiscovery,
+        providerKey: 'cloudflare',
+        synchronizedAt: at,
+        workspaceId,
+      }),
+      getReconciler().reconcile({
+        connectionId,
+        discovery: raceDiscovery,
+        providerKey: 'cloudflare',
+        synchronizedAt: at,
+        workspaceId,
+      }),
+    ]);
+
+    // Exactly one of the two concurrent transactions observes the insert
+    // conflict and must fall back to its retry (update/unchanged) path
+    // instead of crashing or looping; the other performs the real insert.
+    expect(results.map((r) => r.itemsCreated + r.itemsUpdated + r.itemsUnchanged)).toEqual([1, 1]);
+    expect(results.reduce((sum, r) => sum + r.itemsCreated, 0)).toBe(1);
+
+    const rows = await getClient().database
+      .select()
+      .from(providerResourceLinks)
+      .where(
+        and(
+          eq(providerResourceLinks.workspaceId, workspaceId),
+          eq(providerResourceLinks.externalResourceId, 'cloudflare-zone-race'),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'ACTIVE' });
+  });
+
+  it('repeating an identical sync is idempotent: no new rows, everything reported unchanged', async () => {
+    const at = new Date('2026-09-16T01:00:00.000Z');
+    const stableDiscovery = discovery([
+      {
+        canonicalDomain: 'stable.example',
+        dnsHostedByProvider: true,
+        externalResourceId: 'cloudflare-zone-stable',
+        providerStatus: 'active',
+      },
+    ]);
+
+    const first = await getReconciler().reconcile({
+      connectionId,
+      discovery: stableDiscovery,
+      providerKey: 'cloudflare',
+      synchronizedAt: at,
+      workspaceId,
+    });
+    expect(first).toMatchObject({ itemsCreated: 1, itemsUpdated: 0 });
+
+    const domainsBefore = await getClient().database.select().from(domains).where(
+      eq(domains.workspaceId, workspaceId),
+    );
+    const linksBefore = await getClient().database.select().from(providerResourceLinks).where(
+      eq(providerResourceLinks.workspaceId, workspaceId),
+    );
+
+    const repeatAt = new Date(at.getTime() + 1_000);
+    const second = await getReconciler().reconcile({
+      connectionId,
+      discovery: {
+        ...stableDiscovery,
+        domains: stableDiscovery.domains.map((entry) => ({ ...entry })),
+      },
+      providerKey: 'cloudflare',
+      synchronizedAt: repeatAt,
+      workspaceId,
+    });
+    expect(second).toMatchObject({ itemsCreated: 0, itemsUpdated: 0, itemsUnchanged: 1 });
+
+    const domainsAfter = await getClient().database.select().from(domains).where(
+      eq(domains.workspaceId, workspaceId),
+    );
+    const linksAfter = await getClient().database.select().from(providerResourceLinks).where(
+      eq(providerResourceLinks.workspaceId, workspaceId),
+    );
+    expect(domainsAfter).toHaveLength(domainsBefore.length);
+    expect(linksAfter).toHaveLength(linksBefore.length);
+  });
 });

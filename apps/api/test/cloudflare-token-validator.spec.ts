@@ -13,6 +13,9 @@ function fetchReturning(response: Response): typeof fetch {
   return vi.fn().mockResolvedValue(response) as typeof fetch;
 }
 
+// Mirrors CloudflareTokenValidator's private MAX_RESPONSE_BYTES bound.
+const MAX_RESPONSE_BYTES = 1_000_000;
+
 describe('CloudflareTokenValidator', () => {
   it('returns true for an active token', async () => {
     const validator = new CloudflareTokenValidator({
@@ -97,5 +100,31 @@ describe('CloudflareTokenValidator', () => {
       fetchImplementation: fetchReturning(jsonResponse(200, { unexpected: true })),
     });
     await expect(validator.isTokenActive('cf-token')).resolves.toBe(false);
+  });
+
+  it('rejects a blank/whitespace token before ever calling fetch', async () => {
+    const fetchMock = vi.fn();
+    const validator = new CloudflareTokenValidator({ fetchImplementation: fetchMock as unknown as typeof fetch });
+    await expect(validator.isTokenActive('   ')).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('never follows an HTTP redirect (always requests redirect: "error")', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { result: { id: 'tok', status: 'active' }, success: true }));
+    const validator = new CloudflareTokenValidator({ fetchImplementation: fetchMock as unknown as typeof fetch });
+    await validator.isTokenActive('cf-token');
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.redirect).toBe('error');
+  });
+
+  it('rejects a body over the response size bound', async () => {
+    const oversizedBody = JSON.stringify({
+      result: { id: 'x'.repeat(MAX_RESPONSE_BYTES), status: 'active' },
+      success: true,
+    });
+    const validator = new CloudflareTokenValidator({
+      fetchImplementation: fetchReturning(new Response(oversizedBody, { status: 200 })),
+    });
+    await expect(validator.isTokenActive('cf-token')).rejects.toMatchObject({ code: 'UPSTREAM_BAD_RESPONSE' });
   });
 });

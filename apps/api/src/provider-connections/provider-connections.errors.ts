@@ -26,6 +26,20 @@ export class ProviderConnectionDisconnectedError extends Error {
   }
 }
 
+/**
+ * A different sync (INITIAL/SCHEDULED/RETRY/MANUAL, QUEUED or RUNNING) is
+ * already in flight for this connection. The requested manual sync was never
+ * accepted/queued, so its idempotency key must not be persisted or attached
+ * to the unrelated existing run -- the caller must not receive a fabricated
+ * success response for a request that was rejected.
+ */
+export class ProviderConnectionSyncInProgressError extends Error {
+  constructor() {
+    super('A provider sync is already in progress for this connection');
+    this.name = 'ProviderConnectionSyncInProgressError';
+  }
+}
+
 /** Safe: carries only the bounded canonical provider error code, never raw upstream detail. */
 export class ProviderCredentialValidationFailedError extends Error {
   readonly validationErrorCode: string;

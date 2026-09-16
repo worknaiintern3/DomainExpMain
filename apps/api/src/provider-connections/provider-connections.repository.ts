@@ -7,7 +7,7 @@ import {
   type DatabaseTransaction,
   type DatabaseTransactionOperation,
 } from '@domainpulse/database';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import { DISCONNECTED_CREDENTIAL_MASK } from './provider-connection-mask';
 import { InvalidProviderAccountError } from './provider-connections.errors';
@@ -370,6 +370,27 @@ export class PostgresProviderConnectionsRepository implements ProviderConnection
         .orderBy(desc(providerSyncRuns.createdAt))
         .limit(Math.min(limit, DEFAULT_SYNC_RUNS_LIMIT * 5));
       return rows;
+    });
+  }
+
+  async findActiveRun(
+    workspaceId: string,
+    connectionId: string,
+  ): Promise<{ id: string } | undefined> {
+    return await this.host.withWorkspaceContext(workspaceId, async (transaction) => {
+      const [row] = await transaction
+        .select({ id: providerSyncRuns.id })
+        .from(providerSyncRuns)
+        .where(
+          and(
+            eq(providerSyncRuns.workspaceId, workspaceId),
+            eq(providerSyncRuns.connectionId, connectionId),
+            inArray(providerSyncRuns.status, ['QUEUED', 'RUNNING']),
+          ),
+        )
+        .orderBy(desc(providerSyncRuns.createdAt))
+        .limit(1);
+      return row;
     });
   }
 

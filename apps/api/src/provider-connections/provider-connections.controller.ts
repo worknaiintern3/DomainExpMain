@@ -45,6 +45,7 @@ import {
   ProviderConnectionAlreadyExistsError,
   ProviderConnectionDisconnectedError,
   ProviderConnectionNotFoundError,
+  ProviderConnectionSyncInProgressError,
   ProviderConnectionWriteForbiddenError,
   ProviderCredentialValidationFailedError,
   ProviderValidationAttemptFailedError,
@@ -90,6 +91,9 @@ async function executeProviderConnectionOperation<T>(operation: () => Promise<T>
     }
     if (error instanceof ProviderConnectionDisconnectedError) {
       throw new ConflictException('Provider connection is disconnected; reconnect required');
+    }
+    if (error instanceof ProviderConnectionSyncInProgressError) {
+      throw new ConflictException('A provider sync is already in progress for this connection');
     }
     if (error instanceof ProviderCredentialValidationFailedError) {
       // Canonical code kept in the detail text (never raw upstream body/message)

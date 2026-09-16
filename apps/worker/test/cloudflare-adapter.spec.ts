@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { CloudflareAdapter, parseCloudflareRetryAfter } from '../src/providers/cloudflare/cloudflare.adapter';
+import { CLOUDFLARE_MAX_RESPONSE_BYTES } from '../src/providers/cloudflare/cloudflare.constants';
 
 const TEST_TOKEN = 'not-a-real-cloudflare-token';
 
@@ -149,6 +150,42 @@ describe('Cloudflare token validation', () => {
         message: 'Provider request failed',
       }),
     );
+  });
+
+  it('rejects a blank/whitespace token before ever calling fetch', async () => {
+    const fetchMock = vi.fn();
+    await expect(adapter(fetchMock).validateToken('   ')).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('never follows an HTTP redirect (always requests redirect: "error")', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json(tokenResponse()));
+    await adapter(fetchMock).validateToken(TEST_TOKEN);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.redirect).toBe('error');
+  });
+
+  it('rejects a declared content-length over the response size bound without reading the body', async () => {
+    const oversized = new Response('{}', {
+      headers: { 'content-length': String(CLOUDFLARE_MAX_RESPONSE_BYTES + 1) },
+    });
+    const textSpy = vi.spyOn(oversized, 'text');
+    await expect(adapter(vi.fn().mockResolvedValue(oversized)).validateToken(TEST_TOKEN))
+      .rejects.toMatchObject({ code: 'UPSTREAM_BAD_RESPONSE' });
+    expect(textSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects an actual body over the response size bound even without a content-length header', async () => {
+    const oversizedBody = JSON.stringify({
+      result: { id: 'x'.repeat(CLOUDFLARE_MAX_RESPONSE_BYTES), status: 'active' },
+      success: true,
+    });
+    const response = new Response(oversizedBody);
+    response.headers.delete('content-length');
+    await expect(adapter(vi.fn().mockResolvedValue(response)).validateToken(TEST_TOKEN))
+      .rejects.toMatchObject({ code: 'UPSTREAM_BAD_RESPONSE' });
   });
 });
 

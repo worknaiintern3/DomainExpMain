@@ -16,6 +16,7 @@ import {
   InvalidIdempotencyKeyError,
   ProviderConnectionDisconnectedError,
   ProviderConnectionNotFoundError,
+  ProviderConnectionSyncInProgressError,
   ProviderConnectionWriteForbiddenError,
   ProviderCredentialValidationFailedError,
   ProviderValidationAttemptFailedError,
@@ -133,6 +134,10 @@ const idempotencyRuns = new Map<string, { id: string }>();
 // Connection ids for which the validate mock simulates a transient/upstream
 // validation-attempt failure instead of a credential-rejection outcome.
 const transientValidationFailureIds = new Set<string>();
+// Connection ids for which the manual-sync mock simulates a different
+// already-active run (INITIAL/SCHEDULED/RETRY/other MANUAL), rather than an
+// exact idempotency-key match.
+const activeSyncConflictIds = new Set<string>();
 
 function findConnection(workspaceId: string, id: string): ProviderConnectionSummary | undefined {
   return connectionsByWorkspace.get(workspaceId)?.find((c) => c.id === id);
@@ -196,6 +201,12 @@ const mockService = {
       const existing = idempotencyRuns.get(internalKey);
       if (existing) {
         return Promise.resolve({ id: existing.id, message: 'already queued', status: 'QUEUED', trigger: 'MANUAL' });
+      }
+      // A different key must not be attached to an unrelated active run: the
+      // request was never accepted/queued, so it fails closed instead of
+      // fabricating a QUEUED/MANUAL success.
+      if (activeSyncConflictIds.has(id)) {
+        throw new ProviderConnectionSyncInProgressError();
       }
       const run = { id: randomUUID() };
       idempotencyRuns.set(internalKey, run);
@@ -539,6 +550,28 @@ describe('Phase 10E provider connections REST API', () => {
         url: `/api/v1/provider-connections/${connectionId}/sync`,
       });
       expect(response.statusCode).toBe(403);
+    });
+
+    it('a different key while another sync is already active returns 409, never a fabricated QUEUED/MANUAL success', async () => {
+      activeSyncConflictIds.add(connectionId);
+      try {
+        const response = await app.inject({
+          headers: {
+            authorization: `Bearer ${token}`,
+            'idempotency-key': `unrelated-key-${randomUUID()}`,
+            'x-workspace-id': ownerWorkspaceId,
+          },
+          method: 'POST',
+          url: `/api/v1/provider-connections/${connectionId}/sync`,
+        });
+        expect(response.statusCode).toBe(409);
+        expect(response.json<{ detail: string }>().detail).toContain('already in progress');
+        // No fabricated success payload: no id/status/trigger claiming acceptance.
+        expect(response.body).not.toMatch(/"trigger"/u);
+        expect(response.body).not.toMatch(/"status"\s*:\s*"QUEUED"/u);
+      } finally {
+        activeSyncConflictIds.delete(connectionId);
+      }
     });
   });
 

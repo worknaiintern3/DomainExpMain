@@ -19,6 +19,7 @@ import {
   ProviderConnectionDisconnectedError,
   ProviderConnectionNotFoundError,
   ProviderConnectionPersistenceError,
+  ProviderConnectionSyncInProgressError,
   ProviderConnectionWriteForbiddenError,
   ProviderCredentialValidationFailedError,
   ProviderValidationAttemptFailedError,
@@ -315,6 +316,16 @@ export class ProviderConnectionsService {
         status: 'QUEUED',
         trigger: 'MANUAL',
       };
+    }
+
+    // A different idempotency key must not be silently attached to some
+    // other in-flight run (e.g. INITIAL still queued right after connect, or
+    // a SCHEDULED/RETRY/other MANUAL run already in flight): this request was
+    // not accepted, so it must not fabricate a QUEUED/MANUAL success for a
+    // run it did not create, and the supplied key must not be persisted.
+    const active = await this.store.findActiveRun(principal.workspaceId, id);
+    if (active) {
+      throw new ProviderConnectionSyncInProgressError();
     }
 
     try {

@@ -9,6 +9,7 @@ import {
   ProviderConnectionAlreadyExistsError,
   ProviderConnectionDisconnectedError,
   ProviderConnectionNotFoundError,
+  ProviderConnectionSyncInProgressError,
   ProviderConnectionWriteForbiddenError,
   ProviderCredentialValidationFailedError,
   ProviderValidationAttemptFailedError,
@@ -76,6 +77,7 @@ function createMockStore(): { [K in keyof ProviderConnectionsStore]: ReturnType<
     createConnection: vi.fn(),
     createManualSyncRun: vi.fn(),
     disconnect: vi.fn(),
+    findActiveRun: vi.fn(),
     findEnvelopeById: vi.fn(),
     findRunByIdempotencyKey: vi.fn(),
     findSummaryById: vi.fn(),
@@ -311,6 +313,88 @@ describe('ProviderConnectionsService', () => {
 
       const result = await service.enqueueManualSync(ownerPrincipal(), connectionId, 'race-key');
       expect(result).toMatchObject({ id: 'concurrent-run', status: 'QUEUED', trigger: 'MANUAL' });
+    });
+
+    describe('a different idempotency key while another sync is already active', () => {
+      it.each([
+        ['INITIAL', { id: 'other-run' }],
+        ['SCHEDULED', { id: 'other-run' }],
+        ['RETRY', { id: 'other-run' }],
+        ['another MANUAL run', { id: 'other-run' }],
+      ])('rejects with a 409-mapped conflict for an active %s run, never fabricating success', async (_label, activeRun) => {
+        store.findSummaryById.mockResolvedValue(summaryRecord());
+        store.findRunByIdempotencyKey.mockResolvedValue(undefined);
+        store.findActiveRun.mockResolvedValue(activeRun);
+
+        await expect(
+          service.enqueueManualSync(ownerPrincipal(), connectionId, 'a-fresh-key-never-queued'),
+        ).rejects.toBeInstanceOf(ProviderConnectionSyncInProgressError);
+
+        // The unaccepted request must never insert a run or persist its key.
+        expect(store.createManualSyncRun).not.toHaveBeenCalled();
+      });
+
+      it('rejects for an active RUNNING run and never claims a fake QUEUED status', async () => {
+        store.findSummaryById.mockResolvedValue(summaryRecord());
+        store.findRunByIdempotencyKey.mockResolvedValue(undefined);
+        store.findActiveRun.mockResolvedValue({ id: 'running-run' });
+
+        const rejection = service.enqueueManualSync(ownerPrincipal(), connectionId, 'a-fresh-key');
+        await expect(rejection).rejects.toBeInstanceOf(ProviderConnectionSyncInProgressError);
+        // The rejection error itself carries no fabricated status/trigger payload.
+        await expect(rejection).rejects.not.toHaveProperty('status');
+        await expect(rejection).rejects.not.toHaveProperty('trigger');
+        expect(store.createManualSyncRun).not.toHaveBeenCalled();
+      });
+
+      it('an exact idempotency-key match is still honored even while a run is active (same-key path never reaches findActiveRun)', async () => {
+        store.findSummaryById.mockResolvedValue(summaryRecord());
+        store.findRunByIdempotencyKey.mockResolvedValue({ id: 'same-key-run' });
+        store.findActiveRun.mockResolvedValue({ id: 'should-not-be-used' });
+
+        const result = await service.enqueueManualSync(ownerPrincipal(), connectionId, 'repeated-key');
+
+        expect(result).toMatchObject({ id: 'same-key-run', status: 'QUEUED', trigger: 'MANUAL' });
+        expect(store.findActiveRun).not.toHaveBeenCalled();
+        expect(store.createManualSyncRun).not.toHaveBeenCalled();
+      });
+    });
+
+    it('scopes the active-run check to the caller principal workspace, never a foreign one', async () => {
+      store.findSummaryById.mockResolvedValue(summaryRecord());
+      store.findRunByIdempotencyKey.mockResolvedValue(undefined);
+      store.findActiveRun.mockResolvedValue(undefined);
+      store.createManualSyncRun.mockResolvedValue({ id: 'new-run' });
+
+      await service.enqueueManualSync(ownerPrincipal(), connectionId, 'fresh-key');
+
+      expect(store.findActiveRun).toHaveBeenCalledWith(workspaceId, connectionId);
+    });
+
+    it('a disconnected connection is rejected before any active-run check, never turned into success', async () => {
+      store.findSummaryById.mockResolvedValue(summaryRecord({ connectionStatus: 'DISCONNECTED' }));
+      store.findActiveRun.mockResolvedValue({ id: 'irrelevant' });
+
+      await expect(
+        service.enqueueManualSync(ownerPrincipal(), connectionId, 'fresh-key'),
+      ).rejects.toBeInstanceOf(ProviderConnectionDisconnectedError);
+      expect(store.findActiveRun).not.toHaveBeenCalled();
+      expect(store.createManualSyncRun).not.toHaveBeenCalled();
+    });
+
+    it('inserts a new MANUAL run and persists the supplied key when no run is active', async () => {
+      store.findSummaryById.mockResolvedValue(summaryRecord());
+      store.findRunByIdempotencyKey.mockResolvedValue(undefined);
+      store.findActiveRun.mockResolvedValue(undefined);
+      store.createManualSyncRun.mockResolvedValue({ id: 'fresh-run' });
+
+      const result = await service.enqueueManualSync(ownerPrincipal(), connectionId, 'genuinely-fresh-key');
+
+      expect(result).toMatchObject({ id: 'fresh-run', status: 'QUEUED', trigger: 'MANUAL' });
+      expect(store.createManualSyncRun).toHaveBeenCalledTimes(1);
+      const call = store.createManualSyncRun.mock.calls[0] as [string, string, string, Date];
+      expect(call[0]).toBe(workspaceId);
+      expect(call[1]).toBe(connectionId);
     });
   });
 

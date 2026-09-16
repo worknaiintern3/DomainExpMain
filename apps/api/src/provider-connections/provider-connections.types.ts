@@ -130,6 +130,10 @@ export interface ProviderConnectionsStore {
     id: string,
     now: Date,
   ): Promise<{ connectionStatus: ProviderConnectionStatus; disconnectedAt: Date; id: string } | undefined>;
+  findActiveRun(
+    workspaceId: string,
+    connectionId: string,
+  ): Promise<{ id: string } | undefined>;
   findEnvelopeById(
     workspaceId: string,
     id: string,
