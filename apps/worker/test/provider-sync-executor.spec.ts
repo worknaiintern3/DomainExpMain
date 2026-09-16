@@ -52,6 +52,18 @@ function fakeSyncService(
   return { synchronize: vi.fn(implementation) } as unknown as ProviderDomainSyncService;
 }
 
+function successDiscovery() {
+  return {
+    completion: 'COMPLETE' as const,
+    error: null,
+    itemsCreated: 1,
+    itemsDiscovered: 1,
+    itemsMissing: 0,
+    itemsUnchanged: 0,
+    itemsUpdated: 0,
+  };
+}
+
 describe('ProviderSyncExecutor', () => {
   it('decrypts the credential and calls the resolved provider sync service with the plaintext token', async () => {
     const synchronize = vi.fn((input: { token: string }) => {
@@ -126,6 +138,38 @@ describe('ProviderSyncExecutor', () => {
     expect(result.status).toBe('FAILED');
     expect(result.errorCode).toBe('UNKNOWN_PROVIDER_ERROR');
   });
+
+  it.each(['cloudflare', 'godaddy', 'namecheap', 'hostinger'])(
+    'a %s connection dispatches only to its own registered service, never a sibling provider\'s',
+    async (providerKey) => {
+      const synchronizeCalls: Record<string, ReturnType<typeof vi.fn>> = {
+        cloudflare: vi.fn(async () => successDiscovery()),
+        godaddy: vi.fn(async () => successDiscovery()),
+        hostinger: vi.fn(async () => successDiscovery()),
+        namecheap: vi.fn(async () => successDiscovery()),
+      };
+      const executor = new ProviderSyncExecutor(
+        new Map(
+          Object.entries(synchronizeCalls).map(([key, synchronize]) => [
+            key,
+            { synchronize } as unknown as ProviderDomainSyncService,
+          ]),
+        ),
+        keyStore,
+      );
+
+      const result = await executor.execute(run, connectedConnection({ providerKey }));
+
+      expect(result.status).toBe('SUCCESS');
+      for (const [key, synchronize] of Object.entries(synchronizeCalls)) {
+        if (key === providerKey) {
+          expect(synchronize).toHaveBeenCalledTimes(1);
+        } else {
+          expect(synchronize).not.toHaveBeenCalled();
+        }
+      }
+    },
+  );
 
   it('maps a PARTIAL discovery to a PARTIAL run with the safe provider error code', async () => {
     const syncService = fakeSyncService(() => ({

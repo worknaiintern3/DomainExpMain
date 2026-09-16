@@ -4,9 +4,19 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { DatabaseService } from '../database/database.service';
 import { CloudflareTokenValidator } from './cloudflare-token-validator';
+import { GoDaddyTokenValidator } from './godaddy-token-validator';
+import { HostingerTokenValidator } from './hostinger-token-validator';
+import { NamecheapTokenValidator } from './namecheap-token-validator';
 import { ProviderConnectionsController } from './provider-connections.controller';
 import { PostgresProviderConnectionsRepository } from './provider-connections.repository';
 import { ProviderConnectionsService } from './provider-connections.service';
+import type { ProviderConnectionAuthType } from './provider-connections.types';
+import type {
+  ProviderCredentialValidator,
+  ProviderCredentialValidatorRegistry,
+} from './provider-credential-validator';
+
+const PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY = Symbol('PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY');
 
 @Module({
   controllers: [ProviderConnectionsController],
@@ -19,20 +29,26 @@ import { ProviderConnectionsService } from './provider-connections.service';
         new PostgresProviderConnectionsRepository(database),
     },
     {
-      provide: CloudflareTokenValidator,
-      useFactory: () => new CloudflareTokenValidator(),
+      provide: PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY,
+      useFactory: (): ProviderCredentialValidatorRegistry =>
+        new Map<ProviderConnectionAuthType, ProviderCredentialValidator>([
+          ['CLOUDFLARE_API_TOKEN', new CloudflareTokenValidator()],
+          ['GODADDY_PAT', new GoDaddyTokenValidator()],
+          ['NAMECHEAP_API_KEY', new NamecheapTokenValidator()],
+          ['HOSTINGER_API_TOKEN', new HostingerTokenValidator()],
+        ]),
     },
     {
       provide: ProviderConnectionsService,
-      inject: [PostgresProviderConnectionsRepository, CloudflareTokenValidator],
+      inject: [PostgresProviderConnectionsRepository, PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY],
       useFactory: (
         repository: PostgresProviderConnectionsRepository,
-        tokenValidator: CloudflareTokenValidator,
+        validators: ProviderCredentialValidatorRegistry,
       ) =>
         new ProviderConnectionsService(
           repository,
           parseProviderCredentialEncryptionEnvironment(process.env),
-          tokenValidator,
+          validators,
         ),
     },
   ],

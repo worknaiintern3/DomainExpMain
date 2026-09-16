@@ -1,13 +1,22 @@
-export type ProviderConnectionAuthType = 'CLOUDFLARE_API_TOKEN';
+export type ProviderConnectionAuthType =
+  | 'CLOUDFLARE_API_TOKEN'
+  | 'GODADDY_PAT'
+  | 'NAMECHEAP_API_KEY'
+  | 'HOSTINGER_API_TOKEN';
 
 /**
  * Which `provider_accounts.provider_key` a given auth type must reference.
  * A connection can only be created against a provider account whose
  * providerKey matches -- prevents e.g. a CLOUDFLARE_API_TOKEN connection
- * from being attached to a non-Cloudflare provider account.
+ * from being attached to a non-Cloudflare provider account (and, per Phase
+ * 10G, blocks any cross-provider mismatch symmetrically for GoDaddy,
+ * Namecheap, and Hostinger).
  */
 export const AUTH_TYPE_PROVIDER_KEY: Record<ProviderConnectionAuthType, string> = {
   CLOUDFLARE_API_TOKEN: 'cloudflare',
+  GODADDY_PAT: 'godaddy',
+  HOSTINGER_API_TOKEN: 'hostinger',
+  NAMECHEAP_API_KEY: 'namecheap',
 };
 export type ProviderConnectionValidationStatus = 'PENDING' | 'VALID' | 'INVALID';
 export type ProviderConnectionSyncStatus = 'IDLE' | 'PENDING' | 'SYNCING' | 'SUCCESS' | 'FAILED';
@@ -59,6 +68,7 @@ export interface ProviderConnectionSummary {
 
 /** Internal-only projection: carries the encrypted envelope for decrypt/rotate/disconnect. Never leaves the service layer. */
 export interface ProviderConnectionEnvelope {
+  readonly authType: ProviderConnectionAuthType;
   readonly connectionStatus: ProviderConnectionStatus;
   readonly encryptedCiphertext: string | null;
   readonly encryptionAuthTag: string | null;

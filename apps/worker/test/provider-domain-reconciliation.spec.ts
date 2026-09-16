@@ -130,7 +130,7 @@ const at = new Date('2026-09-15T00:00:00.000Z');
 const domain = (
   externalResourceId: string,
   canonicalDomain: string,
-  dnsHostedByProvider = true,
+  dnsHostedByProvider: boolean | null = true,
 ): DiscoveredProviderDomain => ({
   canonicalDomain,
   dnsHostedByProvider,
@@ -150,6 +150,54 @@ describe('provider domain reconciliation', () => {
     })).rejects.toMatchObject({ code: 'CONNECTION_UNAVAILABLE' });
     expect(store.domains).toHaveLength(0);
     expect(store.links).toHaveLength(0);
+  });
+
+  it('a null (unknown) dnsHostedByProvider never creates a DNS association, unlike a confirmed true', async () => {
+    const store = new MemoryReconciliationStore();
+    const reconciler = new ProviderDomainReconciler(store);
+    const base = {
+      connectionId: 'connection-1',
+      providerKey: 'cloudflare',
+      synchronizedAt: at,
+      workspaceId: 'workspace-1',
+    };
+
+    await reconciler.reconcile({
+      ...base,
+      discovery: discovered([domain('zone-unknown', 'unknown.example', null)]),
+    });
+    expect(store.domains.get('unknown.example')?.dnsProviderAccountId).toBeNull();
+
+    await reconciler.reconcile({
+      ...base,
+      discovery: discovered([domain('zone-confirmed', 'confirmed.example', true)]),
+      synchronizedAt: new Date(at.getTime() + 1_000),
+    });
+    expect(store.domains.get('confirmed.example')?.dnsProviderAccountId).toBe('provider-account-1');
+  });
+
+  it('a confirmed-false dnsHostedByProvider never disassociates an existing DNS relationship (no disassociation path exists)', async () => {
+    const store = new MemoryReconciliationStore();
+    const reconciler = new ProviderDomainReconciler(store);
+    const base = {
+      connectionId: 'connection-1',
+      providerKey: 'cloudflare',
+      synchronizedAt: at,
+      workspaceId: 'workspace-1',
+    };
+
+    await reconciler.reconcile({
+      ...base,
+      discovery: discovered([domain('zone-1', 'example.com', true)]),
+    });
+    expect(store.domains.get('example.com')?.dnsProviderAccountId).toBe('provider-account-1');
+
+    await reconciler.reconcile({
+      ...base,
+      discovery: discovered([domain('zone-1', 'example.com', false)]),
+      synchronizedAt: new Date(at.getTime() + 1_000),
+    });
+    expect(store.domains.get('example.com')?.dnsProviderAccountId).toBe('provider-account-1');
   });
 
   it('preserves user provenance, creates provider domains, and deduplicates canonical names', async () => {

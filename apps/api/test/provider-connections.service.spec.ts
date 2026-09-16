@@ -60,6 +60,7 @@ function envelopeRecord(overrides: Partial<ProviderConnectionEnvelope> = {}): Pr
     keyStore,
   );
   return {
+    authType: 'CLOUDFLARE_API_TOKEN',
     connectionStatus: 'CONNECTED',
     encryptedCiphertext: encrypted.ciphertextBase64,
     encryptionAuthTag: encrypted.authTagBase64,
@@ -109,20 +110,78 @@ function wrapped23505(depth: number): unknown {
   return error;
 }
 
+function fakeValidator(): { isTokenActive: ReturnType<typeof vi.fn> } {
+  return { isTokenActive: vi.fn() };
+}
+
 describe('ProviderConnectionsService', () => {
   let store: ReturnType<typeof createMockStore>;
   let validator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let godaddyValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let namecheapValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let hostingerValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let service: ProviderConnectionsService;
 
   beforeEach(() => {
     store = createMockStore();
-    validator = { isTokenActive: vi.fn() };
+    validator = fakeValidator();
+    godaddyValidator = fakeValidator();
+    namecheapValidator = fakeValidator();
+    hostingerValidator = fakeValidator();
     service = new ProviderConnectionsService(
       store as unknown as ProviderConnectionsStore,
       keyStore,
-      validator as never,
+      new Map([
+        ['CLOUDFLARE_API_TOKEN', validator],
+        ['GODADDY_PAT', godaddyValidator],
+        ['NAMECHEAP_API_KEY', namecheapValidator],
+        ['HOSTINGER_API_TOKEN', hostingerValidator],
+      ]) as never,
       () => now,
     );
+  });
+
+  describe('provider validator routing', () => {
+    it.each([
+      ['GODADDY_PAT', 'godaddyValidator'],
+      ['NAMECHEAP_API_KEY', 'namecheapValidator'],
+      ['HOSTINGER_API_TOKEN', 'hostingerValidator'],
+    ] as const)('a %s credential is routed only to its own validator, never to Cloudflare', async (authType, _label) => {
+      const validatorsByAuthType = {
+        GODADDY_PAT: godaddyValidator,
+        HOSTINGER_API_TOKEN: hostingerValidator,
+        NAMECHEAP_API_KEY: namecheapValidator,
+      } as const;
+      const ownValidator = validatorsByAuthType[authType];
+      ownValidator.isTokenActive.mockResolvedValue(true);
+      store.createConnection.mockResolvedValue(summaryRecord({ authType }));
+
+      await service.createConnection(ownerPrincipal(), {
+        authType,
+        credential: 'provider-credential',
+        providerAccountId,
+      });
+
+      expect(ownValidator.isTokenActive).toHaveBeenCalledWith('provider-credential');
+      expect(validator.isTokenActive).not.toHaveBeenCalled();
+      for (const [otherAuthType, otherValidator] of Object.entries(validatorsByAuthType)) {
+        if (otherAuthType === authType) continue;
+        expect(otherValidator.isTokenActive).not.toHaveBeenCalled();
+      }
+    });
+
+    it('validateConnection and replaceCredential route by the connection\'s own stored authType', async () => {
+      store.findEnvelopeById.mockResolvedValue(envelopeRecord({ authType: 'HOSTINGER_API_TOKEN' }));
+      hostingerValidator.isTokenActive.mockResolvedValue(true);
+      store.updateValidationResult.mockResolvedValue(summaryRecord({ authType: 'HOSTINGER_API_TOKEN' }));
+
+      await service.validateConnection(ownerPrincipal(), connectionId);
+
+      expect(hostingerValidator.isTokenActive).toHaveBeenCalledTimes(1);
+      expect(validator.isTokenActive).not.toHaveBeenCalled();
+      expect(godaddyValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(namecheapValidator.isTokenActive).not.toHaveBeenCalled();
+    });
   });
 
   describe('createConnection', () => {

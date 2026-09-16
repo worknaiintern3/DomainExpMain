@@ -49,6 +49,42 @@ describe('provider connections API contracts', () => {
     ).toMatchObject({ providerAccountId });
   });
 
+  it.each([
+    'CLOUDFLARE_API_TOKEN',
+    'GODADDY_PAT',
+    'NAMECHEAP_API_KEY',
+    'HOSTINGER_API_TOKEN',
+  ] as const)('accepts %s as a create-connection auth type', (authType) => {
+    expect(
+      CreateProviderConnectionApiRequestSchema.parse({
+        authType,
+        credential: 'provider-test-credential',
+        providerAccountId,
+      }),
+    ).toMatchObject({ authType });
+  });
+
+  it('rejects an auth type outside the known provider set', () => {
+    expect(
+      CreateProviderConnectionApiRequestSchema.safeParse({
+        authType: 'UNSUPPORTED_PROVIDER_TOKEN',
+        credential: 'provider-test-credential',
+        providerAccountId,
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    'CLOUDFLARE_API_TOKEN',
+    'GODADDY_PAT',
+    'NAMECHEAP_API_KEY',
+    'HOSTINGER_API_TOKEN',
+  ] as const)('accepts %s in the connection summary response', (authType) => {
+    expect(
+      ProviderConnectionSummaryResponseSchema.parse({ ...summary, authType }),
+    ).toMatchObject({ authType });
+  });
+
   it('accepts a bounded credential-replacement request', () => {
     expect(
       ReplaceProviderConnectionCredentialRequestSchema.parse({

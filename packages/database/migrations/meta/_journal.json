@@ -99,6 +99,13 @@
       "when": 1789538565814,
       "tag": "0013_provider_connections_soft_disconnect",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789559239576,
+      "tag": "0014_provider_auth_types",
+      "breakpoints": true
     }
   ]
 }

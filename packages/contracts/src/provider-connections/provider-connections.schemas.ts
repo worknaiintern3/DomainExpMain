@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 export const ProviderConnectionAuthTypeSchema = z.enum([
   'CLOUDFLARE_API_TOKEN',
+  'GODADDY_PAT',
+  'NAMECHEAP_API_KEY',
+  'HOSTINGER_API_TOKEN',
 ]);
 export const ProviderConnectionValidationStatusSchema = z.enum([
   'PENDING',

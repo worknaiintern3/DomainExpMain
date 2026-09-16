@@ -110,6 +110,7 @@ export class PostgresProviderConnectionsRepository implements ProviderConnection
     return await this.host.withWorkspaceContext(workspaceId, async (transaction) => {
       const [row] = await transaction
         .select({
+          authType: providerConnections.authType,
           connectionStatus: providerConnections.connectionStatus,
           encryptedCiphertext: providerConnections.encryptedCiphertext,
           encryptionAuthTag: providerConnections.encryptionAuthTag,

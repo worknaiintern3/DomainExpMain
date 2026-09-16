@@ -17,7 +17,26 @@ export interface SafeProviderError {
   readonly retryAfterSeconds: number | null;
 }
 
+/**
+ * Explicit, honest capability flags for a provider adapter. Only a capability
+ * the provider's official API genuinely supports may be `true` -- a `false`
+ * or omitted flag must never be worked around by inference, scraping, or
+ * fabricated data. Phase 10G registrar adapters populate this from verified
+ * API documentation; Cloudflare (Phase 10D) predates this field and is
+ * unaffected since it is optional.
+ */
+export interface ProviderCapabilities {
+  readonly listDomains: boolean;
+  readonly manageAutoRenew: boolean;
+  readonly manageDnsRecords: boolean;
+  readonly readAutoRenew: boolean;
+  readonly readDnsRecords: boolean;
+  readonly readDomainDetails: boolean;
+  readonly readNameservers: boolean;
+}
+
 export interface ProviderAdapter {
+  readonly capabilities?: ProviderCapabilities;
   readonly providerKey: string;
 }
 
@@ -45,7 +64,16 @@ export interface ProviderTokenValidationCapability {
 
 export interface DiscoveredProviderDomain {
   readonly canonicalDomain: string;
-  readonly dnsHostedByProvider: boolean;
+  /**
+   * Tri-state, not a plain boolean: `true` = confirmed the provider hosts
+   * this domain's DNS; `false` = confirmed it does not; `null` = the
+   * adapter did not retrieve the evidence needed to know (e.g. Hostinger's
+   * bulk portfolio list has no nameserver field). The reconciler must only
+   * ever *create* a DNS-provider association on `true`; `false` and `null`
+   * both leave any existing association untouched -- `null` must never be
+   * treated as a confirmed `false`.
+   */
+  readonly dnsHostedByProvider: boolean | null;
   readonly externalResourceId: string;
   readonly providerStatus: string;
 }

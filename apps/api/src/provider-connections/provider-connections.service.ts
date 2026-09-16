@@ -8,10 +8,6 @@ import {
 } from '@domainpulse/database';
 
 import { getPostgreSqlErrorCode } from '../common/postgres-error';
-import {
-  CloudflareTokenValidationError,
-  type CloudflareTokenValidator,
-} from './cloudflare-token-validator';
 import { buildCredentialMask } from './provider-connection-mask';
 import {
   InvalidIdempotencyKeyError,
@@ -24,7 +20,13 @@ import {
   ProviderCredentialValidationFailedError,
   ProviderValidationAttemptFailedError,
 } from './provider-connections.errors';
+import {
+  getProviderValidationErrorCode,
+  selectProviderCredentialValidator,
+  type ProviderCredentialValidatorRegistry,
+} from './provider-credential-validator';
 import type {
+  ProviderConnectionAuthType,
   ProviderConnectionSummary,
   ProviderConnectionsStore,
   ProviderSyncRunSummary,
@@ -84,7 +86,7 @@ export class ProviderConnectionsService {
   constructor(
     private readonly store: ProviderConnectionsStore,
     private readonly credentialKeys: ProviderCredentialKeyStore,
-    private readonly tokenValidator: CloudflareTokenValidator,
+    private readonly validators: ProviderCredentialValidatorRegistry,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -107,12 +109,14 @@ export class ProviderConnectionsService {
 
   async createConnection(
     principal: { role: string; workspaceId: string },
-    input: { authType: 'CLOUDFLARE_API_TOKEN'; credential: string; providerAccountId: string },
+    input: { authType: ProviderConnectionAuthType; credential: string; providerAccountId: string },
   ): Promise<ProviderConnectionSummary> {
     requireProviderConnectionWriteAccess(principal);
 
     // Validated fully outside any DB transaction, before any persistence.
-    await this.assertTokenActive(input.credential);
+    // Routed by this exact authType -- a GoDaddy/Namecheap/Hostinger
+    // credential can never reach Cloudflare's validator or vice versa.
+    await this.assertTokenActive(input.authType, input.credential);
 
     // Generated before encryption: the AES-GCM envelope's AAD binds
     // ciphertext to this exact {workspaceId, connectionId} pair.
@@ -137,7 +141,7 @@ export class ProviderConnectionsService {
         principal.workspaceId,
         {
           authType: input.authType,
-          credentialMask: buildCredentialMask(input.credential),
+          credentialMask: buildCredentialMask(input.authType, input.credential),
           encryptedCiphertext: encrypted.ciphertextBase64,
           encryptionAuthTag: encrypted.authTagBase64,
           encryptionIv: encrypted.ivBase64,
@@ -193,16 +197,15 @@ export class ProviderConnectionsService {
     }
 
     const now = this.now();
+    const validator = selectProviderCredentialValidator(this.validators, envelope.authType);
     let validationStatus: 'VALID' | 'INVALID';
     let validationErrorCode: string | null;
     try {
-      const active = await this.tokenValidator.isTokenActive(plaintext);
+      const active = await validator.isTokenActive(plaintext);
       validationStatus = active ? 'VALID' : 'INVALID';
       validationErrorCode = active ? null : 'AUTH_INVALID';
     } catch (error) {
-      const code = error instanceof CloudflareTokenValidationError
-        ? error.code
-        : 'UNKNOWN_PROVIDER_ERROR';
+      const code = getProviderValidationErrorCode(error);
       if (!CREDENTIAL_REJECTION_CODES.has(code)) {
         // Transient/upstream failure (rate limit, timeout, upstream
         // unavailable/bad response, unknown): this is not a truthful
@@ -248,7 +251,7 @@ export class ProviderConnectionsService {
 
     // Validate the replacement before touching the stored credential: if
     // this throws, the existing working credential is left untouched.
-    await this.assertTokenActive(credential);
+    await this.assertTokenActive(envelope.authType, credential);
 
     const now = this.now();
     let encrypted;
@@ -266,7 +269,7 @@ export class ProviderConnectionsService {
     }
 
     const updated = await this.store.replaceCredential(principal.workspaceId, id, {
-      credentialMask: buildCredentialMask(credential),
+      credentialMask: buildCredentialMask(envelope.authType, credential),
       encryptedCiphertext: encrypted.ciphertextBase64,
       encryptionAuthTag: encrypted.authTagBase64,
       encryptionIv: encrypted.ivBase64,
@@ -391,15 +394,16 @@ export class ProviderConnectionsService {
     };
   }
 
-  private async assertTokenActive(credential: string): Promise<void> {
+  private async assertTokenActive(
+    authType: ProviderConnectionAuthType,
+    credential: string,
+  ): Promise<void> {
+    const validator = selectProviderCredentialValidator(this.validators, authType);
     let active: boolean;
     try {
-      active = await this.tokenValidator.isTokenActive(credential);
+      active = await validator.isTokenActive(credential);
     } catch (error) {
-      const code = error instanceof CloudflareTokenValidationError
-        ? error.code
-        : 'UNKNOWN_PROVIDER_ERROR';
-      throw new ProviderCredentialValidationFailedError(code);
+      throw new ProviderCredentialValidationFailedError(getProviderValidationErrorCode(error));
     }
     if (!active) {
       throw new ProviderCredentialValidationFailedError('AUTH_INVALID');

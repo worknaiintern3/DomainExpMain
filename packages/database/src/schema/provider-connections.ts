@@ -18,7 +18,12 @@ import { providerAccounts } from './portfolio';
 
 export const providerConnectionAuthTypeEnum = pgEnum(
   'provider_connection_auth_type',
-  ['CLOUDFLARE_API_TOKEN'],
+  [
+    'CLOUDFLARE_API_TOKEN',
+    'GODADDY_PAT',
+    'NAMECHEAP_API_KEY',
+    'HOSTINGER_API_TOKEN',
+  ],
 );
 
 export const providerConnectionValidationStatusEnum = pgEnum(

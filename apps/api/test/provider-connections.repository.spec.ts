@@ -105,4 +105,40 @@ describe('PostgresProviderConnectionsRepository.createConnection', () => {
     expect(transaction.insert).toHaveBeenCalledWith(providerConnections);
     expect(transaction.insert).toHaveBeenCalledWith(providerSyncRuns);
   });
+
+  it.each([
+    ['GODADDY_PAT', 'godaddy'],
+    ['NAMECHEAP_API_KEY', 'namecheap'],
+    ['HOSTINGER_API_TOKEN', 'hostinger'],
+  ] as const)('succeeds for a valid, workspace-owned %s account and stamps the matching providerType', async (authType, providerKey) => {
+    const transaction = fakeTransaction({
+      accountRow: { label: `${providerKey} - primary`, providerKey },
+    });
+    const repository = new PostgresProviderConnectionsRepository(hostReturning(transaction));
+
+    const result = await repository.createConnection(
+      workspaceId,
+      { ...createInput, authType },
+      now,
+    );
+
+    expect(result).toMatchObject({ authType, providerType: providerKey });
+  });
+
+  it.each([
+    ['GODADDY_PAT', 'namecheap'],
+    ['NAMECHEAP_API_KEY', 'hostinger'],
+    ['HOSTINGER_API_TOKEN', 'cloudflare'],
+    ['CLOUDFLARE_API_TOKEN', 'godaddy'],
+  ] as const)('rejects %s against a mismatched %s provider account, never attaching across providers', async (authType, mismatchedProviderKey) => {
+    const transaction = fakeTransaction({
+      accountRow: { label: 'Mismatched account', providerKey: mismatchedProviderKey },
+    });
+    const repository = new PostgresProviderConnectionsRepository(hostReturning(transaction));
+
+    await expect(
+      repository.createConnection(workspaceId, { ...createInput, authType }, now),
+    ).rejects.toBeInstanceOf(InvalidProviderAccountError);
+    expect(transaction.insert).not.toHaveBeenCalled();
+  });
 });

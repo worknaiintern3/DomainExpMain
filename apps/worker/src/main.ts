@@ -18,6 +18,12 @@ import type { WorkerLogEvent, WorkerLogger } from './monitoring/monitoring.types
 import { MonitoringWorker } from './monitoring/monitoring.worker';
 import { CloudflareAdapter } from './providers/cloudflare/cloudflare.adapter';
 import { CLOUDFLARE_PROVIDER_KEY } from './providers/cloudflare/cloudflare.constants';
+import { GoDaddyAdapter } from './providers/godaddy/godaddy.adapter';
+import { GODADDY_PROVIDER_KEY } from './providers/godaddy/godaddy.constants';
+import { HostingerAdapter } from './providers/hostinger/hostinger.adapter';
+import { HOSTINGER_PROVIDER_KEY } from './providers/hostinger/hostinger.constants';
+import { NamecheapAdapter } from './providers/namecheap/namecheap.adapter';
+import { NAMECHEAP_PROVIDER_KEY } from './providers/namecheap/namecheap.constants';
 import { PostgresProviderDomainReconciliationStore } from './providers/reconciliation/provider-domain-reconciliation.repository';
 import {
   ProviderDomainReconciler,
@@ -65,14 +71,21 @@ async function main(): Promise<void> {
   );
 
   const providerSyncDatabase = createDatabaseClient(databaseConfiguration);
+  // One reconciler, reused across every provider: reconciliation is
+  // provider-key-agnostic (see ProviderDomainReconciler), so adding a
+  // registrar here never duplicates that logic.
   const reconciler = new ProviderDomainReconciler(
     new PostgresProviderDomainReconciliationStore(providerSyncDatabase),
   );
-  const cloudflareSyncService = new ProviderDomainSyncService(new CloudflareAdapter(), reconciler);
   const providerSyncWorker = new ProviderSyncWorker(
     new PostgresProviderSyncRepository(providerSyncDatabase),
     new ProviderSyncExecutor(
-      new Map([[CLOUDFLARE_PROVIDER_KEY, cloudflareSyncService]]),
+      new Map([
+        [CLOUDFLARE_PROVIDER_KEY, new ProviderDomainSyncService(new CloudflareAdapter(), reconciler)],
+        [GODADDY_PROVIDER_KEY, new ProviderDomainSyncService(new GoDaddyAdapter(), reconciler)],
+        [NAMECHEAP_PROVIDER_KEY, new ProviderDomainSyncService(new NamecheapAdapter(), reconciler)],
+        [HOSTINGER_PROVIDER_KEY, new ProviderDomainSyncService(new HostingerAdapter(), reconciler)],
+      ]),
       parseProviderCredentialEncryptionEnvironment(process.env),
     ),
     providerSyncConfiguration,

@@ -104,8 +104,16 @@ export class ProviderDomainReconciler {
             discovered.canonicalDomain,
             input.synchronizedAt,
           );
+          // dnsHostedByProvider is tri-state (see DiscoveredProviderDomain):
+          // only `true` may create/advance a DNS-provider association.
+          // `false` and `null` (confirmed-not-hosted and unknown/not
+          // retrieved) both fall through here identically -- neither ever
+          // creates an association, and there is no disassociation path at
+          // all, so an existing legitimate association is never touched or
+          // marked missing merely because this sync couldn't retrieve
+          // nameserver evidence.
           const dnsAssociationChanged =
-            discovered.dnsHostedByProvider &&
+            discovered.dnsHostedByProvider === true &&
             domain.dnsProviderAccountId !== providerAccountId
             ? await transaction.associateDnsProvider(
                 domain.id,

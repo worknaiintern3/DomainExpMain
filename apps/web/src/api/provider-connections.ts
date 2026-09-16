@@ -4,8 +4,14 @@ export type ProviderConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
 export type ProviderConnectionValidationStatus = 'PENDING' | 'VALID' | 'INVALID';
 export type ProviderConnectionSyncStatus = 'IDLE' | 'PENDING' | 'SYNCING' | 'SUCCESS' | 'FAILED';
 
+export type ProviderConnectionAuthType =
+  | 'CLOUDFLARE_API_TOKEN'
+  | 'GODADDY_PAT'
+  | 'NAMECHEAP_API_KEY'
+  | 'HOSTINGER_API_TOKEN';
+
 export type ProviderConnectionResponse = {
-  authType: 'CLOUDFLARE_API_TOKEN';
+  authType: ProviderConnectionAuthType;
   connectionStatus: ProviderConnectionStatus;
   createdAt: string;
   credentialMask: string;
@@ -54,7 +60,7 @@ export function listProviderConnections(signal?: AbortSignal): Promise<ProviderC
 }
 
 export function createProviderConnection(
-  body: { authType: 'CLOUDFLARE_API_TOKEN'; credential: string; providerAccountId: string },
+  body: { authType: ProviderConnectionAuthType; credential: string; providerAccountId: string },
 ): Promise<ProviderConnectionResponse> {
   return apiRequest('/provider-connections', { body, method: 'POST' });
 }
