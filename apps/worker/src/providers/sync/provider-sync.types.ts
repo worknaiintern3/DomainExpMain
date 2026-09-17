@@ -1,3 +1,5 @@
+import type { SafeProviderError } from '../provider-adapter.types';
+
 export type ProviderSyncTerminalStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED';
 
 export interface ClaimedProviderSyncRun {
@@ -53,12 +55,17 @@ export interface ProviderSyncRunExecutor {
 }
 
 /**
- * Phase 10H (VPS providers): the resource-neutral shape `ProviderSyncExecutor`
- * actually depends on. `ProviderDomainSyncService` (domains) and the new
- * `ProviderServerSyncService` (VPS servers) both satisfy this structurally --
- * no changes to either concrete class are needed -- so the executor's
- * provider registry can hold either kind of sync service without a second
- * executor implementation.
+ * The resource-neutral shape `ProviderSyncExecutor` actually depends on.
+ * `ProviderDomainSyncService` (registrar/DNS domains, Phase 10G),
+ * `ProviderServerSyncService` (VPS servers, Phase 10H), and
+ * `ProviderCloudResourceSyncService` (AWS/GCP/Azure VM inventory, Phase 10I)
+ * all satisfy this structurally -- their `synchronize` methods take and
+ * return identically-shaped objects (see provider-domain-reconciliation
+ * .types.ts / provider-server-reconciliation.types.ts /
+ * provider-cloud-resource-reconciliation.types.ts) -- so no changes to any
+ * of the three concrete classes are needed, and the executor's provider
+ * registry can hold any of them, keyed by provider key, without a second
+ * executor implementation or any provider needing to import another.
  */
 export interface ProviderResourceSyncInput {
   readonly connectionId: string;
@@ -69,10 +76,7 @@ export interface ProviderResourceSyncInput {
 
 export interface ProviderResourceSyncResult {
   readonly completion: 'COMPLETE' | 'PARTIAL';
-  readonly error: {
-    readonly code: string;
-    readonly retryAfterSeconds: number | null;
-  } | null;
+  readonly error: SafeProviderError | null;
   readonly itemsCreated: number;
   readonly itemsDiscovered: number;
   readonly itemsMissing: number;

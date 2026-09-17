@@ -71,17 +71,104 @@ const TokenField: React.FC<TokenFieldProps> = ({ autoFocus, label, onChange, pla
   </>
 );
 
+interface TextAreaFieldProps {
+  autoFocus?: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  testId: string;
+  value: string;
+}
+
+/** For structured-credential fields too long for a single-line password input (e.g. a PEM private key). Not natively masked -- there is no multi-line masked HTML input -- but, like TokenField, it is plain React state and is never written to browser storage. */
+const TextAreaField: React.FC<TextAreaFieldProps> = ({ autoFocus, label, onChange, placeholder, testId, value }) => (
+  <>
+    <label className="font-label-md text-label-md text-on-surface font-medium">{label}</label>
+    <textarea
+      autoComplete="off"
+      autoFocus={autoFocus}
+      className="px-3 py-2 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-micro w-full font-mono"
+      data-testid={testId}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      rows={5}
+      spellCheck={false}
+      value={value}
+    />
+  </>
+);
+
 /** A provider's connection credential is always sent to the backend as a single opaque string; see ProviderConfig.credentialShape. */
 type NamecheapFields = { apiKey: string; apiUser: string; clientIp: string; userName: string };
 const EMPTY_NAMECHEAP_FIELDS: NamecheapFields = { apiKey: '', apiUser: '', clientIp: '', userName: '' };
 
+/**
+ * Phase 10I's three cloud auth types (AWS/GCP/Azure) are, like Namecheap,
+ * structured multi-field bundles rather than one opaque token -- but unlike
+ * Namecheap's bespoke fixed-shape state, they share one generic
+ * `structured` mechanism driven entirely by `ProviderConfig
+ * .structuredFields`/`serializeStructured` so a new structured provider
+ * never needs its own dedicated field-state type.
+ */
+interface StructuredFieldConfig {
+  readonly key: string;
+  readonly label: string;
+  /** Fields the backend's credential shape allows to be blank (e.g. AWS's optional STS session token) never block the submit button and are omitted from the serialized JSON when empty. */
+  readonly optional?: boolean;
+  readonly placeholder: string;
+  readonly rows?: 'single' | 'multi';
+}
+
 interface ProviderConfig {
   readonly authType: ProviderConnectionAuthType;
-  readonly credentialShape: 'token' | 'namecheap';
+  readonly credentialShape: 'token' | 'namecheap' | 'structured';
   readonly displayName: string;
   readonly providerKey: string;
+  readonly serializeStructured?: (values: Readonly<Record<string, string>>) => string;
+  readonly structuredFields?: readonly StructuredFieldConfig[];
   readonly tokenLabel: string;
   readonly tokenPlaceholder: string;
+}
+
+function emptyStructuredValues(fields: readonly StructuredFieldConfig[] | undefined): Record<string, string> {
+  return Object.fromEntries((fields ?? []).map((field) => [field.key, '']));
+}
+
+function structuredFieldsFilled(
+  fields: readonly StructuredFieldConfig[] | undefined,
+  values: Readonly<Record<string, string>>,
+): boolean {
+  return (fields ?? []).every((field) => field.optional || (values[field.key] ?? '').trim().length > 0);
+}
+
+function serializeAwsCredential(values: Readonly<Record<string, string>>): string {
+  const sessionToken = (values.sessionToken ?? '').trim();
+  return JSON.stringify({
+    accessKeyId: values.accessKeyId,
+    regions: (values.regions ?? '')
+      .split(',')
+      .map((region) => region.trim())
+      .filter((region) => region.length > 0),
+    secretAccessKey: values.secretAccessKey,
+    ...(sessionToken.length > 0 ? { sessionToken } : {}),
+  });
+}
+
+function serializeGcpCredential(values: Readonly<Record<string, string>>): string {
+  return JSON.stringify({
+    clientEmail: values.clientEmail,
+    privateKey: values.privateKey,
+    projectId: values.projectId,
+  });
+}
+
+function serializeAzureCredential(values: Readonly<Record<string, string>>): string {
+  return JSON.stringify({
+    clientId: values.clientId,
+    clientSecret: values.clientSecret,
+    subscriptionId: values.subscriptionId,
+    tenantId: values.tenantId,
+  });
 }
 
 const PROVIDER_CONFIGS: readonly ProviderConfig[] = [
@@ -149,6 +236,50 @@ const PROVIDER_CONFIGS: readonly ProviderConfig[] = [
     tokenLabel: 'Linode API token',
     tokenPlaceholder: 'Paste your Linode personal access token',
   },
+  {
+    authType: 'AWS_ACCESS_KEY',
+    credentialShape: 'structured',
+    displayName: 'AWS',
+    providerKey: 'aws',
+    serializeStructured: serializeAwsCredential,
+    structuredFields: [
+      { key: 'accessKeyId', label: 'Access Key ID', placeholder: 'AKIA...' },
+      { key: 'secretAccessKey', label: 'Secret Access Key', placeholder: 'Paste your AWS secret access key' },
+      { key: 'sessionToken', label: 'Session Token (optional)', optional: true, placeholder: 'Optional STS session token' },
+      { key: 'regions', label: 'Regions to inventory (comma-separated)', placeholder: 'e.g. us-east-1, eu-west-1' },
+    ],
+    tokenLabel: '',
+    tokenPlaceholder: '',
+  },
+  {
+    authType: 'GCP_SERVICE_ACCOUNT_KEY',
+    credentialShape: 'structured',
+    displayName: 'Google Cloud',
+    providerKey: 'gcp',
+    serializeStructured: serializeGcpCredential,
+    structuredFields: [
+      { key: 'projectId', label: 'Project ID', placeholder: 'my-project-id' },
+      { key: 'clientEmail', label: 'Service Account Email', placeholder: 'name@project.iam.gserviceaccount.com' },
+      { key: 'privateKey', label: 'Service Account Private Key', placeholder: '-----BEGIN PRIVATE KEY-----', rows: 'multi' },
+    ],
+    tokenLabel: '',
+    tokenPlaceholder: '',
+  },
+  {
+    authType: 'AZURE_CLIENT_CREDENTIALS',
+    credentialShape: 'structured',
+    displayName: 'Azure',
+    providerKey: 'azure',
+    serializeStructured: serializeAzureCredential,
+    structuredFields: [
+      { key: 'tenantId', label: 'Tenant ID', placeholder: 'GUID' },
+      { key: 'clientId', label: 'Client (Application) ID', placeholder: 'GUID' },
+      { key: 'clientSecret', label: 'Client Secret', placeholder: 'Paste your client secret' },
+      { key: 'subscriptionId', label: 'Subscription ID', placeholder: 'GUID' },
+    ],
+    tokenLabel: '',
+    tokenPlaceholder: '',
+  },
 ];
 
 /** Serializes the four Namecheap fields into the exact JSON credential shape the backend NamecheapTokenValidator/NamecheapAdapter expect. Never persisted; built only at submit time from in-memory React state. */
@@ -175,6 +306,9 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
   const [showRotateForm, setShowRotateForm] = useState(false);
   const [tokenValue, setTokenValue] = useState('');
   const [namecheapFields, setNamecheapFields] = useState<NamecheapFields>(EMPTY_NAMECHEAP_FIELDS);
+  const [structuredValues, setStructuredValues] = useState<Record<string, string>>(() =>
+    emptyStructuredValues(config.structuredFields),
+  );
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionState, setActionState] = useState<
     'idle' | 'connecting' | 'validating' | 'rotating' | 'disconnecting'
@@ -186,14 +320,20 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
   const clearCredentialInputs = useCallback(() => {
     setTokenValue('');
     setNamecheapFields(EMPTY_NAMECHEAP_FIELDS);
-  }, []);
+    setStructuredValues(emptyStructuredValues(config.structuredFields));
+  }, [config.structuredFields]);
 
-  const buildCredential = useCallback(
-    () => (config.credentialShape === 'namecheap' ? serializeNamecheapCredential(namecheapFields) : tokenValue),
-    [config.credentialShape, namecheapFields, tokenValue],
-  );
+  const buildCredential = useCallback(() => {
+    if (config.credentialShape === 'namecheap') return serializeNamecheapCredential(namecheapFields);
+    if (config.credentialShape === 'structured') return config.serializeStructured?.(structuredValues) ?? '';
+    return tokenValue;
+  }, [config, namecheapFields, structuredValues, tokenValue]);
   const credentialReady =
-    config.credentialShape === 'namecheap' ? namecheapFieldsFilled(namecheapFields) : tokenValue.length > 0;
+    config.credentialShape === 'namecheap'
+      ? namecheapFieldsFilled(namecheapFields)
+      : config.credentialShape === 'structured'
+        ? structuredFieldsFilled(config.structuredFields, structuredValues)
+        : tokenValue.length > 0;
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const { items } = await listProviderConnections(signal);
@@ -375,6 +515,32 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
           testId={`${config.providerKey}-namecheap-client-ip`}
           value={namecheapFields.clientIp}
         />
+      </>
+    ) : config.credentialShape === 'structured' ? (
+      <>
+        {(config.structuredFields ?? []).map((field, index) =>
+          field.rows === 'multi' ? (
+            <TextAreaField
+              autoFocus={autoFocus && index === 0}
+              key={field.key}
+              label={field.label}
+              onChange={(value) => setStructuredValues((prev) => ({ ...prev, [field.key]: value }))}
+              placeholder={field.placeholder}
+              testId={`${config.providerKey}-${field.key}-input`}
+              value={structuredValues[field.key] ?? ''}
+            />
+          ) : (
+            <TokenField
+              autoFocus={autoFocus && index === 0}
+              key={field.key}
+              label={field.label}
+              onChange={(value) => setStructuredValues((prev) => ({ ...prev, [field.key]: value }))}
+              placeholder={field.placeholder}
+              testId={`${config.providerKey}-${field.key}-input`}
+              value={structuredValues[field.key] ?? ''}
+            />
+          ),
+        )}
       </>
     ) : (
       <TokenField

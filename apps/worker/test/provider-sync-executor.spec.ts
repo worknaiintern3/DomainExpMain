@@ -139,14 +139,30 @@ describe('ProviderSyncExecutor', () => {
     expect(result.errorCode).toBe('UNKNOWN_PROVIDER_ERROR');
   });
 
-  it.each(['cloudflare', 'godaddy', 'namecheap', 'hostinger'])(
+  it.each([
+    'cloudflare', 'godaddy', 'namecheap', 'hostinger',
+    'digitalocean', 'hetzner', 'vultr', 'linode',
+    'aws', 'gcp', 'azure',
+  ])(
     'a %s connection dispatches only to its own registered service, never a sibling provider\'s',
     async (providerKey) => {
+      // Domain (10G), VPS/server (10H), and cloud-resource (10I) sync
+      // services all register in the exact same provider-key-keyed map --
+      // this confirms the executor's generalized `ProviderResourceSyncService`
+      // interface (see provider-sync.types.ts) dispatches to any of the
+      // three kinds identically, with no special-casing.
       const synchronizeCalls: Record<string, ReturnType<typeof vi.fn>> = {
+        aws: vi.fn(async () => successDiscovery()),
+        azure: vi.fn(async () => successDiscovery()),
         cloudflare: vi.fn(async () => successDiscovery()),
+        digitalocean: vi.fn(async () => successDiscovery()),
+        gcp: vi.fn(async () => successDiscovery()),
         godaddy: vi.fn(async () => successDiscovery()),
+        hetzner: vi.fn(async () => successDiscovery()),
         hostinger: vi.fn(async () => successDiscovery()),
+        linode: vi.fn(async () => successDiscovery()),
         namecheap: vi.fn(async () => successDiscovery()),
+        vultr: vi.fn(async () => successDiscovery()),
       };
       const executor = new ProviderSyncExecutor(
         new Map(

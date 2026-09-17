@@ -6,7 +6,10 @@ export type ProviderConnectionAuthType =
   | 'DIGITALOCEAN_API_TOKEN'
   | 'HETZNER_API_TOKEN'
   | 'VULTR_API_KEY'
-  | 'LINODE_API_TOKEN';
+  | 'LINODE_API_TOKEN'
+  | 'AWS_ACCESS_KEY'
+  | 'GCP_SERVICE_ACCOUNT_KEY'
+  | 'AZURE_CLIENT_CREDENTIALS';
 
 /**
  * Which `provider_accounts.provider_key` a given auth type must reference.
@@ -14,11 +17,18 @@ export type ProviderConnectionAuthType =
  * providerKey matches -- prevents e.g. a CLOUDFLARE_API_TOKEN connection
  * from being attached to a non-Cloudflare provider account (and, per Phase
  * 10G, blocks any cross-provider mismatch symmetrically for GoDaddy,
- * Namecheap, and Hostinger).
+ * Namecheap, and Hostinger). Phase 10H adds the four VPS auth types
+ * (DigitalOcean/Hetzner/Vultr/Linode) and Phase 10I adds the three cloud-VM
+ * auth types (AWS/GCP/Azure) the same way -- each routes only to its own
+ * provider account, never to a registrar/DNS one or a provider from either
+ * other family.
  */
 export const AUTH_TYPE_PROVIDER_KEY: Record<ProviderConnectionAuthType, string> = {
+  AWS_ACCESS_KEY: 'aws',
+  AZURE_CLIENT_CREDENTIALS: 'azure',
   CLOUDFLARE_API_TOKEN: 'cloudflare',
   DIGITALOCEAN_API_TOKEN: 'digitalocean',
+  GCP_SERVICE_ACCOUNT_KEY: 'gcp',
   GODADDY_PAT: 'godaddy',
   HETZNER_API_TOKEN: 'hetzner',
   HOSTINGER_API_TOKEN: 'hostinger',

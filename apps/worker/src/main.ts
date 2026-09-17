@@ -16,10 +16,16 @@ import { MetadataMonitoringExecutor } from './monitoring/monitoring.executor';
 import { PostgresMonitoringRepository } from './monitoring/monitoring.repository';
 import type { WorkerLogEvent, WorkerLogger } from './monitoring/monitoring.types';
 import { MonitoringWorker } from './monitoring/monitoring.worker';
+import { AwsAdapter } from './providers/aws/aws.adapter';
+import { AWS_PROVIDER_KEY } from './providers/aws/aws.constants';
+import { AzureAdapter } from './providers/azure/azure.adapter';
+import { AZURE_PROVIDER_KEY } from './providers/azure/azure.constants';
 import { CloudflareAdapter } from './providers/cloudflare/cloudflare.adapter';
 import { CLOUDFLARE_PROVIDER_KEY } from './providers/cloudflare/cloudflare.constants';
 import { DigitalOceanAdapter } from './providers/digitalocean/digitalocean.adapter';
 import { DIGITALOCEAN_PROVIDER_KEY } from './providers/digitalocean/digitalocean.constants';
+import { GcpAdapter } from './providers/gcp/gcp.adapter';
+import { GCP_PROVIDER_KEY } from './providers/gcp/gcp.constants';
 import { GoDaddyAdapter } from './providers/godaddy/godaddy.adapter';
 import { GODADDY_PROVIDER_KEY } from './providers/godaddy/godaddy.constants';
 import { HetznerAdapter } from './providers/hetzner/hetzner.adapter';
@@ -30,6 +36,8 @@ import { LinodeAdapter } from './providers/linode/linode.adapter';
 import { LINODE_PROVIDER_KEY } from './providers/linode/linode.constants';
 import { NamecheapAdapter } from './providers/namecheap/namecheap.adapter';
 import { NAMECHEAP_PROVIDER_KEY } from './providers/namecheap/namecheap.constants';
+import { PostgresProviderCloudResourceReconciliationStore } from './providers/reconciliation/provider-cloud-resource-reconciliation.repository';
+import { ProviderCloudResourceReconciler, ProviderCloudResourceSyncService } from './providers/reconciliation/provider-cloud-resource-reconciliation.service';
 import { PostgresProviderDomainReconciliationStore } from './providers/reconciliation/provider-domain-reconciliation.repository';
 import {
   ProviderDomainReconciler,
@@ -87,31 +95,41 @@ async function main(): Promise<void> {
   const providerSyncDatabase = createDatabaseClient(databaseConfiguration);
   // One reconciler per resource kind, each reused across every provider of
   // that kind: reconciliation is provider-key-agnostic (see
-  // ProviderDomainReconciler / ProviderServerReconciler), so adding a
-  // registrar or a VPS provider here never duplicates that logic. Both
-  // kinds of sync service satisfy the same structural
-  // ProviderResourceSyncService interface (see provider-sync.types.ts), so
-  // they share one ProviderSyncExecutor and one provider registry map
-  // without a second executor implementation.
+  // ProviderDomainReconciler / ProviderServerReconciler /
+  // ProviderCloudResourceReconciler), so adding a registrar, a VPS
+  // provider, or a cloud provider here never duplicates that logic. All
+  // three kinds of sync service satisfy the same structural
+  // `ProviderResourceSyncService` interface (see provider-sync.types.ts),
+  // so they share one `ProviderSyncExecutor` and one provider registry map
+  // without a second executor implementation, and each resource kind keeps
+  // its own reconciliation model rather than being merged into one generic
+  // persistence path.
   const domainReconciler = new ProviderDomainReconciler(
     new PostgresProviderDomainReconciliationStore(providerSyncDatabase),
   );
   const serverReconciler = new ProviderServerReconciler(
     new PostgresProviderServerReconciliationStore(providerSyncDatabase),
   );
+  const cloudResourceReconciler = new ProviderCloudResourceReconciler(
+    new PostgresProviderCloudResourceReconciliationStore(providerSyncDatabase),
+  );
+  const syncServicesByProviderKey = new Map<string, ProviderResourceSyncService>([
+    [CLOUDFLARE_PROVIDER_KEY, new ProviderDomainSyncService(new CloudflareAdapter(), domainReconciler)],
+    [GODADDY_PROVIDER_KEY, new ProviderDomainSyncService(new GoDaddyAdapter(), domainReconciler)],
+    [NAMECHEAP_PROVIDER_KEY, new ProviderDomainSyncService(new NamecheapAdapter(), domainReconciler)],
+    [HOSTINGER_PROVIDER_KEY, new ProviderDomainSyncService(new HostingerAdapter(), domainReconciler)],
+    [DIGITALOCEAN_PROVIDER_KEY, new ProviderServerSyncService(new DigitalOceanAdapter(), serverReconciler)],
+    [HETZNER_PROVIDER_KEY, new ProviderServerSyncService(new HetznerAdapter(), serverReconciler)],
+    [VULTR_PROVIDER_KEY, new ProviderServerSyncService(new VultrAdapter(), serverReconciler)],
+    [LINODE_PROVIDER_KEY, new ProviderServerSyncService(new LinodeAdapter(), serverReconciler)],
+    [AWS_PROVIDER_KEY, new ProviderCloudResourceSyncService(new AwsAdapter(), cloudResourceReconciler)],
+    [GCP_PROVIDER_KEY, new ProviderCloudResourceSyncService(new GcpAdapter(), cloudResourceReconciler)],
+    [AZURE_PROVIDER_KEY, new ProviderCloudResourceSyncService(new AzureAdapter(), cloudResourceReconciler)],
+  ]);
   const providerSyncWorker = new ProviderSyncWorker(
     new PostgresProviderSyncRepository(providerSyncDatabase),
     new ProviderSyncExecutor(
-      new Map<string, ProviderResourceSyncService>([
-        [CLOUDFLARE_PROVIDER_KEY, new ProviderDomainSyncService(new CloudflareAdapter(), domainReconciler)],
-        [GODADDY_PROVIDER_KEY, new ProviderDomainSyncService(new GoDaddyAdapter(), domainReconciler)],
-        [NAMECHEAP_PROVIDER_KEY, new ProviderDomainSyncService(new NamecheapAdapter(), domainReconciler)],
-        [HOSTINGER_PROVIDER_KEY, new ProviderDomainSyncService(new HostingerAdapter(), domainReconciler)],
-        [DIGITALOCEAN_PROVIDER_KEY, new ProviderServerSyncService(new DigitalOceanAdapter(), serverReconciler)],
-        [HETZNER_PROVIDER_KEY, new ProviderServerSyncService(new HetznerAdapter(), serverReconciler)],
-        [VULTR_PROVIDER_KEY, new ProviderServerSyncService(new VultrAdapter(), serverReconciler)],
-        [LINODE_PROVIDER_KEY, new ProviderServerSyncService(new LinodeAdapter(), serverReconciler)],
-      ]),
+      syncServicesByProviderKey,
       parseProviderCredentialEncryptionEnvironment(process.env),
     ),
     providerSyncConfiguration,

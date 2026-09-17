@@ -7,9 +7,18 @@ const MASK_PREFIX = '••••';
  * clientIp} object (see namecheap-token-validator.ts), not a single opaque
  * secret -- its raw last-four characters would be a JSON tail like `3.4"}`,
  * not a meaningful masked secret. A fixed, generic mask is used instead so
- * no fragment of the credential shape is ever displayed.
+ * no fragment of the credential shape is ever displayed. Phase 10I's three
+ * cloud auth types are structured JSON bundles for the same reason (access
+ * key + secret + regions; service-account project + key; tenant/client/
+ * secret/subscription) and get the same fixed mask.
  */
 const OPAQUE_CREDENTIAL_MASK = 'Configured';
+const STRUCTURED_CREDENTIAL_AUTH_TYPES = new Set<ProviderConnectionAuthType>([
+  'NAMECHEAP_API_KEY',
+  'AWS_ACCESS_KEY',
+  'GCP_SERVICE_ACCOUNT_KEY',
+  'AZURE_CLIENT_CREDENTIALS',
+]);
 
 /**
  * Builds a display-only mask for a plaintext provider credential: a fixed
@@ -23,7 +32,7 @@ export function buildCredentialMask(
   authType: ProviderConnectionAuthType,
   plaintext: string,
 ): string {
-  if (authType === 'NAMECHEAP_API_KEY') {
+  if (STRUCTURED_CREDENTIAL_AUTH_TYPES.has(authType)) {
     return OPAQUE_CREDENTIAL_MASK;
   }
   const trimmed = plaintext.trim();

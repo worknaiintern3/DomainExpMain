@@ -124,6 +124,9 @@ describe('ProviderConnectionsService', () => {
   let hetznerValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let vultrValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let linodeValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let awsValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let gcpValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let azureValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let service: ProviderConnectionsService;
 
   beforeEach(() => {
@@ -136,6 +139,9 @@ describe('ProviderConnectionsService', () => {
     hetznerValidator = fakeValidator();
     vultrValidator = fakeValidator();
     linodeValidator = fakeValidator();
+    awsValidator = fakeValidator();
+    gcpValidator = fakeValidator();
+    azureValidator = fakeValidator();
     service = new ProviderConnectionsService(
       store as unknown as ProviderConnectionsStore,
       keyStore,
@@ -148,6 +154,9 @@ describe('ProviderConnectionsService', () => {
         ['HETZNER_API_TOKEN', hetznerValidator],
         ['VULTR_API_KEY', vultrValidator],
         ['LINODE_API_TOKEN', linodeValidator],
+        ['AWS_ACCESS_KEY', awsValidator],
+        ['GCP_SERVICE_ACCOUNT_KEY', gcpValidator],
+        ['AZURE_CLIENT_CREDENTIALS', azureValidator],
       ]) as never,
       () => now,
     );
@@ -162,9 +171,15 @@ describe('ProviderConnectionsService', () => {
       ['HETZNER_API_TOKEN', 'hetznerValidator'],
       ['VULTR_API_KEY', 'vultrValidator'],
       ['LINODE_API_TOKEN', 'linodeValidator'],
+      ['AWS_ACCESS_KEY', 'awsValidator'],
+      ['GCP_SERVICE_ACCOUNT_KEY', 'gcpValidator'],
+      ['AZURE_CLIENT_CREDENTIALS', 'azureValidator'],
     ] as const)('a %s credential is routed only to its own validator, never to Cloudflare', async (authType, _label) => {
       const validatorsByAuthType = {
+        AWS_ACCESS_KEY: awsValidator,
+        AZURE_CLIENT_CREDENTIALS: azureValidator,
         DIGITALOCEAN_API_TOKEN: digitaloceanValidator,
+        GCP_SERVICE_ACCOUNT_KEY: gcpValidator,
         GODADDY_PAT: godaddyValidator,
         HETZNER_API_TOKEN: hetznerValidator,
         HOSTINGER_API_TOKEN: hostingerValidator,
@@ -201,6 +216,13 @@ describe('ProviderConnectionsService', () => {
       expect(validator.isTokenActive).not.toHaveBeenCalled();
       expect(godaddyValidator.isTokenActive).not.toHaveBeenCalled();
       expect(namecheapValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(digitaloceanValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(hetznerValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(vultrValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(linodeValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(awsValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(gcpValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(azureValidator.isTokenActive).not.toHaveBeenCalled();
     });
   });
 

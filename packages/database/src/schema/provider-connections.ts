@@ -27,6 +27,9 @@ export const providerConnectionAuthTypeEnum = pgEnum(
     'HETZNER_API_TOKEN',
     'VULTR_API_KEY',
     'LINODE_API_TOKEN',
+    'AWS_ACCESS_KEY',
+    'GCP_SERVICE_ACCOUNT_KEY',
+    'AZURE_CLIENT_CREDENTIALS',
   ],
 );
 
