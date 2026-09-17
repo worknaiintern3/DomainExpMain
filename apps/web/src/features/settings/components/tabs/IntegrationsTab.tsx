@@ -117,6 +117,38 @@ const PROVIDER_CONFIGS: readonly ProviderConfig[] = [
     tokenLabel: 'Hostinger API token',
     tokenPlaceholder: 'Paste your Hostinger API token',
   },
+  {
+    authType: 'DIGITALOCEAN_API_TOKEN',
+    credentialShape: 'token',
+    displayName: 'DigitalOcean',
+    providerKey: 'digitalocean',
+    tokenLabel: 'DigitalOcean API token',
+    tokenPlaceholder: 'Paste your DigitalOcean personal access token',
+  },
+  {
+    authType: 'HETZNER_API_TOKEN',
+    credentialShape: 'token',
+    displayName: 'Hetzner',
+    providerKey: 'hetzner',
+    tokenLabel: 'Hetzner Cloud API token',
+    tokenPlaceholder: 'Paste your Hetzner Cloud project API token',
+  },
+  {
+    authType: 'VULTR_API_KEY',
+    credentialShape: 'token',
+    displayName: 'Vultr',
+    providerKey: 'vultr',
+    tokenLabel: 'Vultr API key',
+    tokenPlaceholder: 'Paste your Vultr personal access token',
+  },
+  {
+    authType: 'LINODE_API_TOKEN',
+    credentialShape: 'token',
+    displayName: 'Linode (Akamai)',
+    providerKey: 'linode',
+    tokenLabel: 'Linode API token',
+    tokenPlaceholder: 'Paste your Linode personal access token',
+  },
 ];
 
 /** Serializes the four Namecheap fields into the exact JSON credential shape the backend NamecheapTokenValidator/NamecheapAdapter expect. Never persisted; built only at submit time from in-memory React state. */

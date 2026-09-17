@@ -110,6 +110,10 @@ describe('PostgresProviderConnectionsRepository.createConnection', () => {
     ['GODADDY_PAT', 'godaddy'],
     ['NAMECHEAP_API_KEY', 'namecheap'],
     ['HOSTINGER_API_TOKEN', 'hostinger'],
+    ['DIGITALOCEAN_API_TOKEN', 'digitalocean'],
+    ['HETZNER_API_TOKEN', 'hetzner'],
+    ['VULTR_API_KEY', 'vultr'],
+    ['LINODE_API_TOKEN', 'linode'],
   ] as const)('succeeds for a valid, workspace-owned %s account and stamps the matching providerType', async (authType, providerKey) => {
     const transaction = fakeTransaction({
       accountRow: { label: `${providerKey} - primary`, providerKey },
@@ -130,6 +134,11 @@ describe('PostgresProviderConnectionsRepository.createConnection', () => {
     ['NAMECHEAP_API_KEY', 'hostinger'],
     ['HOSTINGER_API_TOKEN', 'cloudflare'],
     ['CLOUDFLARE_API_TOKEN', 'godaddy'],
+    ['DIGITALOCEAN_API_TOKEN', 'hetzner'],
+    ['HETZNER_API_TOKEN', 'vultr'],
+    ['VULTR_API_KEY', 'linode'],
+    ['LINODE_API_TOKEN', 'digitalocean'],
+    ['DIGITALOCEAN_API_TOKEN', 'cloudflare'],
   ] as const)('rejects %s against a mismatched %s provider account, never attaching across providers', async (authType, mismatchedProviderKey) => {
     const transaction = fakeTransaction({
       accountRow: { label: 'Mismatched account', providerKey: mismatchedProviderKey },

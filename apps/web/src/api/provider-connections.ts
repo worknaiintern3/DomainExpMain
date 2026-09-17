@@ -8,7 +8,11 @@ export type ProviderConnectionAuthType =
   | 'CLOUDFLARE_API_TOKEN'
   | 'GODADDY_PAT'
   | 'NAMECHEAP_API_KEY'
-  | 'HOSTINGER_API_TOKEN';
+  | 'HOSTINGER_API_TOKEN'
+  | 'DIGITALOCEAN_API_TOKEN'
+  | 'HETZNER_API_TOKEN'
+  | 'VULTR_API_KEY'
+  | 'LINODE_API_TOKEN';
 
 export type ProviderConnectionResponse = {
   authType: ProviderConnectionAuthType;

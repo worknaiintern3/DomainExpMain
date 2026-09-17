@@ -2,7 +2,11 @@ export type ProviderConnectionAuthType =
   | 'CLOUDFLARE_API_TOKEN'
   | 'GODADDY_PAT'
   | 'NAMECHEAP_API_KEY'
-  | 'HOSTINGER_API_TOKEN';
+  | 'HOSTINGER_API_TOKEN'
+  | 'DIGITALOCEAN_API_TOKEN'
+  | 'HETZNER_API_TOKEN'
+  | 'VULTR_API_KEY'
+  | 'LINODE_API_TOKEN';
 
 /**
  * Which `provider_accounts.provider_key` a given auth type must reference.
@@ -14,9 +18,13 @@ export type ProviderConnectionAuthType =
  */
 export const AUTH_TYPE_PROVIDER_KEY: Record<ProviderConnectionAuthType, string> = {
   CLOUDFLARE_API_TOKEN: 'cloudflare',
+  DIGITALOCEAN_API_TOKEN: 'digitalocean',
   GODADDY_PAT: 'godaddy',
+  HETZNER_API_TOKEN: 'hetzner',
   HOSTINGER_API_TOKEN: 'hostinger',
+  LINODE_API_TOKEN: 'linode',
   NAMECHEAP_API_KEY: 'namecheap',
+  VULTR_API_KEY: 'vultr',
 };
 export type ProviderConnectionValidationStatus = 'PENDING' | 'VALID' | 'INVALID';
 export type ProviderConnectionSyncStatus = 'IDLE' | 'PENDING' | 'SYNCING' | 'SUCCESS' | 'FAILED';

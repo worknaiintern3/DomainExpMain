@@ -1,0 +1,15 @@
+export const DIGITALOCEAN_PROVIDER_KEY = 'digitalocean';
+export const DIGITALOCEAN_DROPLET_RESOURCE_TYPE = 'digitalocean.droplet';
+
+export const DIGITALOCEAN_API_ORIGIN = 'https://api.digitalocean.com';
+export const DIGITALOCEAN_TOKEN_VERIFY_PATH = '/v2/account';
+export const DIGITALOCEAN_DROPLETS_PATH = '/v2/droplets';
+
+export const DIGITALOCEAN_DEFAULT_TIMEOUT_MS = 8_000;
+export const DIGITALOCEAN_DEFAULT_PAGE_SIZE = 100;
+export const DIGITALOCEAN_MAX_PAGE_SIZE = 200;
+export const DIGITALOCEAN_MIN_PAGE_SIZE = 5;
+export const DIGITALOCEAN_DEFAULT_MAX_PAGES = 1_000;
+export const DIGITALOCEAN_MAX_RESPONSE_BYTES = 2_000_000;
+export const DIGITALOCEAN_MAX_TOKEN_LENGTH = 4_096;
+export const DIGITALOCEAN_MAX_RETRY_AFTER_SECONDS = 86_400;

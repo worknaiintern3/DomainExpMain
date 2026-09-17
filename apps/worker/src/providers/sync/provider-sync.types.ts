@@ -52,6 +52,40 @@ export interface ProviderSyncRunExecutor {
   ): Promise<ProviderSyncExecutionResult>;
 }
 
+/**
+ * Phase 10H (VPS providers): the resource-neutral shape `ProviderSyncExecutor`
+ * actually depends on. `ProviderDomainSyncService` (domains) and the new
+ * `ProviderServerSyncService` (VPS servers) both satisfy this structurally --
+ * no changes to either concrete class are needed -- so the executor's
+ * provider registry can hold either kind of sync service without a second
+ * executor implementation.
+ */
+export interface ProviderResourceSyncInput {
+  readonly connectionId: string;
+  readonly synchronizedAt: Date;
+  readonly token: string;
+  readonly workspaceId: string;
+}
+
+export interface ProviderResourceSyncResult {
+  readonly completion: 'COMPLETE' | 'PARTIAL';
+  readonly error: {
+    readonly code: string;
+    readonly retryAfterSeconds: number | null;
+  } | null;
+  readonly itemsCreated: number;
+  readonly itemsDiscovered: number;
+  readonly itemsMissing: number;
+  readonly itemsUnchanged: number;
+  readonly itemsUpdated: number;
+}
+
+export interface ProviderResourceSyncService {
+  synchronize(
+    input: ProviderResourceSyncInput,
+  ): Promise<ProviderResourceSyncResult>;
+}
+
 export interface ProviderSyncWorkerLogEvent {
   readonly count?: number;
   readonly event: string;

@@ -23,6 +23,10 @@ export const providerConnectionAuthTypeEnum = pgEnum(
     'GODADDY_PAT',
     'NAMECHEAP_API_KEY',
     'HOSTINGER_API_TOKEN',
+    'DIGITALOCEAN_API_TOKEN',
+    'HETZNER_API_TOKEN',
+    'VULTR_API_KEY',
+    'LINODE_API_TOKEN',
   ],
 );
 

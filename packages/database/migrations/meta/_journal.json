@@ -106,6 +106,13 @@
       "when": 1789559239576,
       "tag": "0014_provider_auth_types",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789626858187,
+      "tag": "0015_provider_vps_auth_types",
+      "breakpoints": true
     }
   ]
 }

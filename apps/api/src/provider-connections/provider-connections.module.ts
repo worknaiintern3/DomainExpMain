@@ -4,9 +4,13 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { DatabaseService } from '../database/database.service';
 import { CloudflareTokenValidator } from './cloudflare-token-validator';
+import { DigitalOceanTokenValidator } from './digitalocean-token-validator';
 import { GoDaddyTokenValidator } from './godaddy-token-validator';
+import { HetznerTokenValidator } from './hetzner-token-validator';
 import { HostingerTokenValidator } from './hostinger-token-validator';
+import { LinodeTokenValidator } from './linode-token-validator';
 import { NamecheapTokenValidator } from './namecheap-token-validator';
+import { VultrTokenValidator } from './vultr-token-validator';
 import { ProviderConnectionsController } from './provider-connections.controller';
 import { PostgresProviderConnectionsRepository } from './provider-connections.repository';
 import { ProviderConnectionsService } from './provider-connections.service';
@@ -36,6 +40,10 @@ const PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY = Symbol('PROVIDER_CREDENTIAL_VALID
           ['GODADDY_PAT', new GoDaddyTokenValidator()],
           ['NAMECHEAP_API_KEY', new NamecheapTokenValidator()],
           ['HOSTINGER_API_TOKEN', new HostingerTokenValidator()],
+          ['DIGITALOCEAN_API_TOKEN', new DigitalOceanTokenValidator()],
+          ['HETZNER_API_TOKEN', new HetznerTokenValidator()],
+          ['VULTR_API_KEY', new VultrTokenValidator()],
+          ['LINODE_API_TOKEN', new LinodeTokenValidator()],
         ]),
     },
     {

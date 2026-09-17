@@ -120,6 +120,10 @@ describe('ProviderConnectionsService', () => {
   let godaddyValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let namecheapValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let hostingerValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let digitaloceanValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let hetznerValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let vultrValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let linodeValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let service: ProviderConnectionsService;
 
   beforeEach(() => {
@@ -128,6 +132,10 @@ describe('ProviderConnectionsService', () => {
     godaddyValidator = fakeValidator();
     namecheapValidator = fakeValidator();
     hostingerValidator = fakeValidator();
+    digitaloceanValidator = fakeValidator();
+    hetznerValidator = fakeValidator();
+    vultrValidator = fakeValidator();
+    linodeValidator = fakeValidator();
     service = new ProviderConnectionsService(
       store as unknown as ProviderConnectionsStore,
       keyStore,
@@ -136,6 +144,10 @@ describe('ProviderConnectionsService', () => {
         ['GODADDY_PAT', godaddyValidator],
         ['NAMECHEAP_API_KEY', namecheapValidator],
         ['HOSTINGER_API_TOKEN', hostingerValidator],
+        ['DIGITALOCEAN_API_TOKEN', digitaloceanValidator],
+        ['HETZNER_API_TOKEN', hetznerValidator],
+        ['VULTR_API_KEY', vultrValidator],
+        ['LINODE_API_TOKEN', linodeValidator],
       ]) as never,
       () => now,
     );
@@ -146,11 +158,19 @@ describe('ProviderConnectionsService', () => {
       ['GODADDY_PAT', 'godaddyValidator'],
       ['NAMECHEAP_API_KEY', 'namecheapValidator'],
       ['HOSTINGER_API_TOKEN', 'hostingerValidator'],
+      ['DIGITALOCEAN_API_TOKEN', 'digitaloceanValidator'],
+      ['HETZNER_API_TOKEN', 'hetznerValidator'],
+      ['VULTR_API_KEY', 'vultrValidator'],
+      ['LINODE_API_TOKEN', 'linodeValidator'],
     ] as const)('a %s credential is routed only to its own validator, never to Cloudflare', async (authType, _label) => {
       const validatorsByAuthType = {
+        DIGITALOCEAN_API_TOKEN: digitaloceanValidator,
         GODADDY_PAT: godaddyValidator,
+        HETZNER_API_TOKEN: hetznerValidator,
         HOSTINGER_API_TOKEN: hostingerValidator,
+        LINODE_API_TOKEN: linodeValidator,
         NAMECHEAP_API_KEY: namecheapValidator,
+        VULTR_API_KEY: vultrValidator,
       } as const;
       const ownValidator = validatorsByAuthType[authType];
       ownValidator.isTokenActive.mockResolvedValue(true);

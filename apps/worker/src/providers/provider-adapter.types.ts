@@ -88,3 +88,35 @@ export interface ProviderDomainDiscovery {
 export interface DomainDiscoveryCapability {
   discoverDomains(token: string): Promise<ProviderDomainDiscovery>;
 }
+
+/**
+ * Phase 10H (VPS providers): the server-inventory analogue of
+ * DiscoveredProviderDomain. There is no cross-provider natural key for a
+ * server the way a domain name is one, so unlike DiscoveredProviderDomain
+ * this carries the display/inventory fields (name, hostname, primaryIp,
+ * region, operatingSystem, serverKind) the reconciler needs to populate a
+ * new `servers` row or match an existing user-added one; it never carries
+ * billing, pricing, or health/monitoring data, which no in-scope provider's
+ * official API exposes as ground truth for that concern.
+ */
+export interface DiscoveredProviderServer {
+  readonly canonicalName: string;
+  readonly externalResourceId: string;
+  readonly hostname: string | null;
+  readonly operatingSystem: string | null;
+  readonly primaryIp: string | null;
+  readonly providerStatus: string;
+  readonly region: string | null;
+  readonly serverKind: string | null;
+}
+
+export interface ProviderServerDiscovery {
+  readonly completion: 'COMPLETE' | 'PARTIAL';
+  readonly error: SafeProviderError | null;
+  readonly externalResourceType: string;
+  readonly servers: readonly DiscoveredProviderServer[];
+}
+
+export interface ServerDiscoveryCapability {
+  discoverServers(token: string): Promise<ProviderServerDiscovery>;
+}
