@@ -3,7 +3,10 @@ import { Module } from '@nestjs/common';
 
 import { DatabaseModule } from '../database/database.module';
 import { DatabaseService } from '../database/database.service';
+import { AwsCredentialValidator } from './aws-credential-validator';
+import { AzureCredentialValidator } from './azure-credential-validator';
 import { CloudflareTokenValidator } from './cloudflare-token-validator';
+import { GcpCredentialValidator } from './gcp-credential-validator';
 import { GoDaddyTokenValidator } from './godaddy-token-validator';
 import { HostingerTokenValidator } from './hostinger-token-validator';
 import { NamecheapTokenValidator } from './namecheap-token-validator';
@@ -36,6 +39,9 @@ const PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY = Symbol('PROVIDER_CREDENTIAL_VALID
           ['GODADDY_PAT', new GoDaddyTokenValidator()],
           ['NAMECHEAP_API_KEY', new NamecheapTokenValidator()],
           ['HOSTINGER_API_TOKEN', new HostingerTokenValidator()],
+          ['AWS_ACCESS_KEY', new AwsCredentialValidator()],
+          ['GCP_SERVICE_ACCOUNT_KEY', new GcpCredentialValidator()],
+          ['AZURE_CLIENT_CREDENTIALS', new AzureCredentialValidator()],
         ]),
     },
     {

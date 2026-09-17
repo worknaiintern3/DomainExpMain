@@ -5,6 +5,9 @@ export const ProviderConnectionAuthTypeSchema = z.enum([
   'GODADDY_PAT',
   'NAMECHEAP_API_KEY',
   'HOSTINGER_API_TOKEN',
+  'AWS_ACCESS_KEY',
+  'GCP_SERVICE_ACCOUNT_KEY',
+  'AZURE_CLIENT_CREDENTIALS',
 ]);
 export const ProviderConnectionValidationStatusSchema = z.enum([
   'PENDING',

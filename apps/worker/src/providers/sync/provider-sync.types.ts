@@ -1,4 +1,39 @@
+import type { SafeProviderError } from '../provider-adapter.types';
+
 export type ProviderSyncTerminalStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED';
+
+/**
+ * Phase 10I: the shape both `ProviderDomainSyncService` (registrar/DNS
+ * domains) and `ProviderCloudResourceSyncService` (AWS/GCP/Azure VM
+ * inventory) already satisfy structurally -- their `synchronize` methods
+ * take and return identically-shaped objects (see
+ * provider-domain-reconciliation.types.ts /
+ * provider-cloud-resource-reconciliation.types.ts). Declaring this common
+ * interface here, rather than a second copy of the executor, lets
+ * `ProviderSyncExecutor` dispatch to either kind through one
+ * provider-key-keyed map without either service needing to import the other
+ * or `implements` anything.
+ */
+export interface ProviderSyncServiceInput {
+  readonly connectionId: string;
+  readonly synchronizedAt: Date;
+  readonly token: string;
+  readonly workspaceId: string;
+}
+
+export interface ProviderSyncServiceResult {
+  readonly completion: 'COMPLETE' | 'PARTIAL';
+  readonly error: SafeProviderError | null;
+  readonly itemsCreated: number;
+  readonly itemsDiscovered: number;
+  readonly itemsMissing: number;
+  readonly itemsUnchanged: number;
+  readonly itemsUpdated: number;
+}
+
+export interface ProviderSyncService {
+  synchronize(input: ProviderSyncServiceInput): Promise<ProviderSyncServiceResult>;
+}
 
 export interface ClaimedProviderSyncRun {
   readonly attemptNo: number;

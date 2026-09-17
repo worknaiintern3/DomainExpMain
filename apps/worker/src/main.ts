@@ -16,14 +16,22 @@ import { MetadataMonitoringExecutor } from './monitoring/monitoring.executor';
 import { PostgresMonitoringRepository } from './monitoring/monitoring.repository';
 import type { WorkerLogEvent, WorkerLogger } from './monitoring/monitoring.types';
 import { MonitoringWorker } from './monitoring/monitoring.worker';
+import { AwsAdapter } from './providers/aws/aws.adapter';
+import { AWS_PROVIDER_KEY } from './providers/aws/aws.constants';
+import { AzureAdapter } from './providers/azure/azure.adapter';
+import { AZURE_PROVIDER_KEY } from './providers/azure/azure.constants';
 import { CloudflareAdapter } from './providers/cloudflare/cloudflare.adapter';
 import { CLOUDFLARE_PROVIDER_KEY } from './providers/cloudflare/cloudflare.constants';
+import { GcpAdapter } from './providers/gcp/gcp.adapter';
+import { GCP_PROVIDER_KEY } from './providers/gcp/gcp.constants';
 import { GoDaddyAdapter } from './providers/godaddy/godaddy.adapter';
 import { GODADDY_PROVIDER_KEY } from './providers/godaddy/godaddy.constants';
 import { HostingerAdapter } from './providers/hostinger/hostinger.adapter';
 import { HOSTINGER_PROVIDER_KEY } from './providers/hostinger/hostinger.constants';
 import { NamecheapAdapter } from './providers/namecheap/namecheap.adapter';
 import { NAMECHEAP_PROVIDER_KEY } from './providers/namecheap/namecheap.constants';
+import { PostgresProviderCloudResourceReconciliationStore } from './providers/reconciliation/provider-cloud-resource-reconciliation.repository';
+import { ProviderCloudResourceReconciler, ProviderCloudResourceSyncService } from './providers/reconciliation/provider-cloud-resource-reconciliation.service';
 import { PostgresProviderDomainReconciliationStore } from './providers/reconciliation/provider-domain-reconciliation.repository';
 import {
   ProviderDomainReconciler,
@@ -31,6 +39,7 @@ import {
 } from './providers/reconciliation/provider-domain-reconciliation.service';
 import { ProviderSyncExecutor } from './providers/sync/provider-sync.executor';
 import { PostgresProviderSyncRepository } from './providers/sync/provider-sync.repository';
+import type { ProviderSyncService } from './providers/sync/provider-sync.types';
 import { ProviderSyncWorker } from './providers/sync/provider-sync.worker';
 
 class JsonWorkerLogger implements WorkerLogger {
@@ -71,21 +80,34 @@ async function main(): Promise<void> {
   );
 
   const providerSyncDatabase = createDatabaseClient(databaseConfiguration);
-  // One reconciler, reused across every provider: reconciliation is
-  // provider-key-agnostic (see ProviderDomainReconciler), so adding a
-  // registrar here never duplicates that logic.
-  const reconciler = new ProviderDomainReconciler(
+  // One domain reconciler, reused across every registrar/DNS provider, and
+  // (Phase 10I) one cloud-resource reconciler, reused across every cloud VM
+  // provider: each abstraction is provider-key-agnostic within its own
+  // resource kind, so adding a provider never duplicates that logic. The two
+  // are distinct abstractions -- see provider-cloud-resource-reconciliation
+  // .service.ts's header comment for why domains and cloud resources cannot
+  // share one reconciler -- but both satisfy the same structural
+  // `ProviderSyncService` interface, so `ProviderSyncExecutor` dispatches to
+  // either kind through a single provider-key-keyed map.
+  const domainReconciler = new ProviderDomainReconciler(
     new PostgresProviderDomainReconciliationStore(providerSyncDatabase),
   );
+  const cloudResourceReconciler = new ProviderCloudResourceReconciler(
+    new PostgresProviderCloudResourceReconciliationStore(providerSyncDatabase),
+  );
+  const syncServicesByProviderKey = new Map<string, ProviderSyncService>([
+    [CLOUDFLARE_PROVIDER_KEY, new ProviderDomainSyncService(new CloudflareAdapter(), domainReconciler)],
+    [GODADDY_PROVIDER_KEY, new ProviderDomainSyncService(new GoDaddyAdapter(), domainReconciler)],
+    [NAMECHEAP_PROVIDER_KEY, new ProviderDomainSyncService(new NamecheapAdapter(), domainReconciler)],
+    [HOSTINGER_PROVIDER_KEY, new ProviderDomainSyncService(new HostingerAdapter(), domainReconciler)],
+    [AWS_PROVIDER_KEY, new ProviderCloudResourceSyncService(new AwsAdapter(), cloudResourceReconciler)],
+    [GCP_PROVIDER_KEY, new ProviderCloudResourceSyncService(new GcpAdapter(), cloudResourceReconciler)],
+    [AZURE_PROVIDER_KEY, new ProviderCloudResourceSyncService(new AzureAdapter(), cloudResourceReconciler)],
+  ]);
   const providerSyncWorker = new ProviderSyncWorker(
     new PostgresProviderSyncRepository(providerSyncDatabase),
     new ProviderSyncExecutor(
-      new Map([
-        [CLOUDFLARE_PROVIDER_KEY, new ProviderDomainSyncService(new CloudflareAdapter(), reconciler)],
-        [GODADDY_PROVIDER_KEY, new ProviderDomainSyncService(new GoDaddyAdapter(), reconciler)],
-        [NAMECHEAP_PROVIDER_KEY, new ProviderDomainSyncService(new NamecheapAdapter(), reconciler)],
-        [HOSTINGER_PROVIDER_KEY, new ProviderDomainSyncService(new HostingerAdapter(), reconciler)],
-      ]),
+      syncServicesByProviderKey,
       parseProviderCredentialEncryptionEnvironment(process.env),
     ),
     providerSyncConfiguration,

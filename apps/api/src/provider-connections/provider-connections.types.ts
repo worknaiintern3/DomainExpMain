@@ -2,7 +2,10 @@ export type ProviderConnectionAuthType =
   | 'CLOUDFLARE_API_TOKEN'
   | 'GODADDY_PAT'
   | 'NAMECHEAP_API_KEY'
-  | 'HOSTINGER_API_TOKEN';
+  | 'HOSTINGER_API_TOKEN'
+  | 'AWS_ACCESS_KEY'
+  | 'GCP_SERVICE_ACCOUNT_KEY'
+  | 'AZURE_CLIENT_CREDENTIALS';
 
 /**
  * Which `provider_accounts.provider_key` a given auth type must reference.
@@ -10,10 +13,15 @@ export type ProviderConnectionAuthType =
  * providerKey matches -- prevents e.g. a CLOUDFLARE_API_TOKEN connection
  * from being attached to a non-Cloudflare provider account (and, per Phase
  * 10G, blocks any cross-provider mismatch symmetrically for GoDaddy,
- * Namecheap, and Hostinger).
+ * Namecheap, and Hostinger). Phase 10I adds the three cloud-VM auth types
+ * (AWS/GCP/Azure) symmetrically -- each routes only to its own provider
+ * account, never to a registrar/DNS one or another cloud.
  */
 export const AUTH_TYPE_PROVIDER_KEY: Record<ProviderConnectionAuthType, string> = {
+  AWS_ACCESS_KEY: 'aws',
+  AZURE_CLIENT_CREDENTIALS: 'azure',
   CLOUDFLARE_API_TOKEN: 'cloudflare',
+  GCP_SERVICE_ACCOUNT_KEY: 'gcp',
   GODADDY_PAT: 'godaddy',
   HOSTINGER_API_TOKEN: 'hostinger',
   NAMECHEAP_API_KEY: 'namecheap',

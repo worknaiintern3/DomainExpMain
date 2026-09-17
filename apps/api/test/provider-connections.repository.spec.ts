@@ -110,6 +110,9 @@ describe('PostgresProviderConnectionsRepository.createConnection', () => {
     ['GODADDY_PAT', 'godaddy'],
     ['NAMECHEAP_API_KEY', 'namecheap'],
     ['HOSTINGER_API_TOKEN', 'hostinger'],
+    ['AWS_ACCESS_KEY', 'aws'],
+    ['GCP_SERVICE_ACCOUNT_KEY', 'gcp'],
+    ['AZURE_CLIENT_CREDENTIALS', 'azure'],
   ] as const)('succeeds for a valid, workspace-owned %s account and stamps the matching providerType', async (authType, providerKey) => {
     const transaction = fakeTransaction({
       accountRow: { label: `${providerKey} - primary`, providerKey },
@@ -130,6 +133,13 @@ describe('PostgresProviderConnectionsRepository.createConnection', () => {
     ['NAMECHEAP_API_KEY', 'hostinger'],
     ['HOSTINGER_API_TOKEN', 'cloudflare'],
     ['CLOUDFLARE_API_TOKEN', 'godaddy'],
+    ['AWS_ACCESS_KEY', 'gcp'],
+    ['GCP_SERVICE_ACCOUNT_KEY', 'azure'],
+    ['AZURE_CLIENT_CREDENTIALS', 'aws'],
+    // Cross-family: a cloud auth type must never attach to a registrar/DNS
+    // provider account, and vice versa.
+    ['AWS_ACCESS_KEY', 'cloudflare'],
+    ['CLOUDFLARE_API_TOKEN', 'aws'],
   ] as const)('rejects %s against a mismatched %s provider account, never attaching across providers', async (authType, mismatchedProviderKey) => {
     const transaction = fakeTransaction({
       accountRow: { label: 'Mismatched account', providerKey: mismatchedProviderKey },

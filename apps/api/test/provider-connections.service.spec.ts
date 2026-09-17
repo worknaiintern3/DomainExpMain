@@ -120,6 +120,9 @@ describe('ProviderConnectionsService', () => {
   let godaddyValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let namecheapValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let hostingerValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let awsValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let gcpValidator: { isTokenActive: ReturnType<typeof vi.fn> };
+  let azureValidator: { isTokenActive: ReturnType<typeof vi.fn> };
   let service: ProviderConnectionsService;
 
   beforeEach(() => {
@@ -128,6 +131,9 @@ describe('ProviderConnectionsService', () => {
     godaddyValidator = fakeValidator();
     namecheapValidator = fakeValidator();
     hostingerValidator = fakeValidator();
+    awsValidator = fakeValidator();
+    gcpValidator = fakeValidator();
+    azureValidator = fakeValidator();
     service = new ProviderConnectionsService(
       store as unknown as ProviderConnectionsStore,
       keyStore,
@@ -136,6 +142,9 @@ describe('ProviderConnectionsService', () => {
         ['GODADDY_PAT', godaddyValidator],
         ['NAMECHEAP_API_KEY', namecheapValidator],
         ['HOSTINGER_API_TOKEN', hostingerValidator],
+        ['AWS_ACCESS_KEY', awsValidator],
+        ['GCP_SERVICE_ACCOUNT_KEY', gcpValidator],
+        ['AZURE_CLIENT_CREDENTIALS', azureValidator],
       ]) as never,
       () => now,
     );
@@ -146,8 +155,14 @@ describe('ProviderConnectionsService', () => {
       ['GODADDY_PAT', 'godaddyValidator'],
       ['NAMECHEAP_API_KEY', 'namecheapValidator'],
       ['HOSTINGER_API_TOKEN', 'hostingerValidator'],
+      ['AWS_ACCESS_KEY', 'awsValidator'],
+      ['GCP_SERVICE_ACCOUNT_KEY', 'gcpValidator'],
+      ['AZURE_CLIENT_CREDENTIALS', 'azureValidator'],
     ] as const)('a %s credential is routed only to its own validator, never to Cloudflare', async (authType, _label) => {
       const validatorsByAuthType = {
+        AWS_ACCESS_KEY: awsValidator,
+        AZURE_CLIENT_CREDENTIALS: azureValidator,
+        GCP_SERVICE_ACCOUNT_KEY: gcpValidator,
         GODADDY_PAT: godaddyValidator,
         HOSTINGER_API_TOKEN: hostingerValidator,
         NAMECHEAP_API_KEY: namecheapValidator,
@@ -181,6 +196,9 @@ describe('ProviderConnectionsService', () => {
       expect(validator.isTokenActive).not.toHaveBeenCalled();
       expect(godaddyValidator.isTokenActive).not.toHaveBeenCalled();
       expect(namecheapValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(awsValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(gcpValidator.isTokenActive).not.toHaveBeenCalled();
+      expect(azureValidator.isTokenActive).not.toHaveBeenCalled();
     });
   });
 

@@ -73,12 +73,12 @@ afterEach(() => {
 });
 
 describe('IntegrationsTab', () => {
-  it('renders a card for every supported provider (Cloudflare, GoDaddy, Namecheap, Hostinger)', async () => {
+  it('renders a card for every supported provider (Cloudflare, GoDaddy, Namecheap, Hostinger, AWS, GCP, Azure)', async () => {
     listProviderConnections.mockResolvedValue({ items: [] });
 
     render(<IntegrationsTab />);
 
-    for (const providerKey of ['cloudflare', 'godaddy', 'namecheap', 'hostinger']) {
+    for (const providerKey of ['cloudflare', 'godaddy', 'namecheap', 'hostinger', 'aws', 'gcp', 'azure']) {
       expect(await screen.findByTestId(`${providerKey}-integration-card`)).toBeInTheDocument();
     }
   });
@@ -344,6 +344,161 @@ describe('IntegrationsTab', () => {
 
       expect(await within(namecheapCard()).findByText('Configured')).toBeInTheDocument();
       expect(document.body.textContent).not.toMatch(/"\}/u);
+    });
+  });
+
+  describe('AWS', () => {
+    function awsCard(): HTMLElement {
+      return screen.getByTestId('aws-integration-card');
+    }
+
+    it('serializes access key/secret/regions into the exact JSON credential shape, omits a blank optional session token, and stays disabled until required fields are filled', async () => {
+      listProviderConnections.mockResolvedValue({ items: [] });
+      createProviderAccount.mockResolvedValue({ externalAccountId: null, id: 'aws-account-1', label: 'AWS', providerKey: 'aws' });
+      createProviderConnection.mockResolvedValue({ ...connectedConnection, authType: 'AWS_ACCESS_KEY' as const, id: 'aws-1', providerType: 'aws' });
+
+      render(<IntegrationsTab />);
+      fireEvent.click(await within(awsCard()).findByRole('button', { name: 'Connect' }));
+
+      const submit = within(awsCard()).getByRole('button', { name: 'Save and connect' });
+      expect(submit).toBeDisabled();
+
+      fireEvent.change(screen.getByTestId('aws-accessKeyId-input'), { target: { value: 'AKIAEXAMPLE12345678' } });
+      expect(submit).toBeDisabled(); // still missing secret/regions
+      fireEvent.change(screen.getByTestId('aws-secretAccessKey-input'), { target: { value: 'super-secret-key' } });
+      fireEvent.change(screen.getByTestId('aws-regions-input'), { target: { value: 'us-east-1, eu-west-1' } });
+      // The session token field is optional and never blocks submission.
+      expect(submit).not.toBeDisabled();
+
+      fireEvent.click(submit);
+
+      await waitFor(() => {
+        expect(createProviderConnection).toHaveBeenCalledWith({
+          authType: 'AWS_ACCESS_KEY',
+          credential: JSON.stringify({
+            accessKeyId: 'AKIAEXAMPLE12345678',
+            regions: ['us-east-1', 'eu-west-1'],
+            secretAccessKey: 'super-secret-key',
+          }),
+          providerAccountId: 'aws-account-1',
+        });
+      });
+      expect(localStorage.length).toBe(0);
+      expect(sessionStorage.length).toBe(0);
+    });
+
+    it('includes a filled-in session token in the serialized credential', async () => {
+      listProviderConnections.mockResolvedValue({ items: [] });
+      createProviderAccount.mockResolvedValue({ externalAccountId: null, id: 'aws-account-1', label: 'AWS', providerKey: 'aws' });
+      createProviderConnection.mockResolvedValue({ ...connectedConnection, authType: 'AWS_ACCESS_KEY' as const, id: 'aws-1', providerType: 'aws' });
+
+      render(<IntegrationsTab />);
+      fireEvent.click(await within(awsCard()).findByRole('button', { name: 'Connect' }));
+
+      fireEvent.change(screen.getByTestId('aws-accessKeyId-input'), { target: { value: 'AKIAEXAMPLE12345678' } });
+      fireEvent.change(screen.getByTestId('aws-secretAccessKey-input'), { target: { value: 'super-secret-key' } });
+      fireEvent.change(screen.getByTestId('aws-sessionToken-input'), { target: { value: 'temp-session-token' } });
+      fireEvent.change(screen.getByTestId('aws-regions-input'), { target: { value: 'us-east-1' } });
+      fireEvent.click(within(awsCard()).getByRole('button', { name: 'Save and connect' }));
+
+      await waitFor(() => {
+        expect(createProviderConnection).toHaveBeenCalledWith({
+          authType: 'AWS_ACCESS_KEY',
+          credential: JSON.stringify({
+            accessKeyId: 'AKIAEXAMPLE12345678',
+            regions: ['us-east-1'],
+            secretAccessKey: 'super-secret-key',
+            sessionToken: 'temp-session-token',
+          }),
+          providerAccountId: 'aws-account-1',
+        });
+      });
+    });
+  });
+
+  describe('Google Cloud', () => {
+    function gcpCard(): HTMLElement {
+      return screen.getByTestId('gcp-integration-card');
+    }
+
+    it('serializes project/email/private key into the exact JSON credential shape via the multi-line key field', async () => {
+      listProviderConnections.mockResolvedValue({ items: [] });
+      createProviderAccount.mockResolvedValue({ externalAccountId: null, id: 'gcp-account-1', label: 'Google Cloud', providerKey: 'gcp' });
+      createProviderConnection.mockResolvedValue({ ...connectedConnection, authType: 'GCP_SERVICE_ACCOUNT_KEY' as const, id: 'gcp-1', providerType: 'gcp' });
+
+      render(<IntegrationsTab />);
+      fireEvent.click(await within(gcpCard()).findByRole('button', { name: 'Connect' }));
+
+      const submit = within(gcpCard()).getByRole('button', { name: 'Save and connect' });
+      expect(submit).toBeDisabled();
+
+      fireEvent.change(screen.getByTestId('gcp-projectId-input'), { target: { value: 'my-test-project' } });
+      fireEvent.change(screen.getByTestId('gcp-clientEmail-input'), {
+        target: { value: 'sa@my-test-project.iam.gserviceaccount.com' },
+      });
+      expect(submit).toBeDisabled(); // still missing the private key
+      fireEvent.change(screen.getByTestId('gcp-privateKey-input'), {
+        target: { value: '-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----' },
+      });
+      expect(submit).not.toBeDisabled();
+
+      fireEvent.click(submit);
+
+      await waitFor(() => {
+        expect(createProviderConnection).toHaveBeenCalledWith({
+          authType: 'GCP_SERVICE_ACCOUNT_KEY',
+          credential: JSON.stringify({
+            clientEmail: 'sa@my-test-project.iam.gserviceaccount.com',
+            privateKey: '-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----',
+            projectId: 'my-test-project',
+          }),
+          providerAccountId: 'gcp-account-1',
+        });
+      });
+      expect(localStorage.length).toBe(0);
+      expect(sessionStorage.length).toBe(0);
+    });
+  });
+
+  describe('Azure', () => {
+    function azureCard(): HTMLElement {
+      return screen.getByTestId('azure-integration-card');
+    }
+
+    it('serializes tenant/client/secret/subscription into the exact JSON credential shape', async () => {
+      listProviderConnections.mockResolvedValue({ items: [] });
+      createProviderAccount.mockResolvedValue({ externalAccountId: null, id: 'azure-account-1', label: 'Azure', providerKey: 'azure' });
+      createProviderConnection.mockResolvedValue({ ...connectedConnection, authType: 'AZURE_CLIENT_CREDENTIALS' as const, id: 'azure-1', providerType: 'azure' });
+
+      render(<IntegrationsTab />);
+      fireEvent.click(await within(azureCard()).findByRole('button', { name: 'Connect' }));
+
+      const submit = within(azureCard()).getByRole('button', { name: 'Save and connect' });
+      expect(submit).toBeDisabled();
+
+      fireEvent.change(screen.getByTestId('azure-tenantId-input'), { target: { value: '11111111-1111-1111-1111-111111111111' } });
+      fireEvent.change(screen.getByTestId('azure-clientId-input'), { target: { value: '22222222-2222-2222-2222-222222222222' } });
+      fireEvent.change(screen.getByTestId('azure-clientSecret-input'), { target: { value: 'super-secret-value' } });
+      expect(submit).toBeDisabled(); // still missing subscriptionId
+      fireEvent.change(screen.getByTestId('azure-subscriptionId-input'), { target: { value: '33333333-3333-3333-3333-333333333333' } });
+      expect(submit).not.toBeDisabled();
+
+      fireEvent.click(submit);
+
+      await waitFor(() => {
+        expect(createProviderConnection).toHaveBeenCalledWith({
+          authType: 'AZURE_CLIENT_CREDENTIALS',
+          credential: JSON.stringify({
+            clientId: '22222222-2222-2222-2222-222222222222',
+            clientSecret: 'super-secret-value',
+            subscriptionId: '33333333-3333-3333-3333-333333333333',
+            tenantId: '11111111-1111-1111-1111-111111111111',
+          }),
+          providerAccountId: 'azure-account-1',
+        });
+      });
+      expect(localStorage.length).toBe(0);
+      expect(sessionStorage.length).toBe(0);
     });
   });
 });

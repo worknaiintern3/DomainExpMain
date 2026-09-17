@@ -139,11 +139,19 @@ describe('ProviderSyncExecutor', () => {
     expect(result.errorCode).toBe('UNKNOWN_PROVIDER_ERROR');
   });
 
-  it.each(['cloudflare', 'godaddy', 'namecheap', 'hostinger'])(
+  it.each(['cloudflare', 'godaddy', 'namecheap', 'hostinger', 'aws', 'gcp', 'azure'])(
     'a %s connection dispatches only to its own registered service, never a sibling provider\'s',
     async (providerKey) => {
+      // Phase 10I: aws/gcp/azure register a ProviderCloudResourceSyncService
+      // in the exact same provider-key-keyed map as the domain-sync
+      // providers -- this confirms the executor's generalized
+      // `ProviderSyncService` interface (see provider-sync.types.ts)
+      // dispatches to either kind identically, with no special-casing.
       const synchronizeCalls: Record<string, ReturnType<typeof vi.fn>> = {
+        aws: vi.fn(async () => successDiscovery()),
+        azure: vi.fn(async () => successDiscovery()),
         cloudflare: vi.fn(async () => successDiscovery()),
+        gcp: vi.fn(async () => successDiscovery()),
         godaddy: vi.fn(async () => successDiscovery()),
         hostinger: vi.fn(async () => successDiscovery()),
         namecheap: vi.fn(async () => successDiscovery()),
