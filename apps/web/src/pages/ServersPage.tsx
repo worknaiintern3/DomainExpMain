@@ -1,282 +1,147 @@
-import React, { useState, useMemo } from 'react';
-import { SERVERS_REFERENCE_DATA } from '@/features/servers/servers.reference';
-import { ServerRecord, ServerFilterState } from '@/features/servers/servers.types';
-import { ServerHeader } from '@/features/servers/components/ServerHeader';
-import { ServerSummaryStrip } from '@/features/servers/components/ServerSummaryStrip';
-import { ServerFilterToolbar } from '@/features/servers/components/ServerFilterToolbar';
-import { ServerTable } from '@/features/servers/components/ServerTable';
-import { ServerInspectorDrawer } from '@/features/servers/components/ServerInspectorDrawer';
-import { ServerAddModal } from '@/features/servers/components/ServerAddModal';
-import { ServerEmptyState } from '@/features/servers/components/ServerEmptyState';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+
+import { archiveInventory, updateInventory } from '@/api/inventory';
+import type { Server } from '@/api/types';
+import { Button } from '@/components/common/Button';
+import {
+  InventoryState,
+  ResourceFormModal,
+  StatePanel,
+} from '@/components/integration/InventoryWorkspace';
+import { serverConfiguration } from '@/features/integration/resource-configs';
+import { useProviderLabels } from '@/features/provider-accounts/useProviderLabels';
+import { useCursorInventory } from '@/hooks/useCursorInventory';
+
+const metadata = (value: string | null) => value || 'Not recorded';
 
 export const ServersPage: React.FC = () => {
-  const initialData = SERVERS_REFERENCE_DATA;
-  const [serverList, setServerList] = useState<ServerRecord[]>(initialData.servers);
-  const [viewMode, setViewMode] = useState<'fleet' | 'empty'>('fleet');
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [search, setSearch] = useState('');
+  const [kind, setKind] = useState('ALL');
+  const [region, setRegion] = useState('ALL');
+  const [editing, setEditing] = useState<Server | 'create' | null>(null);
+  const [inspectedId, setInspectedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const list = useCursorInventory('servers', includeArchived);
+  const providerLabels = useProviderLabels(list.items.map((server) => server.providerAccountId));
+  const config = useMemo(() => serverConfiguration(providerLabels), [providerLabels]);
 
-  // Multi-selection state (defaults to prod-01 per Stitch locked reference)
-  const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({
-    'prod-01': true,
-  });
-
-  // Inspected server for right drawer (defaults to prod-01 per Stitch reference)
-  const [inspectedServerId, setInspectedServerId] = useState<string | null>('prod-01');
-
-  // Add / Edit Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingServer, setEditingServer] = useState<ServerRecord | null>(null);
-
-  // Filter state
-  const [filterState, setFilterState] = useState<ServerFilterState>({
-    searchQuery: '',
-    status: 'All',
-    provider: 'Provider: All',
-    region: 'Region: Global',
-    accountEmail: 'All Accounts',
-    os: 'All OS',
-    sortBy: 'Renewal Soonest',
-  });
-
-  const handleFilterChange = (key: keyof ServerFilterState, value: string) => {
-    setFilterState((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleClearFilters = () => {
-    setFilterState({
-      searchQuery: '',
-      status: 'All',
-      provider: 'Provider: All',
-      region: 'Region: Global',
-      accountEmail: 'All Accounts',
-      os: 'All OS',
-      sortBy: 'Renewal Soonest',
+  const kinds = useMemo(
+    () => [...new Set(list.items.map((server) => server.serverKind).filter((value): value is string => Boolean(value)))].sort(),
+    [list.items],
+  );
+  const regions = useMemo(
+    () => [...new Set(list.items.map((server) => server.region).filter((value): value is string => Boolean(value)))].sort(),
+    [list.items],
+  );
+  const visibleServers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return list.items.filter((server) => {
+      if (kind !== 'ALL' && server.serverKind !== kind) return false;
+      if (region !== 'ALL' && server.region !== region) return false;
+      if (!query) return true;
+      const providerLabel = server.providerAccountId
+        ? providerLabels.get(server.providerAccountId)
+        : null;
+      return [server.name, server.hostname, server.serverKind, server.region, server.primaryIp, server.operatingSystem, providerLabel]
+        .some((value) => value?.toLowerCase().includes(query));
     });
-  };
+  }, [kind, list.items, providerLabels, region, search]);
+  const inspected = list.items.find((server) => server.id === inspectedId) ?? null;
 
-  // Filtered and sorted server records
-  const filteredServers = useMemo(() => {
-    let result = [...serverList];
-
-    // Search query
-    if (filterState.searchQuery.trim() !== '') {
-      const q = filterState.searchQuery.toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.hostname.toLowerCase().includes(q) ||
-          s.provider.toLowerCase().includes(q) ||
-          s.accountEmail.toLowerCase().includes(q) ||
-          s.ipAddress.toLowerCase().includes(q) ||
-          s.region.toLowerCase().includes(q) ||
-          s.connectedWebsites.some((w) => w.domain.toLowerCase().includes(q))
-      );
+  useEffect(() => {
+    if (list.loading || list.items.length === 0) return;
+    if (!inspectedId || !list.items.some((server) => server.id === inspectedId)) {
+      setInspectedId(list.items[0]?.id ?? null);
     }
+  }, [inspectedId, list.items, list.loading]);
 
-    // Status filter
-    if (filterState.status === 'Active') {
-      result = result.filter((s) => s.status === 'active');
-    } else if (filterState.status === 'Attention') {
-      result = result.filter((s) => s.status === 'attention');
-    }
-
-    // Provider filter
-    if (filterState.provider !== 'Provider: All') {
-      result = result.filter(
-        (s) => s.provider.toLowerCase() === filterState.provider.toLowerCase()
-      );
-    }
-
-    // Region filter
-    if (filterState.region !== 'Region: Global') {
-      result = result.filter(
-        (s) => s.region.toLowerCase() === filterState.region.toLowerCase()
-      );
-    }
-
-    // Account Email filter
-    if (filterState.accountEmail !== 'All Accounts') {
-      result = result.filter(
-        (s) => s.accountEmail.toLowerCase() === filterState.accountEmail.toLowerCase()
-      );
-    }
-
-    // OS filter
-    if (filterState.os !== 'All OS') {
-      result = result.filter(
-        (s) => s.osPlatform.toLowerCase() === filterState.os.toLowerCase()
-      );
-    }
-
-    // Sorting
-    if (filterState.sortBy === 'Renewal Soonest') {
-      result.sort((a, b) => (a.renewalDaysRemaining ?? 999) - (b.renewalDaysRemaining ?? 999));
-    } else if (filterState.sortBy === 'Monthly Cost (High to Low)') {
-      result.sort((a, b) => b.monthlyCost - a.monthlyCost);
-    } else if (filterState.sortBy === 'Server Name (A-Z)') {
-      result.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (filterState.sortBy === 'Websites Count') {
-      result.sort((a, b) => b.hostedWebsitesCount - a.hostedWebsitesCount);
-    }
-
-    return result;
-  }, [serverList, filterState]);
-
-  const currentlyInspectedServer = useMemo(() => {
-    if (!inspectedServerId) return null;
-    return serverList.find((s) => s.id === inspectedServerId) || null;
-  }, [serverList, inspectedServerId]);
-
-  const handleToggleSelectRow = (id: string) => {
-    setSelectedRows((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
-
-  const handleToggleSelectAll = (checked: boolean) => {
-    const updated: Record<string, boolean> = {};
-    if (checked) {
-      filteredServers.forEach((s) => {
-        updated[s.id] = true;
-      });
-    }
-    setSelectedRows(updated);
-  };
-
-  const handleSelectInspect = (server: ServerRecord) => {
-    setInspectedServerId(server.id);
-  };
-
-  const handleOpenAddModal = () => {
-    setEditingServer(null);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = (server: ServerRecord) => {
-    setEditingServer(server);
-    setIsModalOpen(true);
-  };
-
-  const handleModalSubmit = (data: Partial<ServerRecord>) => {
-    if (editingServer) {
-      setServerList((prev) =>
-        prev.map((s) => (s.id === editingServer.id ? { ...s, ...data } : s))
-      );
-    } else {
-      const newServer: ServerRecord = {
-        id: `server-${Date.now()}`,
-        name: data.name || 'New VPS Node',
-        hostname: data.hostname || 'vps-custom-01',
-        provider: data.provider || 'Hostinger',
-        providerColor: {
-          bg: 'bg-[#673de6]/10',
-          text: 'text-[#4c1d95]',
-          dot: 'bg-[#673de6]',
-        },
-        accountName: data.accountName || 'WorknAi Primary Cloud',
-        accountEmail: data.accountEmail || 'infra@worknai.com',
-        ipAddress: data.ipAddress || '103.21.58.112',
-        region: data.region || 'Singapore',
-        regionCode: 'SGP-1',
-        osPlatform: 'Ubuntu 24.04 LTS',
-        computeSpecs: data.computeSpecs || '4 vCPU / 8 GB / 160 GB',
-        vcpuCount: data.vcpuCount || 4,
-        ramGb: data.ramGb || 8,
-        storageGb: data.storageGb || 160,
-        storageType: 'NVMe SSD',
-        storageProgressPercentage: 20,
-        hostedWebsitesCount: 0,
-        monthlyCost: data.monthlyCost || 1499,
-        monthlyCostFormatted: data.monthlyCostFormatted || '₹1,499',
-        annualizedRunRateFormatted: data.annualizedRunRateFormatted || '₹17,988/yr',
-        renewalDateFormatted: '18 Oct 2027',
-        autoRenew: data.autoRenew ?? true,
-        status: 'active',
-        statusLabel: 'Inventory: Active',
-        connectedWebsites: [],
-        notes: data.notes,
-      };
-      setServerList((prev) => [newServer, ...prev]);
-      setInspectedServerId(newServer.id);
+  const changeState = async (server: Server) => {
+    setActionError(null);
+    try {
+      if (server.inventoryState === 'TRACKED') {
+        await archiveInventory('servers', server.id);
+        if (includeArchived) list.markArchived(server.id);
+        else list.remove(server.id);
+      } else {
+        list.upsert(await updateInventory('servers', server.id, { inventoryState: 'TRACKED' }));
+      }
+    } catch (requestError) {
+      setActionError(requestError instanceof Error ? requestError.message : 'The server could not be updated.');
     }
   };
 
-  const handleExportFleet = () => {
-    const fleetJson = JSON.stringify(serverList, null, 2);
-    const blob = new Blob([fleetJson], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `domainpulse-servers-fleet-inventory.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const trackedCount = list.items.filter((server) => server.inventoryState === 'TRACKED').length;
+  const archivedCount = list.items.length - trackedCount;
+  const providerCount = new Set(list.items.map((server) => server.providerAccountId).filter(Boolean)).size;
 
   return (
-    <div className="flex flex-col w-full gap-unit-md">
-      {/* 1. Top Heading & Actions */}
-      <ServerHeader
-        totalCount={initialData.summary.totalServers}
-        viewMode={viewMode}
-        onToggleViewMode={setViewMode}
-        onOpenAddModal={handleOpenAddModal}
-        onExport={handleExportFleet}
-      />
-
-      {/* 2. Empty State View Toggle */}
-      {viewMode === 'empty' ? (
-        <ServerEmptyState onOpenAddModal={handleOpenAddModal} />
-      ) : (
-        <div className="flex flex-col gap-unit-md">
-          {/* 3. Summary Metric Strip (6 Bento Tiles) */}
-          <ServerSummaryStrip summary={initialData.summary} />
-
-          {/* 4. Main Workpane: Table + Persistent Slide-out Inspection Drawer */}
-          <div className="flex flex-col xl:flex-row items-start gap-unit-lg w-full">
-            {/* Server Inventory Column */}
-            <div className="flex-1 w-full min-w-0 flex flex-col gap-unit-md">
-              {/* Filter Toolbar */}
-              <ServerFilterToolbar
-                filterState={filterState}
-                onFilterChange={handleFilterChange}
-                onClearFilters={handleClearFilters}
-                filterOptions={initialData.filterOptions}
-                filteredCount={filteredServers.length}
-                totalCount={initialData.summary.totalServers}
-              />
-
-              {/* Technical Data Table */}
-              <ServerTable
-                servers={filteredServers}
-                totalCount={initialData.summary.totalServers}
-                selectedRows={selectedRows}
-                inspectedServerId={inspectedServerId}
-                onToggleSelectRow={handleToggleSelectRow}
-                onToggleSelectAll={handleToggleSelectAll}
-                onSelectInspect={handleSelectInspect}
-                onOpenEditModal={handleOpenEditModal}
-              />
-            </div>
-
-            {/* 5. Persistent Master-Detail Slide-Out Inspection Drawer */}
-            {currentlyInspectedServer && (
-              <ServerInspectorDrawer
-                server={currentlyInspectedServer}
-                onClose={() => setInspectedServerId(null)}
-                onOpenEditModal={handleOpenEditModal}
-              />
-            )}
+    <div className="flex w-full flex-col gap-unit-md">
+      <header className="mb-unit-xs flex flex-col justify-between gap-unit-md lg:flex-row lg:items-center">
+        <div className="min-w-0">
+          <div className="flex items-center gap-unit-xs">
+            <h1 className="font-headline-md text-headline-md font-semibold tracking-tight text-on-surface">VPS &amp; Servers</h1>
+            <span className="rounded border border-outline-variant/30 bg-surface-container-high px-unit-xs py-unit-2xs font-label-mono text-caption-xs font-semibold text-primary">{list.items.length} LOADED</span>
           </div>
+          <p className="mt-unit-2xs max-w-3xl text-body-md text-secondary">Workspace server inventory, provider ownership, and recorded infrastructure metadata. Live health and utilization are not connected.</p>
         </div>
-      )}
+        <Button variant="primary" iconLeading="add" onClick={() => setEditing('create')}>Add Server</Button>
+      </header>
 
-      {/* 6. Add / Edit Server Modal Overlay */}
-      <ServerAddModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleModalSubmit}
-        editServer={editingServer}
-      />
+      <section className="grid grid-cols-2 gap-unit-sm lg:grid-cols-4" aria-label="Loaded server summary">
+        {[
+          { icon: 'dns', label: 'Loaded records', value: list.items.length },
+          { icon: 'inventory_2', label: 'Tracked', value: trackedCount },
+          { icon: 'archive', label: 'Archived', value: archivedCount },
+          { icon: 'hub', label: 'Provider accounts', value: providerCount },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-unit-md shadow-sm">
+            <div className="flex items-center justify-between gap-3"><span className="text-caption-xs font-semibold uppercase tracking-wider text-secondary">{item.label}</span><span className="material-symbols-outlined text-[20px] text-primary">{item.icon}</span></div>
+            <p className="mt-unit-xs font-label-mono text-headline-md font-semibold text-on-surface">{item.value}</p>
+            <p className="mt-1 text-caption-xs text-secondary">Current loaded page only</p>
+          </div>
+        ))}
+      </section>
+
+      <div className="flex flex-col items-start gap-unit-lg xl:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-unit-sm">
+          <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-unit-sm shadow-sm">
+            <div className="flex flex-col gap-unit-sm lg:flex-row lg:items-center">
+              <label className="relative min-w-[240px] flex-1"><span className="sr-only">Filter loaded servers</span><span className="material-symbols-outlined pointer-events-none absolute left-unit-sm top-1/2 -translate-y-1/2 text-[18px] text-secondary">search</span><input className="h-9 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low py-0 pl-9 pr-unit-md text-body-sm text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Filter loaded servers by name, host, provider, IP, or OS…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+              <select aria-label="Filter by server kind" className="h-9 rounded-lg border border-outline-variant/30 bg-surface-container-low px-unit-sm text-label-md" value={kind} onChange={(event) => setKind(event.target.value)}><option value="ALL">All server kinds</option>{kinds.map((value) => <option key={value} value={value}>{value}</option>)}</select>
+              <select aria-label="Filter by region" className="h-9 rounded-lg border border-outline-variant/30 bg-surface-container-low px-unit-sm text-label-md" value={region} onChange={(event) => setRegion(event.target.value)}><option value="ALL">All regions</option>{regions.map((value) => <option key={value} value={value}>{value}</option>)}</select>
+              <label className="flex h-9 items-center gap-unit-xs whitespace-nowrap rounded-lg border border-outline-variant/30 bg-surface-container-low px-unit-sm text-caption-xs text-secondary"><input type="checkbox" checked={includeArchived} onChange={(event) => setIncludeArchived(event.target.checked)} />Include archived</label>
+            </div>
+            <div className="mt-unit-sm flex items-center justify-between border-t border-outline-variant/20 pt-unit-xs text-caption-xs text-secondary"><span>{visibleServers.length} shown from {list.items.length} loaded records</span>{(search || kind !== 'ALL' || region !== 'ALL') && <button className="font-semibold text-primary hover:underline" type="button" onClick={() => { setSearch(''); setKind('ALL'); setRegion('ALL'); }}>Clear filters</button>}</div>
+          </div>
+
+          <section className="overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm">
+            {list.loading ? <StatePanel icon="progress_activity" message="Loading server inventory…" spinning />
+              : list.error ? <StatePanel icon="error" message={list.error} action={<Button onClick={list.reload}>Try again</Button>} />
+              : visibleServers.length === 0 ? <StatePanel icon="dns" message={search || kind !== 'ALL' || region !== 'ALL' ? 'No loaded servers match these filters.' : 'No server records have been added.'} action={!search && kind === 'ALL' && region === 'ALL' ? <Button variant="primary" onClick={() => setEditing('create')}>Add server</Button> : undefined} />
+              : <div className="overflow-x-auto"><table className="w-full border-collapse text-left"><thead><tr className="h-9 border-b border-outline-variant/30 bg-surface-container-low text-caption-xs uppercase tracking-wider text-secondary"><th className="px-unit-sm font-semibold">Server / hostname</th><th className="px-unit-sm font-semibold">Kind</th><th className="px-unit-sm font-semibold">Provider</th><th className="px-unit-sm font-semibold">Primary IP</th><th className="px-unit-sm font-semibold">Region</th><th className="px-unit-sm font-semibold">State</th><th className="px-unit-sm text-right font-semibold">Actions</th></tr></thead><tbody className="divide-y divide-outline-variant/25 text-body-sm">
+                {visibleServers.map((server) => <tr key={server.id} className={`${inspectedId === server.id ? 'bg-primary/5' : 'hover:bg-surface-container-low'} transition-colors`}><td className="px-unit-sm py-unit-sm"><div className="flex min-w-[180px] items-center gap-unit-sm"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container-high text-primary"><span className="material-symbols-outlined text-[18px]">dns</span></span><div className="min-w-0"><p className="truncate font-semibold text-on-surface">{server.name}</p><p className="truncate font-label-mono text-caption-xs text-secondary">{metadata(server.hostname)}</p></div></div></td><td className="px-unit-sm py-unit-sm text-secondary">{metadata(server.serverKind)}</td><td className="px-unit-sm py-unit-sm"><span className="font-medium text-on-surface">{server.providerAccountId ? (providerLabels.get(server.providerAccountId) ?? 'Resolving provider…') : 'Not mapped'}</span></td><td className="px-unit-sm py-unit-sm font-label-mono text-caption-xs text-on-surface">{metadata(server.primaryIp)}</td><td className="px-unit-sm py-unit-sm text-secondary">{metadata(server.region)}</td><td className="px-unit-sm py-unit-sm"><InventoryState state={server.inventoryState} /></td><td className="px-unit-sm py-unit-sm"><div className="flex justify-end gap-1"><Button size="sm" variant="ghost" onClick={() => setInspectedId(server.id)}>Inspect</Button><Link className="inline-flex h-7 items-center px-2.5 text-[11px] font-semibold text-primary hover:underline" to={`/servers/${server.id}`}>Details</Link><Button size="sm" variant="ghost" onClick={() => setEditing(server)}>Edit</Button></div></td></tr>)}
+              </tbody></table></div>}
+            <footer className="flex min-h-11 items-center justify-between gap-unit-md border-t border-outline-variant/30 bg-surface-container-low px-unit-md py-unit-xs text-caption-xs text-secondary"><span>Search and filters apply to loaded records only.</span>{list.nextCursor && <Button disabled={list.loadingMore} onClick={() => void list.loadMore()}>{list.loadingMore ? 'Loading…' : 'Load more'}</Button>}</footer>
+          </section>
+          {(actionError || list.loadMoreError) && <p role="alert" className="text-body-sm text-error">{actionError ?? list.loadMoreError}</p>}
+        </div>
+
+        {inspected && <aside className="flex w-full shrink-0 flex-col gap-unit-md rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-unit-lg shadow-md xl:sticky xl:top-unit-md xl:w-[360px]" aria-label={`Inspect ${inspected.name}`}>
+          <div className="flex items-start justify-between gap-unit-sm border-b border-outline-variant/25 pb-unit-sm"><div className="min-w-0"><p className="truncate text-headline-sm font-semibold text-on-surface">{inspected.name}</p><p className="mt-1 truncate font-label-mono text-caption-xs text-secondary">{metadata(inspected.hostname)}</p></div><button className="text-secondary hover:text-on-surface" type="button" aria-label="Close server inspector" onClick={() => setInspectedId(null)}><span className="material-symbols-outlined text-[20px]">close</span></button></div>
+          <div><InventoryState state={inspected.inventoryState} /></div>
+          <dl className="grid grid-cols-2 gap-unit-xs">{[
+            ['Provider', inspected.providerAccountId ? (providerLabels.get(inspected.providerAccountId) ?? 'Resolving provider…') : 'Not mapped'],
+            ['Kind', metadata(inspected.serverKind)], ['Primary IP', metadata(inspected.primaryIp)], ['Region', metadata(inspected.region)], ['Operating system', metadata(inspected.operatingSystem)], ['Provenance', inspected.provenance.split('_').join(' ')],
+          ].map(([label, value]) => <div key={label} className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm"><dt className="text-caption-xs text-secondary">{label}</dt><dd className="mt-1 break-words text-body-sm font-medium text-on-surface">{value}</dd></div>)}</dl>
+          {inspected.notes && <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm"><p className="text-caption-xs text-secondary">Notes</p><p className="mt-1 whitespace-pre-wrap text-body-sm text-on-surface">{inspected.notes}</p></div>}
+          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm text-caption-xs text-secondary">Live CPU, memory, storage, uptime, latency, health, and billing are not available from the current API.</div>
+          <Link className="flex h-9 items-center justify-center gap-unit-xs rounded-lg bg-primary-container text-label-md font-medium text-on-primary hover:bg-primary" to={`/servers/${inspected.id}`}>View full server page<span className="material-symbols-outlined text-[16px]">arrow_forward</span></Link>
+          <div className="flex gap-unit-xs"><Button className="flex-1" onClick={() => setEditing(inspected)}>Edit</Button><Button className="flex-1" variant={inspected.inventoryState === 'TRACKED' ? 'destructive' : 'outline'} onClick={() => void changeState(inspected)}>{inspected.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}</Button></div>
+        </aside>}
+      </div>
+      {editing && <ResourceFormModal config={config} record={editing === 'create' ? undefined : editing} onClose={() => setEditing(null)} onSaved={list.upsert} />}
     </div>
   );
 };

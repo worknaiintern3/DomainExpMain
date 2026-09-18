@@ -1,8 +1,15 @@
 export {
+  oauthIdentities,
+  oauthTransactionFlowEnum,
+  oauthTransactions,
   passwordCredentials,
   sessions,
+  type NewOAuthIdentity,
+  type NewOAuthTransaction,
   type NewPasswordCredential,
   type NewSession,
+  type OAuthIdentity,
+  type OAuthTransaction,
   type PasswordCredential,
   type Session,
 } from './auth';
@@ -43,6 +50,26 @@ export {
   type WebsiteApplication,
 } from './portfolio';
 export {
+  providerConnectionAuthTypeEnum,
+  providerConnections,
+  providerConnectionStatusEnum,
+  providerConnectionSyncStatusEnum,
+  providerConnectionValidationStatusEnum,
+  type NewProviderConnection,
+  type ProviderConnection,
+} from './provider-connections';
+export {
+  providerResourceLinks,
+  providerResourceLinkStatusEnum,
+  providerSyncRuns,
+  providerSyncRunStatusEnum,
+  providerSyncRunTriggerEnum,
+  type NewProviderResourceLink,
+  type NewProviderSyncRun,
+  type ProviderResourceLink,
+  type ProviderSyncRun,
+} from './provider-sync';
+export {
   users,
   workspaceMembers,
   workspaceMembershipRoleEnum,
@@ -54,3 +81,38 @@ export {
   type Workspace,
   type WorkspaceMember,
 } from './tenancy';
+export {
+  domainDnsMetadata,
+  domainMetadataAttemptStatusEnum,
+  domainRdapMetadata,
+  domainTlsMetadata,
+  type DomainDnsDsRecord,
+  type DomainDnsMetadata,
+  type DomainDnsMxRecord,
+  type DomainDnsRecordErrors,
+  type DomainRdapMetadata,
+  type DomainTlsMetadata,
+  type NewDomainDnsMetadata,
+  type NewDomainRdapMetadata,
+  type NewDomainTlsMetadata,
+} from './metadata';
+export {
+  alertEventStatusEnum,
+  alertEvents,
+  alertRuleKeyEnum,
+  alertRules,
+  alertSeverityEnum,
+  monitoringResultStatusEnum,
+  monitoringRunStatusEnum,
+  monitoringRuns,
+  monitoringRunTriggerEnum,
+  monitoringTargets,
+  type AlertEvent,
+  type AlertRule,
+  type MonitoringRun,
+  type MonitoringTarget,
+  type NewAlertEvent,
+  type NewAlertRule,
+  type NewMonitoringRun,
+  type NewMonitoringTarget,
+} from './monitoring';

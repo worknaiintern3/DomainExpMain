@@ -16,6 +16,7 @@ export default tseslint.config(
   {
     files: [
       'apps/api/**/*.ts',
+      'apps/worker/**/*.ts',
       'packages/contracts/**/*.ts',
       'packages/database/**/*.ts',
     ],

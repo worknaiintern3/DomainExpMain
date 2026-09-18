@@ -7,6 +7,9 @@ import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { MetadataModule } from './metadata/metadata.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
+import { ProviderConnectionsModule } from './provider-connections/provider-connections.module';
 import { ReadinessModule } from './readiness/readiness.module';
 
 @Module({
@@ -17,6 +20,9 @@ import { ReadinessModule } from './readiness/readiness.module';
     HealthModule,
     ReadinessModule,
     InventoryModule,
+    MetadataModule,
+    MonitoringModule,
+    ProviderConnectionsModule,
   ],
   providers: [
     {

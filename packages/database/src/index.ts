@@ -23,9 +23,32 @@ export {
   sanitizeDatabaseConfiguration,
 } from './config/database-env.schema';
 export {
+  buildProviderCredentialAad,
+  decryptProviderCredential,
+  encryptProviderCredential,
+  parseProviderCredentialEncryptionEnvironment,
+  ProviderCredentialCryptoError,
+  type EncryptedProviderCredential,
+  type ProviderCredentialIdentity,
+  type ProviderCredentialKeyStore,
+} from './crypto/provider-credential-crypto';
+export {
+  PROVIDER_CREDENTIAL_AAD_PREFIX,
+  PROVIDER_CREDENTIAL_AUTH_TAG_BYTES,
+  PROVIDER_CREDENTIAL_IV_BYTES,
+  PROVIDER_CREDENTIAL_KEY_BYTES,
+  PROVIDER_CREDENTIAL_MAX_KEY_VERSION,
+  PROVIDER_CREDENTIAL_MAX_PLAINTEXT_BYTES,
+} from './crypto/provider-credential-crypto.constants';
+export {
   checkDatabaseAvailability,
   type DatabaseAvailability,
 } from './health/database-health';
+export {
+  InvalidDomainNameError,
+  normalizeDomainName,
+  type NormalizedDomainName,
+} from './normalization/domain-name';
 export {
   archiveStoredInventoryRelationship,
   createStoredInventoryRelationship,
@@ -76,6 +99,9 @@ export {
   inventoryRecordStateEnum,
   inventoryNodes,
   inventoryRelationships,
+  oauthIdentities,
+  oauthTransactionFlowEnum,
+  oauthTransactions,
   passwordCredentials,
   projects,
   providerAccounts,
@@ -92,6 +118,8 @@ export {
   type EmailAccount,
   type InventoryNode,
   type InventoryRelationship,
+  type NewOAuthIdentity,
+  type NewOAuthTransaction,
   type NewPasswordCredential,
   type NewCloudResource,
   type NewDomain,
@@ -106,6 +134,8 @@ export {
   type NewWebsiteApplication,
   type NewWorkspace,
   type NewWorkspaceMember,
+  type OAuthIdentity,
+  type OAuthTransaction,
   type PasswordCredential,
   type Project,
   type ProviderAccount,
@@ -125,3 +155,58 @@ export {
   withUserContext,
   withWorkspaceContext,
 } from './transactions/workspace-context';
+export {
+  domainDnsMetadata,
+  domainMetadataAttemptStatusEnum,
+  domainRdapMetadata,
+  domainTlsMetadata,
+  type DomainDnsDsRecord,
+  type DomainDnsMetadata,
+  type DomainDnsMxRecord,
+  type DomainDnsRecordErrors,
+  type DomainRdapMetadata,
+  type DomainTlsMetadata,
+  type NewDomainDnsMetadata,
+  type NewDomainRdapMetadata,
+  type NewDomainTlsMetadata,
+} from './schema/metadata';
+export {
+  alertEventStatusEnum,
+  alertEvents,
+  alertRuleKeyEnum,
+  alertRules,
+  alertSeverityEnum,
+  monitoringResultStatusEnum,
+  monitoringRunStatusEnum,
+  monitoringRuns,
+  monitoringRunTriggerEnum,
+  monitoringTargets,
+  type AlertEvent,
+  type AlertRule,
+  type MonitoringRun,
+  type MonitoringTarget,
+  type NewAlertEvent,
+  type NewAlertRule,
+  type NewMonitoringRun,
+  type NewMonitoringTarget,
+} from './schema/monitoring';
+export {
+  providerConnectionAuthTypeEnum,
+  providerConnections,
+  providerConnectionStatusEnum,
+  providerConnectionSyncStatusEnum,
+  providerConnectionValidationStatusEnum,
+  type NewProviderConnection,
+  type ProviderConnection,
+} from './schema/provider-connections';
+export {
+  providerResourceLinks,
+  providerResourceLinkStatusEnum,
+  providerSyncRuns,
+  providerSyncRunStatusEnum,
+  providerSyncRunTriggerEnum,
+  type NewProviderResourceLink,
+  type NewProviderSyncRun,
+  type ProviderResourceLink,
+  type ProviderSyncRun,
+} from './schema/provider-sync';

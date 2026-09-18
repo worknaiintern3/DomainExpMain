@@ -15,16 +15,16 @@ interface SearchEntry {
 }
 
 const SEARCH_ITEMS: SearchEntry[] = [
-  { title: 'Overview', category: 'Navigation', path: '/overview', icon: 'grid_view', subtext: 'Portfolio summary and health metrics' },
-  { title: 'My Domains', category: 'Domains', path: '/domains', icon: 'language', subtext: '42 domains in tracking' },
-  { title: 'VPS & Servers', category: 'Servers', path: '/servers', icon: 'dns', subtext: '6 active server nodes' },
-  { title: 'Websites & Apps', category: 'Websites', path: '/websites', icon: 'web', subtext: '18 deployed applications' },
+  { title: 'Overview', category: 'Navigation', path: '/overview', icon: 'grid_view', subtext: 'Loaded portfolio summary' },
+  { title: 'My Domains', category: 'Domains', path: '/domains', icon: 'language', subtext: 'Manage domain inventory' },
+  { title: 'VPS & Servers', category: 'Servers', path: '/servers', icon: 'dns', subtext: 'Manage server inventory' },
+  { title: 'Websites & Apps', category: 'Websites', path: '/websites', icon: 'web', subtext: 'Manage application inventory' },
   { title: 'Accounts & Emails', category: 'Accounts', path: '/accounts', icon: 'alternate_email', subtext: 'Linked provider accounts' },
-  { title: 'Find Domain', category: 'Navigation', path: '/find-domain', icon: 'search', subtext: 'Multi-TLD availability checker' },
-  { title: 'Price Comparison', category: 'Navigation', path: '/pricing', icon: 'payments', subtext: 'Registrar & hosting cost comparison' },
-  { title: 'Alerts & Monitoring', category: 'Navigation', path: '/alerts', icon: 'notifications', subtext: 'Expiry and status alerts' },
-  { title: 'Infrastructure Map', category: 'Navigation', path: '/infrastructure-map', icon: 'hub', subtext: 'Interactive relationship topology' },
-  { title: 'Settings', category: 'Navigation', path: '/settings', icon: 'settings', subtext: 'Workspace preferences' },
+  { title: 'Find Domain', category: 'Navigation', path: '/find-domain', icon: 'search', subtext: 'Future domain-discovery preview' },
+  { title: 'Price Comparison', category: 'Navigation', path: '/pricing', icon: 'payments', subtext: 'Reference pricing preview' },
+  { title: 'Alerts & Monitoring', category: 'Navigation', path: '/alerts', icon: 'notifications', subtext: 'Future monitoring preview' },
+  { title: 'Infrastructure Map', category: 'Navigation', path: '/infrastructure-map', icon: 'hub', subtext: 'Workspace relationship inventory' },
+  { title: 'Settings', category: 'Navigation', path: '/settings', icon: 'settings', subtext: 'Local interface preferences' },
   { title: 'Help & Support', category: 'Navigation', path: '/support', icon: 'help', subtext: 'Documentation and guides' },
 ];
 
@@ -67,20 +67,28 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-100">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-100"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-xl rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-modal overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-navigation-title"
       >
         {/* Search Input Field */}
         <div className="flex items-center px-unit-md py-unit-sm border-b border-outline-variant/40 gap-unit-sm bg-surface-container-lowest">
           <span className="material-symbols-outlined text-secondary text-[20px]">search</span>
+          <span id="quick-navigation-title" className="sr-only">Quick navigation</span>
           <input
             type="text"
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search domains, servers, websites, emails, IPs..."
+            placeholder="Find a DomainPulse view…"
+            aria-label="Filter navigation views"
             className="w-full h-9 bg-transparent text-on-surface font-body-md text-body-md placeholder:text-outline focus:outline-none"
           />
           <kbd className="px-1.5 py-0.5 rounded bg-surface-container font-mono text-[10px] text-secondary border border-outline-variant/40">
@@ -125,7 +133,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
 
         {/* Modal Footer */}
         <div className="px-unit-md py-unit-xs bg-surface-container-low border-t border-outline-variant/30 flex items-center justify-between text-caption-xs font-caption-xs text-secondary">
-          <span>Navigate with arrow keys or click to select</span>
+          <span>Choose a view to navigate</span>
           <span className="font-mono text-[10px]">DomainPulse Quick Navigation</span>
         </div>
       </div>

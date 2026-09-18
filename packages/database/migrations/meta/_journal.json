@@ -43,6 +43,90 @@
       "when": 1788870760576,
       "tag": "0005_inventory_graph",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789119489677,
+      "tag": "0006_domain_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789121537907,
+      "tag": "0007_metadata_provenance_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789191941398,
+      "tag": "0008_monitoring_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789194197178,
+      "tag": "0009_monitoring_worker_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789366872295,
+      "tag": "0010_monitoring_retention",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789374633042,
+      "tag": "0011_provider_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789384661641,
+      "tag": "0012_provider_sync_runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789538565814,
+      "tag": "0013_provider_connections_soft_disconnect",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789559239576,
+      "tag": "0014_provider_auth_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789626858187,
+      "tag": "0015_provider_vps_auth_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789647089967,
+      "tag": "0016_cloud_provider_auth_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789714147238,
+      "tag": "0017_google_oauth_identities",
+      "breakpoints": true
     }
   ]
 }

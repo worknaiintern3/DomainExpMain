@@ -17,8 +17,10 @@ must prove the runtime login owns no protected table and has no bypass flag.
 ## Current protected and bootstrap tables
 
 RLS is enabled on `workspaces`, `workspace_members`, all seven core portfolio
-tables, `inventory_nodes`, and `inventory_relationships`. Workspace policies
-require their workspace key to equal `domainpulse.current_workspace_id()`.
+tables, `provider_connections`, `provider_sync_runs`, `provider_resource_links`,
+`inventory_nodes`, `inventory_relationships`, the three domain metadata tables,
+and the four monitoring/alert tables. Workspace policies require their
+workspace key to equal `domainpulse.current_workspace_id()`.
 Membership SELECT additionally permits only rows belonging to
 `domainpulse.current_user_id()` when no workspace context is active; this is
 the narrow bootstrap path. The helpers return `NULL` for absent, empty, or
@@ -91,6 +93,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   cloud_resources,
   website_applications
   TO :"runtime_role";
+GRANT SELECT, INSERT, UPDATE, DELETE ON provider_connections
+  TO :"runtime_role";
 GRANT SELECT ON inventory_nodes TO :"runtime_role";
 GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_relationships
   TO :"runtime_role";
@@ -118,12 +122,22 @@ WHERE schemaname = 'public'
     'projects',
     'email_accounts',
     'provider_accounts',
+    'provider_connections',
+    'provider_sync_runs',
+    'provider_resource_links',
     'domains',
     'servers',
     'cloud_resources',
     'website_applications',
     'inventory_nodes',
-    'inventory_relationships'
+    'inventory_relationships',
+    'domain_rdap_metadata',
+    'domain_dns_metadata',
+    'domain_tls_metadata',
+    'monitoring_targets',
+    'monitoring_runs',
+    'alert_rules',
+    'alert_events'
   );
 ```
 
@@ -148,6 +162,86 @@ isolation, bootstrap membership isolation, cross-workspace
 INSERT/UPDATE/DELETE denial, allowed same-workspace writes, missing/invalid
 context failure, and context cleanup on commit, rollback, and reuse of the same
 physical pooled session. The test role and its grants are removed afterward.
+
+## Monitoring worker role and cross-workspace queue functions
+
+Phase 9C uses a dedicated login that remains a non-owner `NOBYPASSRLS` role.
+It receives no global table-reading capability. Migration 0009 installs three
+role-agnostic, migration-owner `SECURITY DEFINER` functions for the narrow
+global operations: schedule due targets, claim queued runs, and recover
+expired leases. Each function uses static schema-qualified SQL, a fixed
+`pg_catalog` search path, bounded arguments, deterministic ordering,
+`FOR UPDATE SKIP LOCKED`, and minimal identifier-only return columns. PUBLIC
+execution is revoked in the migration.
+
+Provision the role outside migrations, then explicitly grant only the worker
+surface. Replace the variables before running this as an administrator:
+
+```sql
+\set worker_role 'replace_me_worker_role'
+\set database_name 'replace_me_database'
+
+SELECT format(
+  'CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS',
+  :'worker_role'
+)
+WHERE NOT EXISTS (
+  SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'worker_role'
+) \gexec
+
+ALTER ROLE :"worker_role"
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+GRANT CONNECT ON DATABASE :"database_name" TO :"worker_role";
+GRANT USAGE ON SCHEMA public, domainpulse TO :"worker_role";
+GRANT EXECUTE ON FUNCTION domainpulse.current_workspace_id()
+  TO :"worker_role";
+GRANT EXECUTE ON FUNCTION
+  domainpulse.schedule_due_monitoring_runs(timestamp with time zone, integer),
+  domainpulse.claim_monitoring_runs(timestamp with time zone, integer, integer),
+  domainpulse.reclaim_expired_monitoring_runs(timestamp with time zone, integer, integer),
+  domainpulse.cleanup_old_terminal_monitoring_runs(timestamp with time zone, integer),
+  domainpulse.schedule_due_provider_sync_runs(timestamp with time zone, integer),
+  domainpulse.claim_provider_sync_runs(timestamp with time zone, integer, integer),
+  domainpulse.reclaim_expired_provider_sync_runs(timestamp with time zone, integer, integer)
+  TO :"worker_role";
+
+GRANT SELECT ON domains TO :"worker_role";
+GRANT SELECT, INSERT, UPDATE ON monitoring_targets, monitoring_runs
+  TO :"worker_role";
+GRANT SELECT, INSERT, UPDATE ON
+  domain_rdap_metadata,
+  domain_dns_metadata,
+  domain_tls_metadata
+  TO :"worker_role";
+REVOKE CREATE ON SCHEMA public, domainpulse FROM :"worker_role";
+```
+
+The worker `DATABASE_URL` authenticates only as this dedicated role. The
+worker checks on startup that the current identity is neither superuser nor
+`BYPASSRLS` and owns none of the tenant tables it accesses. Never grant it
+alert-table privileges, DELETE, table ownership, membership in the migration
+role, or broader function execution. Phase 10C grants only the three provider
+sync queue functions above; their `SECURITY DEFINER` implementations require no
+direct global table privilege. It still grants no `provider_connections`,
+`provider_sync_runs`, or `provider_resource_links` table privileges to the
+worker. The shared server-side crypto in `@domainpulse/database` is available
+to API and future worker code; the provider runtime phase must grant only the
+tenant-scoped table capabilities it actually uses, and nothing broader. Tenant domain lookup, metadata writes,
+run finalization, target updates, and retry insertion all execute inside
+`withWorkspaceContext(workspaceId)` and remain subject to RLS.
+
+`monitoring_runs.run_metadata` and `alert_events.evidence` are reserved for
+small, normalized, non-secret facts. Writers must never place raw DNS TXT
+values, RDAP documents, HTTP bodies, PEM material, private keys, tokens,
+credentials, or connection details in either JSON object.
+
+Scheduling advances the regular cadence independently of retry availability.
+On completion, SUCCESS resets `consecutive_failures`; PARTIAL and FAILED both
+increment it, so the field consistently represents consecutive non-successful
+runs. An expired RUNNING lease is finalized as FAILED with
+`WORKER_LEASE_EXPIRED`, then creates a deduplicated retry when allowed. Retry
+attempts 2, 3, and 4 become available after exactly 5, 20, and 60 minutes;
+there are at most three retries after the original attempt.
 
 ## Future workspace-scoped tables
 

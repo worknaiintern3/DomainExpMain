@@ -16,7 +16,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint \"src/**/*.ts\" --max-warnings=0"
+    "test": "vitest run --config test/vitest.config.ts",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --max-warnings=0"
   },
   "dependencies": {
     "zod": "^4.5.4"

@@ -19,6 +19,7 @@ const CATEGORIES: Array<{
   { id: 'alerts', label: 'Alerts & Notifications', icon: 'notifications_active' },
   { id: 'pricing', label: 'Pricing & Currency', icon: 'payments' },
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
+  { id: 'integrations', label: 'Integrations', icon: 'cloud' },
   { id: 'data-management', label: 'Data Management', icon: 'dataset', isDanger: true },
 ];
 
