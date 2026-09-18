@@ -32,6 +32,26 @@ export interface LoginResponse extends TokenPair {
   user: PublicUser;
 }
 
+export interface GoogleOAuthStartResponse {
+  authorizationUrl: string;
+}
+
+export interface LoginMethodsStatus {
+  canUnlinkGoogle: boolean;
+  google: {
+    connected: boolean;
+    email: string | null;
+  };
+  password: {
+    enabled: boolean;
+  };
+}
+
+export interface GoogleLinkResult {
+  alreadyLinked: boolean;
+  providerEmail: string;
+}
+
 export interface InventoryMetadata {
   createdAt: string;
   id: string;

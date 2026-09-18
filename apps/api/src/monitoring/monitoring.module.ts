@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 
+import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { DatabaseService } from '../database/database.service';
+import { WorkspaceContextModule } from '../workspace-context/workspace-context.module';
 import {
   AlertRulesController,
   AlertsController,
@@ -11,7 +13,7 @@ import { PostgresMonitoringRepository } from './monitoring.repository';
 import { MonitoringService } from './monitoring.service';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [AuthModule, DatabaseModule, WorkspaceContextModule],
   controllers: [MonitoringController, AlertsController, AlertRulesController],
   providers: [
     {

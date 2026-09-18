@@ -4,11 +4,11 @@ import {
   type ProviderCredentialKeyStore,
 } from '@domainpulse/database';
 
-import type { ProviderDomainSyncService } from '../reconciliation/provider-domain-reconciliation.service';
 import { ProviderReconciliationError, safeProviderError } from '../provider.errors';
 import type {
   ClaimedProviderSyncRun,
   ProviderConnectionForSync,
+  ProviderResourceSyncService,
   ProviderSyncExecutionResult,
   ProviderSyncRunExecutor,
 } from './provider-sync.types';
@@ -23,7 +23,7 @@ const EMPTY_COUNTS = {
 
 export class ProviderSyncExecutor implements ProviderSyncRunExecutor {
   constructor(
-    private readonly syncServicesByProviderKey: ReadonlyMap<string, ProviderDomainSyncService>,
+    private readonly syncServicesByProviderKey: ReadonlyMap<string, ProviderResourceSyncService>,
     private readonly credentialKeys: ProviderCredentialKeyStore,
     private readonly clock: () => Date = () => new Date(),
   ) {}

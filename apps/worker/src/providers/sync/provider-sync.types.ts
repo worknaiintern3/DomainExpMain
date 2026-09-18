@@ -1,3 +1,5 @@
+import type { SafeProviderError } from '../provider-adapter.types';
+
 export type ProviderSyncTerminalStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED';
 
 export interface ClaimedProviderSyncRun {
@@ -50,6 +52,42 @@ export interface ProviderSyncRunExecutor {
     run: ClaimedProviderSyncRun,
     connection: ProviderConnectionForSync,
   ): Promise<ProviderSyncExecutionResult>;
+}
+
+/**
+ * The resource-neutral shape `ProviderSyncExecutor` actually depends on.
+ * `ProviderDomainSyncService` (registrar/DNS domains, Phase 10G),
+ * `ProviderServerSyncService` (VPS servers, Phase 10H), and
+ * `ProviderCloudResourceSyncService` (AWS/GCP/Azure VM inventory, Phase 10I)
+ * all satisfy this structurally -- their `synchronize` methods take and
+ * return identically-shaped objects (see provider-domain-reconciliation
+ * .types.ts / provider-server-reconciliation.types.ts /
+ * provider-cloud-resource-reconciliation.types.ts) -- so no changes to any
+ * of the three concrete classes are needed, and the executor's provider
+ * registry can hold any of them, keyed by provider key, without a second
+ * executor implementation or any provider needing to import another.
+ */
+export interface ProviderResourceSyncInput {
+  readonly connectionId: string;
+  readonly synchronizedAt: Date;
+  readonly token: string;
+  readonly workspaceId: string;
+}
+
+export interface ProviderResourceSyncResult {
+  readonly completion: 'COMPLETE' | 'PARTIAL';
+  readonly error: SafeProviderError | null;
+  readonly itemsCreated: number;
+  readonly itemsDiscovered: number;
+  readonly itemsMissing: number;
+  readonly itemsUnchanged: number;
+  readonly itemsUpdated: number;
+}
+
+export interface ProviderResourceSyncService {
+  synchronize(
+    input: ProviderResourceSyncInput,
+  ): Promise<ProviderResourceSyncResult>;
 }
 
 export interface ProviderSyncWorkerLogEvent {

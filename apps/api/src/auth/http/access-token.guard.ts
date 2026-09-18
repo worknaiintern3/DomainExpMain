@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -12,7 +13,10 @@ const BEARER_CREDENTIAL_PATTERN = /^Bearer ([^\s]+)$/iu;
 
 @Injectable()
 export class AccessTokenGuard implements CanActivate {
-  constructor(private readonly accessTokenService: AccessTokenService) {}
+  constructor(
+    @Inject(AccessTokenService)
+    private readonly accessTokenService: AccessTokenService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const request = context
