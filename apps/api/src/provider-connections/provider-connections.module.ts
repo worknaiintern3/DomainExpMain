@@ -1,8 +1,10 @@
 import { parseProviderCredentialEncryptionEnvironment } from '@domainpulse/database';
 import { Module } from '@nestjs/common';
 
+import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { DatabaseService } from '../database/database.service';
+import { WorkspaceContextModule } from '../workspace-context/workspace-context.module';
 import { AwsCredentialValidator } from './aws-credential-validator';
 import { AzureCredentialValidator } from './azure-credential-validator';
 import { CloudflareTokenValidator } from './cloudflare-token-validator';
@@ -27,7 +29,7 @@ const PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY = Symbol('PROVIDER_CREDENTIAL_VALID
 
 @Module({
   controllers: [ProviderConnectionsController],
-  imports: [DatabaseModule],
+  imports: [AuthModule, DatabaseModule, WorkspaceContextModule],
   providers: [
     {
       provide: PostgresProviderConnectionsRepository,

@@ -1,8 +1,15 @@
 export {
+  oauthIdentities,
+  oauthTransactionFlowEnum,
+  oauthTransactions,
   passwordCredentials,
   sessions,
+  type NewOAuthIdentity,
+  type NewOAuthTransaction,
   type NewPasswordCredential,
   type NewSession,
+  type OAuthIdentity,
+  type OAuthTransaction,
   type PasswordCredential,
   type Session,
 } from './auth';

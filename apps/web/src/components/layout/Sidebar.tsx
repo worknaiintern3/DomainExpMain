@@ -17,6 +17,7 @@ const MAIN_NAV_ITEMS: NavItem[] = [
 ];
 
 const BOTTOM_NAV_ITEMS: NavItem[] = [
+  { id: 'security', label: 'Security', path: '/security', icon: 'shield_person' },
   { id: 'settings', label: 'Settings', path: '/settings', icon: 'settings' },
   { id: 'support', label: 'Help & Support', path: '/help', icon: 'help' },
 ];

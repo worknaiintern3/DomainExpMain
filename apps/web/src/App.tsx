@@ -9,12 +9,14 @@ import { AlertsPage } from './pages/AlertsPage';
 import { DomainDetailPage } from './pages/DomainDetailPage';
 import { DomainsPage } from './pages/DomainsPage';
 import { FindDomainPage } from './pages/FindDomainPage';
+import { GoogleCallbackPage } from './pages/GoogleCallbackPage';
 import { InfrastructureMapPage } from './pages/InfrastructureMapPage';
 import { LoginPage } from './pages/LoginPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { PricingPage } from './pages/PricingPage';
 import { ProviderDetailPage } from './pages/ProviderDetailPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { SecurityPage } from './pages/SecurityPage';
 import { ServerDetailPage } from './pages/ServerDetailPage';
 import { ServersPage } from './pages/ServersPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -26,6 +28,12 @@ export const App: React.FC = () => (
   <AuthProvider>
     <BrowserRouter>
       <Routes>
+        {/* Neither GuestRoute nor ProtectedRoute: this callback serves both
+            an unauthenticated Google login return and an authenticated
+            Connect-Google return, so it must never be redirected away by
+            either wrapper. See GoogleCallbackPage's own comment. */}
+        <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
+
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -47,6 +55,7 @@ export const App: React.FC = () => (
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/infrastructure-map" element={<InfrastructureMapPage />} />
+            <Route path="/security" element={<SecurityPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/help" element={<SupportPage />} />
             <Route path="/support" element={<SupportPage />} />

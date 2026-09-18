@@ -9,11 +9,57 @@ import React, {
 } from 'react';
 
 import { ApiError, apiRequest, configureApiAuthentication } from '@/api/client';
-import type { LoginResponse, PublicUser, TokenPair } from '@/api/types';
+import type {
+  GoogleLinkResult,
+  GoogleOAuthStartResponse,
+  LoginMethodsStatus,
+  LoginResponse,
+  PublicUser,
+  TokenPair,
+} from '@/api/types';
 
 const REFRESH_TOKEN_STORAGE_KEY = 'domainpulse.refresh-token';
+const GOOGLE_OAUTH_INTENT_STORAGE_KEY = 'domainpulse.google-oauth-intent';
 
 type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
+
+/**
+ * UX/routing state only, read by `GoogleCallbackPage` to decide which flow
+ * to complete on return from Google -- NEVER security authority. The
+ * backend's `oauth_transactions.flow` (login vs. link) is what actually
+ * decides what a given `state` is allowed to do; a caller could tamper with
+ * or clear this marker and the worst outcome is landing on the wrong local
+ * UI branch, never a security bypass.
+ */
+export type GoogleOAuthIntent = 'link' | 'login';
+
+/**
+ * Returns `null` -- rather than guessing 'login' -- when the marker is
+ * absent or holds anything other than exactly 'login'/'link'. A stray visit
+ * to this callback URL that never went through `startGoogleLogin`/
+ * `startGoogleLink` (a stale bookmark, a manually-typed URL, a blocked
+ * session store) must never be silently treated as an intended login
+ * attempt; `GoogleCallbackPage` fails closed on `null` instead.
+ */
+export function readAndClearGoogleOAuthIntent(): GoogleOAuthIntent | null {
+  try {
+    const value = sessionStorage.getItem(GOOGLE_OAUTH_INTENT_STORAGE_KEY);
+    sessionStorage.removeItem(GOOGLE_OAUTH_INTENT_STORAGE_KEY);
+    return value === 'link' || value === 'login' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeGoogleOAuthIntent(intent: GoogleOAuthIntent): void {
+  try {
+    sessionStorage.setItem(GOOGLE_OAUTH_INTENT_STORAGE_KEY, intent);
+  } catch {
+    // A blocked session store just leaves the callback page unable to read
+    // the marker back, which now fails closed to the 'failed' state --
+    // never a security-relevant fallback.
+  }
+}
 
 interface LoginInput {
   email: string;
@@ -25,12 +71,19 @@ interface RegisterInput extends LoginInput {
 }
 
 interface AuthContextValue {
+  addPassword(password: string): Promise<LoginMethodsStatus>;
+  completeGoogleLink(code: string, state: string): Promise<GoogleLinkResult>;
+  completeGoogleLogin(code: string, state: string): Promise<void>;
   error: string | null;
+  getLoginMethods(): Promise<LoginMethodsStatus>;
   login(input: LoginInput): Promise<void>;
   logout(): Promise<void>;
   register(input: RegisterInput): Promise<void>;
   sessionScopeKey: string | null;
+  startGoogleLink(): Promise<void>;
+  startGoogleLogin(): Promise<void>;
   status: AuthStatus;
+  unlinkGoogle(): Promise<LoginMethodsStatus>;
   user: PublicUser | null;
 }
 
@@ -144,12 +197,32 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     void boot();
   }, [clearSession, refreshAccessToken]);
 
-  const login = useCallback(async (input: LoginInput) => {
+  const beginAuthenticationAttempt = useCallback((): number => {
     const generation = ++generationRef.current;
     accessTokenRef.current = null;
     writeRefreshToken(null);
     setError(null);
     setStatus('booting');
+    return generation;
+  }, []);
+
+  /** Shared tail for every flow that ends in a fresh DomainPulse session (password login, Google login) -- accepting a LoginResponse is identical regardless of which auth method produced it. */
+  const applyAuthenticatedResponse = useCallback((generation: number, response: LoginResponse) => {
+    if (generation !== generationRef.current) return;
+    acceptTokenPair(response);
+    setUser(response.user);
+    setStatus('authenticated');
+  }, [acceptTokenPair]);
+
+  const failAuthenticationAttempt = useCallback((generation: number, attemptError: unknown) => {
+    if (generation === generationRef.current) {
+      setError(messageFor(attemptError));
+      setStatus('unauthenticated');
+    }
+  }, []);
+
+  const login = useCallback(async (input: LoginInput) => {
+    const generation = beginAuthenticationAttempt();
     try {
       const response = await apiRequest<LoginResponse>('/auth/login', {
         authenticated: false,
@@ -157,18 +230,80 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         method: 'POST',
         retryAuthentication: false,
       });
-      if (generation !== generationRef.current) return;
-      acceptTokenPair(response);
-      setUser(response.user);
-      setStatus('authenticated');
+      applyAuthenticatedResponse(generation, response);
     } catch (loginError) {
-      if (generation === generationRef.current) {
-        setError(messageFor(loginError));
-        setStatus('unauthenticated');
-      }
+      failAuthenticationAttempt(generation, loginError);
       throw loginError;
     }
-  }, [acceptTokenPair]);
+  }, [applyAuthenticatedResponse, beginAuthenticationAttempt, failAuthenticationAttempt]);
+
+  const startGoogleLogin = useCallback(async () => {
+    setError(null);
+    writeGoogleOAuthIntent('login');
+    const response = await apiRequest<GoogleOAuthStartResponse>('/auth/google/start', {
+      authenticated: false,
+      body: {},
+      method: 'POST',
+      retryAuthentication: false,
+    });
+    // Full top-level navigation -- Google's consent screen refuses to render in an iframe/fetch.
+    window.location.assign(response.authorizationUrl);
+  }, []);
+
+  const completeGoogleLogin = useCallback(async (code: string, state: string) => {
+    const generation = beginAuthenticationAttempt();
+    try {
+      const response = await apiRequest<LoginResponse>('/auth/google/callback', {
+        authenticated: false,
+        body: { code, state },
+        method: 'POST',
+        retryAuthentication: false,
+      });
+      applyAuthenticatedResponse(generation, response);
+    } catch (callbackError) {
+      failAuthenticationAttempt(generation, callbackError);
+      throw callbackError;
+    }
+  }, [applyAuthenticatedResponse, beginAuthenticationAttempt, failAuthenticationAttempt]);
+
+  /** Connect Google (authenticated linking) -- the caller must already have a live DomainPulse session; the backend re-derives `userId` from the bearer token, never from anything this page sends. */
+  const startGoogleLink = useCallback(async () => {
+    setError(null);
+    writeGoogleOAuthIntent('link');
+    const response = await apiRequest<GoogleOAuthStartResponse>('/auth/google/link/start', {
+      body: {},
+      method: 'POST',
+    });
+    window.location.assign(response.authorizationUrl);
+  }, []);
+
+  const completeGoogleLink = useCallback(
+    (code: string, state: string) =>
+      apiRequest<GoogleLinkResult>('/auth/google/link/callback', {
+        body: { code, state },
+        method: 'POST',
+      }),
+    [],
+  );
+
+  const getLoginMethods = useCallback(
+    () => apiRequest<LoginMethodsStatus>('/auth/login-methods'),
+    [],
+  );
+
+  const addPassword = useCallback(
+    (password: string) =>
+      apiRequest<LoginMethodsStatus>('/auth/password/add', {
+        body: { password },
+        method: 'POST',
+      }),
+    [],
+  );
+
+  const unlinkGoogle = useCallback(
+    () => apiRequest<LoginMethodsStatus>('/auth/google/link', { method: 'DELETE' }),
+    [],
+  );
 
   const register = useCallback(async (input: RegisterInput) => {
     setError(null);
@@ -197,14 +332,36 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   }, [clearSession]);
 
   const value = useMemo<AuthContextValue>(() => ({
+    addPassword,
+    completeGoogleLink,
+    completeGoogleLogin,
     error,
+    getLoginMethods,
     login,
     logout,
     register,
     sessionScopeKey: user && sessionId ? `${user.id}:${sessionId}` : null,
+    startGoogleLink,
+    startGoogleLogin,
     status,
+    unlinkGoogle,
     user,
-  }), [error, login, logout, register, sessionId, status, user]);
+  }), [
+    addPassword,
+    completeGoogleLink,
+    completeGoogleLogin,
+    error,
+    getLoginMethods,
+    login,
+    logout,
+    register,
+    sessionId,
+    startGoogleLink,
+    startGoogleLogin,
+    status,
+    unlinkGoogle,
+    user,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
