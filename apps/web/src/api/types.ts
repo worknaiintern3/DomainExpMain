@@ -161,6 +161,7 @@ export interface RefreshDomainMetadataResponse {
 }
 
 export interface Server extends InventoryMetadata {
+  expiresAt: string | null;
   hostname: string | null;
   name: string;
   notes: string | null;

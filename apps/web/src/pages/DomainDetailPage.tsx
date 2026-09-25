@@ -6,6 +6,8 @@ import { archiveInventory, getInventory, updateInventory } from '@/api/inventory
 import { getDomainMetadata, refreshDomainMetadata } from '@/api/metadata';
 import { getImmediateRelationships } from '@/api/read-models';
 import type { Domain, DomainMetadataResponse } from '@/api/types';
+import { lookupWhois } from '@/api/whois';
+import type { NormalizedWhoisData } from '@/api/whois.types';
 import { Button } from '@/components/common/Button';
 import { EntityAssociations } from '@/components/integration/EntityAssociations';
 import {
@@ -13,6 +15,7 @@ import {
   ResourceFormModal,
   StatePanel,
 } from '@/components/integration/InventoryWorkspace';
+import { WhoisDetailsModal } from '@/components/whois/WhoisDetailsModal';
 import { domainConfiguration } from '@/features/integration/resource-configs';
 import { DomainMetadataSection } from '@/features/domain-details/components/DomainMetadataSection';
 import { DomainMonitoringSection } from '@/features/monitoring/components/DomainMonitoringSection';
@@ -45,6 +48,27 @@ export const DomainDetailPage: React.FC = () => {
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
   const [refreshingMetadata, setRefreshingMetadata] = useState(false);
+
+  // Live WHOIS state
+  const [whoisModalOpen, setWhoisModalOpen] = useState(false);
+  const [whoisData, setWhoisData] = useState<NormalizedWhoisData | null>(null);
+  const [whoisLoading, setWhoisLoading] = useState(false);
+  const [whoisError, setWhoisError] = useState<string | null>(null);
+
+  const handleOpenWhois = async () => {
+    if (!domain) return;
+    setWhoisModalOpen(true);
+    setWhoisLoading(true);
+    setWhoisError(null);
+    try {
+      const res = await lookupWhois(domain.domainName, domain.id);
+      setWhoisData(res);
+    } catch (err) {
+      setWhoisError(err instanceof Error ? err.message : 'Failed to lookup WHOIS details');
+    } finally {
+      setWhoisLoading(false);
+    }
+  };
 
   useEffect(() => {
     const generation = ++generationRef.current;
@@ -169,7 +193,13 @@ export const DomainDetailPage: React.FC = () => {
           <div className="mt-unit-sm flex flex-wrap items-center gap-unit-sm"><h1 className="break-all font-label-mono text-headline-lg font-semibold tracking-tight text-on-surface">{domain.domainName}</h1><InventoryState state={domain.inventoryState} /></div>
           <p className="mt-unit-xs text-body-sm text-secondary">Stored domain identity, registration metadata, and immediate workspace relationships.</p>
         </div>
-        <div className="flex shrink-0 gap-unit-sm"><Button iconLeading="edit" onClick={() => setEditing(true)}>Edit metadata</Button><Button variant={domain.inventoryState === 'TRACKED' ? 'destructive' : 'outline'} disabled={changingState} onClick={() => void changeState()}>{changingState ? 'Updating…' : domain.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}</Button></div>
+        <div className="flex shrink-0 gap-unit-sm">
+          <Button variant="outline" iconLeading="travel_explore" onClick={() => void handleOpenWhois()}>
+            Live WHOIS
+          </Button>
+          <Button iconLeading="edit" onClick={() => setEditing(true)}>Edit metadata</Button>
+          <Button variant={domain.inventoryState === 'TRACKED' ? 'destructive' : 'outline'} disabled={changingState} onClick={() => void changeState()}>{changingState ? 'Updating…' : domain.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}</Button>
+        </div>
       </header>
 
       {error && <p role="alert" className="rounded-lg border border-error/20 bg-error-container/20 p-unit-sm text-body-sm text-error">{error}</p>}
@@ -205,16 +235,55 @@ export const DomainDetailPage: React.FC = () => {
           <DomainMonitoringSection domainId={domainId} inventoryState={domain.inventoryState} />
 
           <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-unit-lg shadow-sm">
-            <div className="mb-unit-md flex items-center gap-unit-sm"><span className="material-symbols-outlined flex size-9 items-center justify-center rounded-lg bg-primary/10 text-[20px] text-primary">assignment</span><div><h2 className="text-headline-sm font-semibold">Registration metadata</h2><p className="text-caption-xs text-secondary">Direct values stored on this domain record</p></div></div>
+            <div className="mb-unit-md flex items-center justify-between">
+              <div className="flex items-center gap-unit-sm">
+                <span className="material-symbols-outlined flex size-9 items-center justify-center rounded-lg bg-primary/10 text-[20px] text-primary">assignment</span>
+                <div>
+                  <h2 className="text-headline-sm font-semibold">Registration metadata</h2>
+                  <p className="text-caption-xs text-secondary">Direct values stored on this domain record</p>
+                </div>
+              </div>
+              <Button size="sm" variant="ghost" iconLeading="edit" onClick={() => setEditing(true)}>Edit</Button>
+            </div>
             <dl className="grid grid-cols-1 gap-unit-sm md:grid-cols-2">
-              {[
-                ['Domain name', domain.domainName],
-                ['Registered at', formatDate(domain.registeredAt)],
-                ['Expires at', formatDate(domain.expiresAt)],
-                ['Auto-renew', domain.autoRenew === null ? 'Unknown' : domain.autoRenew ? 'Enabled' : 'Disabled'],
-                ['Registrar account', registrar],
-                ['DNS provider account', dnsProvider],
-              ].map(([label, value]) => <div key={label} className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm"><dt className="text-caption-xs uppercase tracking-wider text-secondary">{label}</dt><dd className="mt-1 break-words text-body-sm font-semibold text-on-surface">{value}</dd></div>)}
+              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
+                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Domain name</dt>
+                <dd className="mt-1 break-words font-label-mono text-body-sm font-semibold text-on-surface">{domain.domainName}</dd>
+              </div>
+              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
+                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Expires at (ISO)</dt>
+                <dd className="mt-1 text-body-sm font-semibold text-on-surface">{formatDate(domain.expiresAt)}</dd>
+                <dd className="mt-0.5 font-label-mono text-[11px] text-secondary">{domain.expiresAt || 'Not recorded'}</dd>
+              </div>
+              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
+                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Auto-renew</dt>
+                <dd className="mt-1 flex items-center gap-2">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-caption-xs font-semibold ${
+                    domain.autoRenew === true ? 'bg-success/15 text-success' : domain.autoRenew === false ? 'bg-amber-500/15 text-amber-600' : 'bg-surface-container text-secondary'
+                  }`}>
+                    {domain.autoRenew === null ? 'Not recorded' : domain.autoRenew ? 'Enabled' : 'Disabled'}
+                  </span>
+                </dd>
+              </div>
+              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
+                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Registrar account ID</dt>
+                <dd className="mt-1 font-label-mono text-body-sm font-semibold text-on-surface break-all">
+                  {domain.registrarProviderAccountId || 'Not recorded'}
+                </dd>
+                {registrar !== 'Unknown' && <dd className="mt-0.5 text-caption-xs text-secondary">{registrar}</dd>}
+              </div>
+              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
+                <dt className="text-caption-xs uppercase tracking-wider text-secondary">DNS provider account ID</dt>
+                <dd className="mt-1 font-label-mono text-body-sm font-semibold text-on-surface break-all">
+                  {domain.dnsProviderAccountId || 'Not recorded'}
+                </dd>
+                {dnsProvider !== 'Unknown' && <dd className="mt-0.5 text-caption-xs text-secondary">{dnsProvider}</dd>}
+              </div>
+              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
+                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Registered at (ISO)</dt>
+                <dd className="mt-1 text-body-sm font-semibold text-on-surface">{formatDate(domain.registeredAt)}</dd>
+                <dd className="mt-0.5 font-label-mono text-[11px] text-secondary">{domain.registeredAt || 'Not recorded'}</dd>
+              </div>
             </dl>
           </section>
         </div>
@@ -230,6 +299,15 @@ export const DomainDetailPage: React.FC = () => {
       </div>
 
       {editing && <ResourceFormModal config={config} record={domain} onClose={() => setEditing(false)} onSaved={setDomain} />}
+
+      <WhoisDetailsModal
+        isOpen={whoisModalOpen}
+        onClose={() => setWhoisModalOpen(false)}
+        data={whoisData}
+        loading={whoisLoading}
+        error={whoisError}
+        onRefresh={() => void handleOpenWhois()}
+      />
     </div>
   );
 };

@@ -25,6 +25,12 @@ export default defineConfig({
     // String shorthand keeps this assignable without new dependencies.
     proxy: {
       '/api': 'http://127.0.0.1:4000',
-    } as Record<string, string>,
+      '/whoisfreaks-api': {
+        target: 'https://api.whoisfreaks.com',
+        changeOrigin: true,
+        rewrite: (p: string) => p.replace(/^\/whoisfreaks-api/, ''),
+        secure: true,
+      },
+    } as Record<string, any>,
   },
 });

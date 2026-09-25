@@ -10,8 +10,8 @@ export class InvalidCredentialsError extends Error {
 export class LoginPersistenceError extends Error {
   readonly code = 'LOGIN_PERSISTENCE_ERROR';
 
-  constructor() {
-    super('Login could not be completed');
+  constructor(message?: string) {
+    super(message || 'Login could not be completed');
     this.name = 'LoginPersistenceError';
   }
 }

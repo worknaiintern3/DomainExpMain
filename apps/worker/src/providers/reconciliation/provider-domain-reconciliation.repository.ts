@@ -7,7 +7,7 @@ import {
   type DatabaseClient,
   type DatabaseTransaction,
 } from '@domainpulse/database';
-import { and, eq, lte } from 'drizzle-orm';
+import { and, eq, isNull, lte } from 'drizzle-orm';
 
 import type {
   ActivateProviderResourceLinkInput,
@@ -23,10 +23,15 @@ function metadataFor(providerStatus: string): Record<string, unknown> {
 }
 
 function equalMetadata(
-  left: Record<string, unknown>,
-  right: Record<string, unknown>,
+  stored: unknown,
+  incoming: Record<string, unknown>,
 ): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  if (typeof stored !== 'object' || stored === null) return false;
+  const storedRecord = stored as Record<string, unknown>;
+  const storedKeys = Object.keys(storedRecord);
+  const incomingKeys = Object.keys(incoming);
+  if (storedKeys.length !== incomingKeys.length) return false;
+  return incomingKeys.every((key) => storedRecord[key] === incoming[key]);
 }
 
 class PostgresProviderDomainReconciliationTransaction
@@ -66,8 +71,33 @@ implements ProviderDomainReconciliationTransaction {
     canonicalDomain: string,
     synchronizedAt: Date,
   ): Promise<ReconciledDomainRecord> {
+    const [connection] = await this.transaction
+      .select({ providerAccountId: providerConnections.providerAccountId })
+      .from(providerConnections)
+      .where(
+        and(
+          eq(providerConnections.workspaceId, this.workspaceId),
+          eq(providerConnections.id, this.connectionId),
+        ),
+      )
+      .limit(1);
+
     const existing = await this.findDomain(canonicalDomain);
-    if (existing) return { ...existing, created: false };
+    if (existing) {
+      if (connection?.providerAccountId) {
+        await this.transaction
+          .update(domains)
+          .set({ registrarProviderAccountId: connection.providerAccountId, updatedAt: synchronizedAt })
+          .where(
+            and(
+              eq(domains.workspaceId, this.workspaceId),
+              eq(domains.id, existing.id),
+              isNull(domains.registrarProviderAccountId),
+            ),
+          );
+      }
+      return { ...existing, created: false };
+    }
 
     const [created] = await this.transaction
       .insert(domains)
@@ -77,6 +107,7 @@ implements ProviderDomainReconciliationTransaction {
         inventoryState: 'TRACKED',
         normalizedDomainName: canonicalDomain,
         provenance: 'PROVIDER_API',
+        registrarProviderAccountId: connection?.providerAccountId ?? null,
         updatedAt: synchronizedAt,
         workspaceId: this.workspaceId,
       })

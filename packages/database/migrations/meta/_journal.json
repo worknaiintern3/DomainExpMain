@@ -127,6 +127,20 @@
       "when": 1789714147238,
       "tag": "0017_google_oauth_identities",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789800000000,
+      "tag": "0018_mobile_admin_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789850000000,
+      "tag": "0019_whois_records",
+      "breakpoints": true
     }
   ]
 }

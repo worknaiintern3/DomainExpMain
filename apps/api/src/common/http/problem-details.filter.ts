@@ -41,10 +41,12 @@ export function toProblemDetails(
       : 500;
   const title = STATUS_CODES[status] ?? 'Error';
   const detail =
-    status >= 500
+    status >= 500 && process.env.NODE_ENV === 'production'
       ? 'An unexpected error occurred.'
       : exception instanceof HttpException
       ? getHttpExceptionDetail(exception)
+      : exception instanceof Error
+      ? `${exception.name}: ${exception.message}`
       : 'An unexpected error occurred.';
 
   return {
@@ -73,10 +75,14 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
     if (!(exception instanceof HttpException)) {
       const errorName = exception instanceof Error ? exception.name : 'UnknownError';
+      const errorMessage = exception instanceof Error ? exception.message : String(exception);
+      const stack = exception instanceof Error ? exception.stack : undefined;
       this.logger.error(
         JSON.stringify({
           event: 'unhandled_http_error',
           errorName,
+          errorMessage,
+          stack,
           requestId: problem.requestId,
           status: problem.status,
         }),

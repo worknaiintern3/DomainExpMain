@@ -1,4 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { lookupWhois } from '@/api/whois';
+import type { NormalizedWhoisData } from '@/api/whois.types';
+import { WhoisDetailsModal } from '@/components/whois/WhoisDetailsModal';
 import {
   FindDomainHeader,
   DomainSearchHero,
@@ -30,6 +33,30 @@ export const FindDomainPage: React.FC = () => {
   const [selectedCompareDomain, setSelectedCompareDomain] = useState('worknai.in');
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
 
+  // Live WHOIS from WhoisFreaks state
+  const [liveWhoisData, setLiveWhoisData] = useState<NormalizedWhoisData | null>(null);
+  const [liveWhoisLoading, setLiveWhoisLoading] = useState(false);
+  const [isWhoisModalOpen, setIsWhoisModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!selectedInspectionDomain) return;
+    let active = true;
+    setLiveWhoisLoading(true);
+    lookupWhois(selectedInspectionDomain)
+      .then((data) => {
+        if (active) setLiveWhoisData(data);
+      })
+      .catch(() => {
+        if (active) setLiveWhoisData(null);
+      })
+      .finally(() => {
+        if (active) setLiveWhoisLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedInspectionDomain]);
+
   // Derived set of saved domain names
   const savedSet = useMemo(() => new Set(watchlist.map((w) => w.domain)), [watchlist]);
 
@@ -39,11 +66,36 @@ export const FindDomainPage: React.FC = () => {
     [query, selectedTlds, savedSet]
   );
 
-  // Derived inspection and pricing quotes
-  const inspectionDetails = useMemo(
-    () => getDomainInspectionDetails(selectedInspectionDomain, selectedInspectionStatus),
-    [selectedInspectionDomain, selectedInspectionStatus]
-  );
+  // Derived inspection with live WhoisFreaks data overlay
+  const inspectionDetails = useMemo(() => {
+    const base = getDomainInspectionDetails(selectedInspectionDomain, selectedInspectionStatus);
+    if (!liveWhoisData) return base;
+
+    return {
+      ...base,
+      domain: liveWhoisData.domainName,
+      status: (liveWhoisData.isRegistered ? 'registered' : 'available') as DomainAvailabilityStatus,
+      statusBadgeText: liveWhoisData.isRegistered ? 'Registered • Live WHOIS' : 'Available • Live WHOIS',
+      sponsoringRegistrar: liveWhoisData.registrar.name || base.sponsoringRegistrar,
+      registrationDateFormatted: liveWhoisData.registeredAt
+        ? new Date(liveWhoisData.registeredAt).toLocaleDateString()
+        : base.registrationDateFormatted,
+      expirationDateFormatted: liveWhoisData.expiresAt
+        ? new Date(liveWhoisData.expiresAt).toLocaleDateString()
+        : base.expirationDateFormatted,
+      expirationDaysRemaining: liveWhoisData.daysRemaining ?? base.expirationDaysRemaining,
+      lastUpdateFormatted: liveWhoisData.updatedDate
+        ? new Date(liveWhoisData.updatedDate).toLocaleDateString()
+        : base.lastUpdateFormatted,
+      authoritativeNameservers:
+        liveWhoisData.nameservers.length > 0 ? liveWhoisData.nameservers : base.authoritativeNameservers,
+      icannStatusFlags:
+        liveWhoisData.statuses.length > 0 ? liveWhoisData.statuses : base.icannStatusFlags,
+      operationalNotice: liveWhoisData.isRegistered
+        ? 'Live verified registration via WhoisFreaks API and stored in workspace database.'
+        : 'Domain is currently available for registration according to live WHOIS query.',
+    };
+  }, [selectedInspectionDomain, selectedInspectionStatus, liveWhoisData]);
 
   const registrarQuotes = useMemo(
     () => getRegistrarQuotesForDomain(selectedCompareDomain),
@@ -205,6 +257,7 @@ export const FindDomainPage: React.FC = () => {
               details={inspectionDetails}
               onToggleWatchlist={handleToggleWatchlistFromInspector}
               isSaved={savedSet.has(selectedInspectionDomain)}
+              onOpenFullWhois={() => setIsWhoisModalOpen(true)}
             />
 
             <RegistrarPriceCards
@@ -257,6 +310,21 @@ export const FindDomainPage: React.FC = () => {
       {searchState === 'empty' && (
         <SearchEmptyState onSelectPrompt={handleSearch} />
       )}
+
+      {/* Full Live WHOIS Modal */}
+      <WhoisDetailsModal
+        isOpen={isWhoisModalOpen}
+        onClose={() => setIsWhoisModalOpen(false)}
+        data={liveWhoisData}
+        loading={liveWhoisLoading}
+        error={null}
+        onRefresh={() => {
+          setLiveWhoisLoading(true);
+          lookupWhois(selectedInspectionDomain)
+            .then(setLiveWhoisData)
+            .finally(() => setLiveWhoisLoading(false));
+        }}
+      />
     </div>
   );
 };

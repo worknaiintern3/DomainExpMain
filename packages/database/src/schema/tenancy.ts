@@ -25,6 +25,13 @@ export const workspaceMembershipRoleEnum = pgEnum(
   ['owner', 'admin', 'member'],
 );
 
+export const platformRoleEnum = pgEnum('platform_role', [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'SUPPORT',
+  'USER',
+]);
+
 export const users = pgTable(
   'users',
   {
@@ -32,6 +39,7 @@ export const users = pgTable(
     email: text('email').notNull(),
     normalizedEmail: text('normalized_email').notNull(),
     displayName: text('display_name'),
+    platformRole: platformRoleEnum('platform_role').default('USER').notNull(),
     personalWorkspaceId: uuid('personal_workspace_id')
       .notNull()
       .references((): AnyPgColumn => workspaces.id, { onDelete: 'restrict' }),
@@ -96,3 +104,4 @@ export type Workspace = typeof workspaces.$inferSelect;
 export type NewWorkspace = typeof workspaces.$inferInsert;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type NewWorkspaceMember = typeof workspaceMembers.$inferInsert;
+export type PlatformRole = (typeof platformRoleEnum.enumValues)[number];

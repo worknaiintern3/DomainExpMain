@@ -118,4 +118,23 @@ describe('HostingerTokenValidator', () => {
     });
     await expect(validator.isTokenActive('hostinger-token')).rejects.toMatchObject({ code: 'UPSTREAM_BAD_RESPONSE' });
   });
+
+  it('returns true when domains fails with 403 but VPS endpoint succeeds', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: URL | string) => {
+      if (String(url).includes('/api/domains/v1/portfolio')) {
+        return Promise.resolve(new Response('', { status: 403 }));
+      }
+      return Promise.resolve(jsonResponse(200, [{ id: 994393, hostname: 'srv994393.hstgr.cloud' }]));
+    });
+    const validator = new HostingerTokenValidator({ fetchImplementation: fetchMock as unknown as typeof fetch });
+    await expect(validator.isTokenActive('hostinger-token')).resolves.toBe(true);
+  });
+
+  it('returns true when domains response is wrapped in a data property', async () => {
+    const validator = new HostingerTokenValidator({
+      fetchImplementation: fetchReturning(jsonResponse(200, { data: [{ domain: 'example.com' }] })),
+    });
+    await expect(validator.isTokenActive('hostinger-token')).resolves.toBe(true);
+  });
 });
+

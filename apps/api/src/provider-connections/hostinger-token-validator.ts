@@ -16,14 +16,29 @@ import type { ProviderErrorCode } from './provider-connections.types';
 
 const HOSTINGER_API_ORIGIN = 'https://developers.hostinger.com';
 const HOSTINGER_DOMAINS_PORTFOLIO_PATH = '/api/domains/v1/portfolio';
+const HOSTINGER_VPS_PATH = '/api/vps/v1/virtual-machines';
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 4_000_000;
 const MAX_TOKEN_LENGTH = 4_096;
 
 const domainEntrySchema = z.object({
   domain: z.string().min(1).max(253),
-});
-const domainListSchema = z.array(domainEntrySchema);
+}).passthrough();
+
+const domainListSchema = z.union([
+  z.array(domainEntrySchema),
+  z.object({ data: z.array(domainEntrySchema) }).transform((val) => val.data),
+  z.object({ domains: z.array(domainEntrySchema) }).transform((val) => val.domains),
+]);
+
+const vpsEntrySchema = z.object({
+  id: z.union([z.string(), z.number()]),
+}).passthrough();
+
+const vpsListSchema = z.union([
+  z.array(vpsEntrySchema),
+  z.object({ data: z.array(vpsEntrySchema) }).transform((val) => val.data),
+]);
 
 export class HostingerTokenValidationError extends Error {
   readonly code: ProviderErrorCode;
@@ -49,7 +64,7 @@ export class HostingerTokenValidator {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
-  /** Resolves true when the token can read the domain portfolio, false only for a truthful 401, and throws for every other transport/upstream failure. */
+  /** Resolves true when the token can read the domain portfolio or VPS virtual machines, false only for a truthful 401, and throws for every other transport/upstream failure. */
   async isTokenActive(token: string): Promise<boolean> {
     if (
       typeof token !== 'string'
@@ -59,8 +74,74 @@ export class HostingerTokenValidator {
       throw new HostingerTokenValidationError('INVALID_REQUEST');
     }
 
-    const url = new URL(HOSTINGER_DOMAINS_PORTFOLIO_PATH, HOSTINGER_API_ORIGIN);
+    const domainsResult = await this.tryCheckEndpoint(
+      token,
+      HOSTINGER_DOMAINS_PORTFOLIO_PATH,
+      domainListSchema,
+    );
 
+    if (domainsResult.status === 'VALID') {
+      return true;
+    }
+    if (domainsResult.status === 'UNAUTHORIZED') {
+      return false;
+    }
+
+    // If the domain portfolio check was rejected as forbidden (e.g. VPS-only token)
+    // or failed schema/resource-not-found, attempt verification via the VPS endpoint.
+    if (
+      domainsResult.status === 'FORBIDDEN'
+      || domainsResult.status === 'BAD_RESPONSE'
+      || domainsResult.status === 'NOT_FOUND'
+    ) {
+      const vpsResult = await this.tryCheckEndpoint(
+        token,
+        HOSTINGER_VPS_PATH,
+        vpsListSchema,
+      );
+
+      if (vpsResult.status === 'VALID') {
+        return true;
+      }
+      if (vpsResult.status === 'UNAUTHORIZED') {
+        return false;
+      }
+      if (vpsResult.status === 'FORBIDDEN' && domainsResult.status === 'FORBIDDEN') {
+        throw new HostingerTokenValidationError('PERMISSION_DENIED');
+      }
+    }
+
+    if (domainsResult.status === 'FORBIDDEN') {
+      throw new HostingerTokenValidationError('PERMISSION_DENIED');
+    }
+    if (domainsResult.status === 'TIMEOUT') {
+      throw new HostingerTokenValidationError('NETWORK_TIMEOUT');
+    }
+    if (domainsResult.status === 'NETWORK_ERROR') {
+      throw new HostingerTokenValidationError('UPSTREAM_UNAVAILABLE');
+    }
+    if (domainsResult.status === 'HTTP_ERROR') {
+      throw new HostingerTokenValidationError(domainsResult.code);
+    }
+
+    throw new HostingerTokenValidationError('UPSTREAM_BAD_RESPONSE');
+  }
+
+  private async tryCheckEndpoint(
+    token: string,
+    pathname: string,
+    schema: z.ZodTypeAny,
+  ): Promise<
+    | { status: 'VALID' }
+    | { status: 'UNAUTHORIZED' }
+    | { status: 'FORBIDDEN' }
+    | { status: 'NOT_FOUND' }
+    | { status: 'TIMEOUT' }
+    | { status: 'NETWORK_ERROR' }
+    | { code: ProviderErrorCode; status: 'HTTP_ERROR' }
+    | { status: 'BAD_RESPONSE' }
+  > {
+    const url = new URL(pathname, HOSTINGER_API_ORIGIN);
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       controller.abort();
@@ -74,50 +155,45 @@ export class HostingerTokenValidator {
         signal: controller.signal,
       });
     } catch {
-      throw new HostingerTokenValidationError(
-        controller.signal.aborted ? 'NETWORK_TIMEOUT' : 'UPSTREAM_UNAVAILABLE',
-      );
+      return { status: controller.signal.aborted ? 'TIMEOUT' : 'NETWORK_ERROR' };
     } finally {
       clearTimeout(timeout);
     }
 
     if (!response.ok) {
-      if (response.status === 401) {
-        return false;
-      }
-      if (response.status === 403) {
-        throw new HostingerTokenValidationError('PERMISSION_DENIED');
-      }
-      throw new HostingerTokenValidationError(this.httpErrorCode(response.status));
+      if (response.status === 401) return { status: 'UNAUTHORIZED' };
+      if (response.status === 403) return { status: 'FORBIDDEN' };
+      if (response.status === 404) return { status: 'NOT_FOUND' };
+      return { code: this.httpErrorCode(response.status), status: 'HTTP_ERROR' };
     }
 
     const declaredLength = Number(response.headers.get('content-length'));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-      throw new HostingerTokenValidationError('UPSTREAM_BAD_RESPONSE');
+      return { status: 'BAD_RESPONSE' };
     }
 
     let text: string;
     try {
       text = await response.text();
     } catch {
-      throw new HostingerTokenValidationError('UPSTREAM_BAD_RESPONSE');
+      return { status: 'BAD_RESPONSE' };
     }
     if (Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) {
-      throw new HostingerTokenValidationError('UPSTREAM_BAD_RESPONSE');
+      return { status: 'BAD_RESPONSE' };
     }
 
     let parsedJson: unknown;
     try {
       parsedJson = JSON.parse(text) as unknown;
     } catch {
-      throw new HostingerTokenValidationError('UPSTREAM_BAD_RESPONSE');
+      return { status: 'BAD_RESPONSE' };
     }
 
-    const parsed = domainListSchema.safeParse(parsedJson);
+    const parsed = schema.safeParse(parsedJson);
     if (!parsed.success) {
-      throw new HostingerTokenValidationError('UPSTREAM_BAD_RESPONSE');
+      return { status: 'BAD_RESPONSE' };
     }
-    return true;
+    return { status: 'VALID' };
   }
 
   private httpErrorCode(status: number): ProviderErrorCode {

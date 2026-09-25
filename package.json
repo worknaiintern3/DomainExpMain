@@ -10,13 +10,17 @@
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=@domainpulse/api",
-    "build": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database && npm run build --workspace=@domainpulse/api && npm run build --workspace=@domainpulse/worker && npm run build --workspace=@domainpulse/web",
-    "typecheck": "npm run build --workspace=@domainpulse/contracts && npm run typecheck --workspace=@domainpulse/database && npm run typecheck --workspace=@domainpulse/api && npm run typecheck --workspace=@domainpulse/worker && npm run typecheck --workspace=@domainpulse/web",
+    "dev:admin": "npm run dev --workspace=@domainpulse/admin",
+    "dev:mobile": "npx expo start apps/mobile",
+    "dev:worker": "npm run dev --workspace=@domainpulse/worker",
+    "build": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database && npm run build --workspace=@domainpulse/api && npm run build --workspace=@domainpulse/worker && npm run build --workspace=@domainpulse/web && npm run build --workspace=@domainpulse/admin",
+    "typecheck": "npm run build --workspace=@domainpulse/contracts && npm run typecheck --workspace=@domainpulse/database && npm run typecheck --workspace=@domainpulse/api && npm run typecheck --workspace=@domainpulse/worker && npm run typecheck --workspace=@domainpulse/web && npm run typecheck --workspace=@domainpulse/admin",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "db:generate": "npm run db:generate --workspace=@domainpulse/database",
     "db:migrate": "npm run db:migrate --workspace=@domainpulse/database",
     "db:check": "npm run db:check --workspace=@domainpulse/database",
+    "db:up": "docker compose up -d",
     "preview": "npm run preview --workspace=apps/web"
   },
   "engines": {
@@ -25,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@expo/ngrok": "^4.1.0",
     "drizzle-orm": "^0.45.2",
     "eslint": "^10.10.0",
     "typescript": "^5.9.3",

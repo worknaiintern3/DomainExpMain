@@ -15,7 +15,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { domains, recordProvenanceEnum } from './portfolio';
-import { lifecycleTimestamps } from './tenancy';
+import { lifecycleTimestamps, workspaces } from './tenancy';
 
 export const domainMetadataAttemptStatusEnum = pgEnum(
   'domain_metadata_attempt_status',
@@ -363,3 +363,48 @@ export type NewDomainDnsMetadata = typeof domainDnsMetadata.$inferInsert;
 
 export type DomainTlsMetadata = typeof domainTlsMetadata.$inferSelect;
 export type NewDomainTlsMetadata = typeof domainTlsMetadata.$inferInsert;
+
+export const whoisRecords = pgTable(
+  'whois_records',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+    domainId: uuid('domain_id').references(() => domains.id, { onDelete: 'set null' }),
+    domainName: text('domain_name').notNull(),
+    normalizedDomainName: text('normalized_domain_name').notNull(),
+    isRegistered: boolean('is_registered').notNull().default(true),
+    queryTime: text('query_time'),
+    registeredAt: timestamp('registered_at', { mode: 'date', withTimezone: true }),
+    expiresAt: timestamp('expires_at', { mode: 'date', withTimezone: true }),
+    updatedDate: timestamp('updated_date', { mode: 'date', withTimezone: true }),
+    registrarName: text('registrar_name'),
+    registrarIanaId: text('registrar_iana_id'),
+    registrarWebsite: text('registrar_website'),
+    registrarEmail: text('registrar_email'),
+    registrarPhone: text('registrar_phone'),
+    registrantContact: jsonb('registrant_contact'),
+    technicalContact: jsonb('technical_contact'),
+    administrativeContact: jsonb('administrative_contact'),
+    nameservers: text('nameservers')
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    statuses: text('statuses')
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    rawWhois: text('raw_whois'),
+    rawResponse: jsonb('raw_response'),
+    retrievedAt: timestamp('retrieved_at', { mode: 'date', withTimezone: true }).notNull(),
+    ...lifecycleTimestamps(),
+  },
+  (table) => [
+    index('whois_records_workspace_domain_idx').on(table.workspaceId, table.normalizedDomainName),
+    index('whois_records_domain_id_idx').on(table.domainId),
+    index('whois_records_retrieved_at_idx').on(table.retrievedAt),
+  ],
+);
+
+export type WhoisRecord = typeof whoisRecords.$inferSelect;
+export type NewWhoisRecord = typeof whoisRecords.$inferInsert;
+

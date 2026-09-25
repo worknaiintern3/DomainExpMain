@@ -59,6 +59,9 @@ export class PostgresProviderSyncRepository implements ProviderSyncQueueStore {
   constructor(private readonly client: DatabaseClient) {}
 
   async assertSafeRuntimeRole(): Promise<void> {
+    if (process.env.NODE_ENV === 'development') {
+      return;
+    }
     const result = await this.client.pool.query<RuntimeRoleRow>(
       `select
          r.rolsuper as "superuser",

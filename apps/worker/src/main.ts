@@ -1,8 +1,45 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 import {
   createDatabaseClient,
   parseDatabaseEnvironment,
   parseProviderCredentialEncryptionEnvironment,
 } from '@domainpulse/database';
+
+function loadAndApplyEnvFile(filePath: string): void {
+  if (!fs.existsSync(filePath)) return;
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx <= 0) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      process.env[key] = val;
+    }
+  } catch {
+    // Continue searching
+  }
+}
+
+for (const envPath of [
+  path.resolve(__dirname, '../../../.env'),
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(__dirname, '../.env'),
+  path.resolve(process.cwd(), '../../.env'),
+  path.resolve(process.cwd(), '.env'),
+]) {
+  loadAndApplyEnvFile(envPath);
+}
 
 import { DnsClient } from '../../api/src/metadata/dns/dns.client';
 import { PostgresMetadataRepository } from '../../api/src/metadata/metadata.repository';
@@ -50,7 +87,11 @@ import {
 } from './providers/reconciliation/provider-server-reconciliation.service';
 import { ProviderSyncExecutor } from './providers/sync/provider-sync.executor';
 import { PostgresProviderSyncRepository } from './providers/sync/provider-sync.repository';
-import type { ProviderResourceSyncService } from './providers/sync/provider-sync.types';
+import type {
+  ProviderResourceSyncInput,
+  ProviderResourceSyncResult,
+  ProviderResourceSyncService,
+} from './providers/sync/provider-sync.types';
 import { ProviderSyncWorker } from './providers/sync/provider-sync.worker';
 import { VultrAdapter } from './providers/vultr/vultr.adapter';
 import { VULTR_PROVIDER_KEY } from './providers/vultr/vultr.constants';
@@ -62,6 +103,35 @@ class JsonWorkerLogger implements WorkerLogger {
 
   info(event: WorkerLogEvent): void {
     process.stdout.write(`${JSON.stringify(event)}\n`);
+  }
+}
+
+class HostingerCompositeSyncService implements ProviderResourceSyncService {
+  constructor(
+    private readonly domainSync: ProviderDomainSyncService,
+    private readonly serverSync: ProviderServerSyncService,
+  ) {}
+
+  async synchronize(
+    input: ProviderResourceSyncInput,
+  ): Promise<ProviderResourceSyncResult> {
+    const [domainRes, serverRes] = await Promise.all([
+      this.domainSync.synchronize(input),
+      this.serverSync.synchronize(input),
+    ]);
+
+    return {
+      completion:
+        domainRes.completion === 'COMPLETE' && serverRes.completion === 'COMPLETE'
+          ? 'COMPLETE'
+          : 'PARTIAL',
+      error: domainRes.error ?? serverRes.error,
+      itemsCreated: domainRes.itemsCreated + serverRes.itemsCreated,
+      itemsDiscovered: domainRes.itemsDiscovered + serverRes.itemsDiscovered,
+      itemsMissing: domainRes.itemsMissing + serverRes.itemsMissing,
+      itemsUnchanged: domainRes.itemsUnchanged + serverRes.itemsUnchanged,
+      itemsUpdated: domainRes.itemsUpdated + serverRes.itemsUpdated,
+    };
   }
 }
 
@@ -113,11 +183,18 @@ async function main(): Promise<void> {
   const cloudResourceReconciler = new ProviderCloudResourceReconciler(
     new PostgresProviderCloudResourceReconciliationStore(providerSyncDatabase),
   );
+
+  const hostingerAdapter = new HostingerAdapter();
+  const hostingerCompositeSync = new HostingerCompositeSyncService(
+    new ProviderDomainSyncService(hostingerAdapter, domainReconciler),
+    new ProviderServerSyncService(hostingerAdapter, serverReconciler),
+  );
+
   const syncServicesByProviderKey = new Map<string, ProviderResourceSyncService>([
     [CLOUDFLARE_PROVIDER_KEY, new ProviderDomainSyncService(new CloudflareAdapter(), domainReconciler)],
     [GODADDY_PROVIDER_KEY, new ProviderDomainSyncService(new GoDaddyAdapter(), domainReconciler)],
     [NAMECHEAP_PROVIDER_KEY, new ProviderDomainSyncService(new NamecheapAdapter(), domainReconciler)],
-    [HOSTINGER_PROVIDER_KEY, new ProviderDomainSyncService(new HostingerAdapter(), domainReconciler)],
+    [HOSTINGER_PROVIDER_KEY, hostingerCompositeSync],
     [DIGITALOCEAN_PROVIDER_KEY, new ProviderServerSyncService(new DigitalOceanAdapter(), serverReconciler)],
     [HETZNER_PROVIDER_KEY, new ProviderServerSyncService(new HetznerAdapter(), serverReconciler)],
     [VULTR_PROVIDER_KEY, new ProviderServerSyncService(new VultrAdapter(), serverReconciler)],
@@ -151,7 +228,8 @@ async function main(): Promise<void> {
   }
 }
 
-void main().catch(() => {
-  process.stderr.write(`${JSON.stringify({ event: 'worker_fatal' })}\n`);
+void main().catch((err: unknown) => {
+  const message = err instanceof Error ? err.stack ?? err.message : String(err);
+  process.stderr.write(`${JSON.stringify({ error: message, event: 'worker_fatal' })}\n`);
   process.exitCode = 1;
 });

@@ -63,3 +63,21 @@ export function archiveInventory(
     method: 'DELETE',
   });
 }
+
+export interface ApplicationProbeResult {
+  online: boolean;
+  statusCode: number | null;
+  latencyMs: number | null;
+  title: string | null;
+  ssl: boolean;
+  error: string | null;
+}
+
+export function probeApplicationUrl(
+  url: string,
+  signal?: AbortSignal,
+): Promise<ApplicationProbeResult> {
+  return apiRequest(`/applications/probe?url=${encodeURIComponent(url)}`, {
+    signal,
+  });
+}

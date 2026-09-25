@@ -117,6 +117,13 @@ export class ProviderServerReconciler {
             }
           }
 
+          // Always update expiresAt on every sync so it stays current
+          await transaction.updateServerExpiry(
+            nodeId,
+            discovered.expiresAt,
+            input.synchronizedAt,
+          );
+
           const outcome = await transaction.activateResourceLink({
             externalResourceId: discovered.externalResourceId,
             externalResourceType: discovery.externalResourceType,

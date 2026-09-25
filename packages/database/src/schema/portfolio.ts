@@ -231,6 +231,7 @@ export const servers = pgTable(
     region: text('region'),
     operatingSystem: text('operating_system'),
     notes: text('notes'),
+    expiresAt: timestamp('expires_at', { mode: 'date', withTimezone: true }),
   },
   (table) => [
     unique('servers_workspace_id_id_unique').on(table.workspaceId, table.id),

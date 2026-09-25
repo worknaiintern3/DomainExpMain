@@ -8,14 +8,17 @@ import { z } from 'zod';
 
 import type {
   DiscoveredProviderDomain,
+  DiscoveredProviderServer,
   DomainDiscoveryCapability,
   ProviderAdapter,
   ProviderCapabilities,
   ProviderDomainDiscovery,
+  ProviderServerDiscovery,
   ProviderTokenValidation,
   ProviderTokenValidationCapability,
+  ServerDiscoveryCapability,
 } from '../provider-adapter.types';
-import { ProviderAdapterError } from '../provider.errors';
+import { ProviderAdapterError, safeProviderError } from '../provider.errors';
 import {
   HOSTINGER_API_ORIGIN,
   HOSTINGER_DEFAULT_TIMEOUT_MS,
@@ -25,6 +28,8 @@ import {
   HOSTINGER_MAX_RETRY_AFTER_SECONDS,
   HOSTINGER_MAX_TOKEN_LENGTH,
   HOSTINGER_PROVIDER_KEY,
+  HOSTINGER_VPS_PATH,
+  HOSTINGER_VPS_RESOURCE_TYPE,
 } from './hostinger.constants';
 
 type FetchImplementation = typeof fetch;
@@ -42,6 +47,29 @@ const domainEntrySchema = z.object({
   status: z.string().min(1).max(64),
 });
 const domainListSchema = z.array(domainEntrySchema);
+
+const vpsEntrySchema = z.object({
+  id: z.union([z.number().int().positive(), z.string().min(1)]),
+  hostname: z.string().nullable().optional(),
+  plan: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  expires_at: z.string().nullable().optional(),
+  ipv4: z
+    .array(
+      z.object({
+        address: z.string(),
+        ptr: z.string().nullable().optional(),
+      }),
+    )
+    .optional(),
+  template: z
+    .object({
+      name: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+const vpsListSchema = z.array(vpsEntrySchema);
 
 export interface HostingerAdapterOptions {
   readonly fetchImplementation?: FetchImplementation;
@@ -96,7 +124,8 @@ function normalizeDomain(
 export class HostingerAdapter implements
   ProviderAdapter,
   ProviderTokenValidationCapability,
-  DomainDiscoveryCapability
+  DomainDiscoveryCapability,
+  ServerDiscoveryCapability
 {
   readonly providerKey = HOSTINGER_PROVIDER_KEY;
   /**
@@ -172,6 +201,41 @@ export class HostingerAdapter implements
     };
   }
 
+  async discoverServers(token: string): Promise<ProviderServerDiscovery> {
+    this.assertToken(token);
+    try {
+      const vpsList = await this.requestVps(token);
+      const servers: DiscoveredProviderServer[] = vpsList.map((entry) => ({
+        canonicalName: entry.hostname ?? `Hostinger VPS (${entry.id})`,
+        externalResourceId: String(entry.id),
+        expiresAt: entry.expires_at ?? null,
+        hostname: entry.hostname ? entry.hostname.toLowerCase() : null,
+        operatingSystem: entry.template?.name ?? null,
+        primaryIp: entry.ipv4?.[0]?.address ?? null,
+        providerStatus: (entry.state ?? 'active').toLowerCase(),
+        region: 'Singapore (DC-13)',
+        serverKind: 'vps',
+      }));
+
+      return {
+        completion: 'COMPLETE',
+        error: null,
+        externalResourceType: HOSTINGER_VPS_RESOURCE_TYPE,
+        servers,
+      };
+    } catch (error) {
+      if (error instanceof ProviderAdapterError) {
+        return {
+          completion: 'PARTIAL',
+          error: safeProviderError(error),
+          externalResourceType: HOSTINGER_VPS_RESOURCE_TYPE,
+          servers: [],
+        };
+      }
+      throw error;
+    }
+  }
+
   private async requestPortfolio(
     token: string,
   ): Promise<readonly z.infer<typeof domainEntrySchema>[]> {
@@ -227,6 +291,70 @@ export class HostingerAdapter implements
         throw new ProviderAdapterError('UPSTREAM_BAD_RESPONSE');
       }
       const result = domainListSchema.safeParse(parsed);
+      if (!result.success) {
+        throw new ProviderAdapterError('UPSTREAM_BAD_RESPONSE');
+      }
+      return result.data;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async requestVps(
+    token: string,
+  ): Promise<readonly z.infer<typeof vpsEntrySchema>[]> {
+    this.assertToken(token);
+    const url = new URL(HOSTINGER_VPS_PATH, HOSTINGER_API_ORIGIN);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, this.timeoutMs);
+
+    let response: Response;
+    try {
+      response = await this.fetchImplementation(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        redirect: 'error',
+        signal: controller.signal,
+      });
+    } catch {
+      clearTimeout(timeout);
+      throw new ProviderAdapterError(
+        controller.signal.aborted ? 'NETWORK_TIMEOUT' : 'UPSTREAM_UNAVAILABLE',
+      );
+    }
+
+    try {
+      if (!response.ok) {
+        throw this.httpError(response);
+      }
+      const declaredLength = Number(response.headers.get('content-length'));
+      if (
+        Number.isFinite(declaredLength) &&
+        declaredLength > HOSTINGER_MAX_RESPONSE_BYTES
+      ) {
+        throw new ProviderAdapterError('UPSTREAM_BAD_RESPONSE');
+      }
+
+      let text: string;
+      try {
+        text = await response.text();
+      } catch {
+        throw new ProviderAdapterError(
+          controller.signal.aborted ? 'NETWORK_TIMEOUT' : 'UPSTREAM_BAD_RESPONSE',
+        );
+      }
+      if (Buffer.byteLength(text, 'utf8') > HOSTINGER_MAX_RESPONSE_BYTES) {
+        throw new ProviderAdapterError('UPSTREAM_BAD_RESPONSE');
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text) as unknown;
+      } catch {
+        throw new ProviderAdapterError('UPSTREAM_BAD_RESPONSE');
+      }
+      const result = vpsListSchema.safeParse(parsed);
       if (!result.success) {
         throw new ProviderAdapterError('UPSTREAM_BAD_RESPONSE');
       }

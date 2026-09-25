@@ -42,9 +42,11 @@ export const Sidebar: React.FC = () => {
     >
       <div className="flex flex-col min-h-0">
         <div className="h-header-height px-unit-lg flex items-center gap-unit-md border-b border-outline-variant/60">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-micro shrink-0">
-            <span className="material-symbols-outlined text-[20px]">pulse_alert</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="DomainPulse"
+            className="w-8 h-8 rounded-lg object-cover shadow-micro shrink-0 border border-outline-variant/30"
+          />
           <span className="font-headline-sm text-headline-sm text-on-surface tracking-tight font-semibold">DomainPulse</span>
         </div>
 

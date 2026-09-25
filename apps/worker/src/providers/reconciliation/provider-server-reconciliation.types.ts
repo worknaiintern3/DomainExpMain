@@ -58,6 +58,11 @@ export interface ProviderServerReconciliationTransaction {
     providerKey: string,
   ): Promise<string | undefined>;
   resolveServerNodeId(serverId: string): Promise<string | undefined>;
+  updateServerExpiry(
+    nodeId: string,
+    expiresAt: string | null,
+    synchronizedAt: Date,
+  ): Promise<void>;
 }
 
 export interface ProviderServerReconciliationStore {

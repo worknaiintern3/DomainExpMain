@@ -317,6 +317,16 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
+  const [extraConnections, setExtraConnections] = useState<ProviderConnectionResponse[]>([]);
+  const [showAddAccountForm, setShowAddAccountForm] = useState(false);
+  const [addAccountLabel, setAddAccountLabel] = useState('');
+  const [rotatingExtraId, setRotatingExtraId] = useState<string | null>(null);
+  const [extraActionError, setExtraActionError] = useState<Record<string, string | null>>({});
+  const [extraSyncing, setExtraSyncing] = useState<Record<string, boolean>>({});
+  const [extraValidating, setExtraValidating] = useState<Record<string, boolean>>({});
+  const [extraDisconnecting, setExtraDisconnecting] = useState<Record<string, boolean>>({});
+  const [addAccountError, setAddAccountError] = useState<string | null>(null);
+
   const clearCredentialInputs = useCallback(() => {
     setTokenValue('');
     setNamecheapFields(EMPTY_NAMECHEAP_FIELDS);
@@ -337,14 +347,18 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const { items } = await listProviderConnections(signal);
-    const found = items.find((c) => c.providerType === config.providerKey) ?? null;
+    const matches = items.filter((c) => c.providerType === config.providerKey);
+    const active = matches.filter((c) => c.connectionStatus === 'CONNECTED');
     if (signal?.aborted) return;
-    setConnection(found);
-    if (found) {
-      const { items: runs } = await listProviderConnectionSyncRuns(found.id, 1, signal);
+    if (active.length > 0) {
+      setConnection(active[0] ?? null);
+      setExtraConnections(active.slice(1));
+      const { items: runs } = await listProviderConnectionSyncRuns(active[0].id, 1, signal);
       if (signal?.aborted) return;
       setLatestRun(runs[0] ?? null);
     } else {
+      setConnection(matches[0] ?? null);
+      setExtraConnections([]);
       setLatestRun(null);
     }
   }, [config.providerKey]);
@@ -404,82 +418,187 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
     return created.id;
   }
 
-  async function handleConnect(): Promise<void> {
+  async function handleConnect(customLabel?: string): Promise<void> {
     const credential = buildCredential();
-    setActionError(null);
+    const isAdditional = showAddAccountForm;
+    if (isAdditional) {
+      setAddAccountError(null);
+    } else {
+      setActionError(null);
+    }
     setActionState('connecting');
     try {
-      const providerAccountId = await resolveProviderAccountId();
+      let providerAccountId: string;
+      if (customLabel && customLabel.trim().length > 0) {
+        const created = await createProviderAccount({ label: customLabel.trim(), providerKey: config.providerKey });
+        providerAccountId = created.id;
+      } else {
+        providerAccountId = await resolveProviderAccountId();
+      }
       const created = await createProviderConnection({ authType: config.authType, credential, providerAccountId });
-      setConnection(created);
+      if (!connection || connection.connectionStatus === 'DISCONNECTED') {
+        setConnection(created);
+      } else {
+        setExtraConnections((prev) => [...prev, created]);
+      }
       setShowConnectForm(false);
-    } catch (error) {
-      setActionError(safeErrorMessage(error, `Could not connect to ${config.displayName}.`));
-    } finally {
+      setShowAddAccountForm(false);
+      setAddAccountLabel('');
+      setAddAccountError(null);
       clearCredentialInputs();
+    } catch (error) {
+      const errorMsg = safeErrorMessage(error, `Could not connect to ${config.displayName}.`);
+      if (isAdditional) {
+        setAddAccountError(errorMsg);
+      } else {
+        setActionError(errorMsg);
+      }
+    } finally {
       setActionState('idle');
     }
   }
 
-  async function handleValidate(): Promise<void> {
-    if (!connection) return;
-    setActionError(null);
-    setActionState('validating');
+  async function handleValidate(targetId?: string): Promise<void> {
+    const id = targetId ?? connection?.id;
+    if (!id) return;
+    const isPrimary = !targetId || targetId === connection?.id;
+    if (isPrimary) {
+      setActionError(null);
+      setActionState('validating');
+    } else {
+      setExtraActionError((prev) => ({ ...prev, [id]: null }));
+      setExtraValidating((prev) => ({ ...prev, [id]: true }));
+    }
     try {
-      await validateProviderConnection(connection.id);
+      await validateProviderConnection(id);
       const { items } = await listProviderConnections();
-      setConnection(items.find((c) => c.id === connection.id) ?? null);
+      if (isPrimary) {
+        setConnection(items.find((c) => c.id === id) ?? null);
+      } else {
+        setExtraConnections((prev) => prev.map((c) => (c.id === id ? items.find((item) => item.id === id) ?? c : c)));
+      }
     } catch (error) {
-      setActionError(safeErrorMessage(error, 'Validation failed.'));
+      const errorMsg = safeErrorMessage(error, 'Validation failed.');
+      if (isPrimary) setActionError(errorMsg);
+      else setExtraActionError((prev) => ({ ...prev, [id]: errorMsg }));
     } finally {
-      setActionState('idle');
+      if (isPrimary) setActionState('idle');
+      else setExtraValidating((prev) => ({ ...prev, [id]: false }));
     }
   }
 
-  async function handleRotate(): Promise<void> {
-    if (!connection) return;
+  async function handleRotate(targetId?: string): Promise<void> {
+    const id = targetId ?? connection?.id;
+    if (!id) return;
+    const isPrimary = !targetId || targetId === connection?.id;
     const credential = buildCredential();
-    setActionError(null);
-    setActionState('rotating');
+    if (isPrimary) {
+      setActionError(null);
+      setActionState('rotating');
+    } else {
+      setExtraActionError((prev) => ({ ...prev, [id]: null }));
+    }
     try {
-      const updated = await replaceProviderConnectionCredential(connection.id, credential);
-      setConnection(updated);
-      setShowRotateForm(false);
+      const updated = await replaceProviderConnectionCredential(id, credential);
+      if (isPrimary) {
+        setConnection(updated);
+        setShowRotateForm(false);
+      } else {
+        setExtraConnections((prev) => prev.map((c) => (c.id === id ? updated : c)));
+        setRotatingExtraId(null);
+      }
     } catch (error) {
-      setActionError(safeErrorMessage(error, 'Could not replace the credential.'));
+      const errorMsg = safeErrorMessage(error, 'Could not replace the credential.');
+      if (isPrimary) setActionError(errorMsg);
+      else setExtraActionError((prev) => ({ ...prev, [id]: errorMsg }));
     } finally {
       clearCredentialInputs();
-      setActionState('idle');
+      if (isPrimary) setActionState('idle');
     }
   }
 
-  async function handleSyncNow(): Promise<void> {
-    if (!connection) return;
-    setActionError(null);
+  async function handleSyncNow(targetId?: string): Promise<void> {
+    const id = targetId ?? connection?.id;
+    if (!id) return;
+    const isPrimary = !targetId || targetId === connection?.id;
+    if (isPrimary) {
+      setActionError(null);
+    } else {
+      setExtraActionError((prev) => ({ ...prev, [id]: null }));
+      setExtraSyncing((prev) => ({ ...prev, [id]: true }));
+    }
     try {
       const idempotencyKey = crypto.randomUUID();
-      await triggerProviderConnectionSync(connection.id, idempotencyKey);
-      const { items: runs } = await listProviderConnectionSyncRuns(connection.id, 1);
-      setLatestRun(runs[0] ?? null);
-      pollUntilSettled(connection.id, Date.now() + SYNC_POLL_TIMEOUT_MS);
+      await triggerProviderConnectionSync(id, idempotencyKey);
+      const { items: runs } = await listProviderConnectionSyncRuns(id, 1);
+      if (isPrimary) {
+        setLatestRun(runs[0] ?? null);
+        pollUntilSettled(id, Date.now() + SYNC_POLL_TIMEOUT_MS);
+      } else {
+        const deadline = Date.now() + SYNC_POLL_TIMEOUT_MS;
+        const pollExtra = (attemptDeadline: number) => {
+          setTimeout(() => {
+            void (async () => {
+              try {
+                const { items: latestRuns } = await listProviderConnectionSyncRuns(id, 1);
+                const run = latestRuns[0] ?? null;
+                const stillRunning = run?.status === 'QUEUED' || run?.status === 'RUNNING';
+                if (stillRunning && Date.now() < attemptDeadline) {
+                  pollExtra(attemptDeadline);
+                } else {
+                  setExtraSyncing((prev) => ({ ...prev, [id]: false }));
+                  const { items: allConns } = await listProviderConnections();
+                  const updatedExtra = allConns.find((c) => c.id === id);
+                  if (updatedExtra) {
+                    setExtraConnections((prev) => prev.map((c) => (c.id === id ? updatedExtra : c)));
+                  }
+                }
+              } catch {
+                setExtraSyncing((prev) => ({ ...prev, [id]: false }));
+              }
+            })();
+          }, SYNC_POLL_INTERVAL_MS);
+        };
+        pollExtra(deadline);
+      }
     } catch (error) {
-      setActionError(safeErrorMessage(error, 'Could not queue a sync.'));
+      const errorMsg = safeErrorMessage(error, 'Could not queue a sync.');
+      if (isPrimary) {
+        setActionError(errorMsg);
+      } else {
+        setExtraActionError((prev) => ({ ...prev, [id]: errorMsg }));
+        setExtraSyncing((prev) => ({ ...prev, [id]: false }));
+      }
     }
   }
 
-  async function handleDisconnect(): Promise<void> {
-    if (!connection) return;
-    setActionError(null);
-    setActionState('disconnecting');
+  async function handleDisconnect(targetId?: string): Promise<void> {
+    const id = targetId ?? connection?.id;
+    if (!id) return;
+    const isPrimary = !targetId || targetId === connection?.id;
+    if (isPrimary) {
+      setActionError(null);
+      setActionState('disconnecting');
+    } else {
+      setExtraActionError((prev) => ({ ...prev, [id]: null }));
+      setExtraDisconnecting((prev) => ({ ...prev, [id]: true }));
+    }
     try {
-      await disconnectProviderConnection(connection.id);
-      const { items } = await listProviderConnections();
-      setConnection(items.find((c) => c.id === connection.id) ?? null);
-      setLatestRun(null);
+      await disconnectProviderConnection(id);
+      if (isPrimary) {
+        const { items } = await listProviderConnections();
+        setConnection(items.find((c) => c.id === id) ?? null);
+        setLatestRun(null);
+      } else {
+        setExtraConnections((prev) => prev.filter((c) => c.id !== id));
+      }
     } catch (error) {
-      setActionError(safeErrorMessage(error, 'Could not disconnect.'));
+      const errorMsg = safeErrorMessage(error, 'Could not disconnect.');
+      if (isPrimary) setActionError(errorMsg);
+      else setExtraActionError((prev) => ({ ...prev, [id]: errorMsg }));
     } finally {
-      setActionState('idle');
+      if (isPrimary) setActionState('idle');
+      else setExtraDisconnecting((prev) => ({ ...prev, [id]: false }));
     }
   }
 
@@ -632,6 +751,11 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
 
       {!loading && !loadError && connection && connection.connectionStatus === 'CONNECTED' && (
         <div className="mt-unit-md flex flex-col gap-unit-sm">
+          {extraConnections.length > 0 && (
+            <div className="text-caption-xs font-semibold text-primary uppercase tracking-wider">
+              {connection.providerAccountLabel || `${config.displayName} (Primary)`}
+            </div>
+          )}
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-unit-md gap-y-1 font-body-sm text-body-sm">
             <div className="flex justify-between sm:block">
               <dt className="text-secondary">Credential</dt>
@@ -730,6 +854,189 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
                   className="h-9 px-unit-lg rounded-lg bg-surface-container-lowest text-on-surface border border-outline-variant/60 hover:bg-surface-container-low shadow-micro font-label-md text-label-md cursor-pointer"
                   onClick={() => {
                     setShowRotateForm(false);
+                    clearCredentialInputs();
+                  }}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Secondary / additional accounts for this provider */}
+          {extraConnections.map((extra) => (
+            <div
+              key={extra.id}
+              className="mt-4 pt-4 border-t border-outline-variant/30 flex flex-col gap-unit-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-label-md text-label-md font-semibold text-on-surface">
+                  {extra.providerAccountLabel || `${config.displayName} (Additional)`}
+                </span>
+                <span
+                  className={`font-caption-xs text-caption-xs px-2 py-0.5 rounded-full border ${
+                    extra.validationStatus === 'VALID'
+                      ? 'border-primary/40 text-primary'
+                      : 'border-error/40 text-error'
+                  }`}
+                >
+                  {extra.validationStatus === 'VALID' ? 'Connected' : 'Attention needed'}
+                </span>
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-unit-md gap-y-1 font-body-sm text-body-sm">
+                <div className="flex justify-between sm:block">
+                  <dt className="text-secondary">Credential</dt>
+                  <dd className="text-on-surface font-mono">{extra.credentialMask}</dd>
+                </div>
+                <div className="flex justify-between sm:block">
+                  <dt className="text-secondary">Last validated</dt>
+                  <dd className="text-on-surface">{formatTimestamp(extra.lastValidatedAt)}</dd>
+                </div>
+                <div className="flex justify-between sm:block">
+                  <dt className="text-secondary">Last sync</dt>
+                  <dd className="text-on-surface">{formatTimestamp(extra.lastSyncAt)}</dd>
+                </div>
+                <div className="flex justify-between sm:block">
+                  <dt className="text-secondary">Next sync</dt>
+                  <dd className="text-on-surface">{formatTimestamp(extra.nextSyncAt)}</dd>
+                </div>
+              </dl>
+
+              {extraSyncing[extra.id] && (
+                <p className="font-body-sm text-body-sm text-secondary">
+                  Sync in progress…
+                </p>
+              )}
+
+              {extraActionError[extra.id] && (
+                <p className="font-body-sm text-body-sm text-error" role="alert">
+                  {extraActionError[extra.id]}
+                </p>
+              )}
+
+              {rotatingExtraId !== extra.id ? (
+                <div className="flex flex-wrap gap-unit-sm mt-unit-2xs">
+                  <button
+                    className="h-8 px-unit-sm rounded-lg bg-surface-container-lowest text-on-surface border border-outline-variant/60 hover:bg-surface-container-low shadow-micro text-[12px] font-medium cursor-pointer disabled:opacity-50"
+                    disabled={extraSyncing[extra.id]}
+                    onClick={() => void handleSyncNow(extra.id)}
+                    type="button"
+                  >
+                    Sync Now
+                  </button>
+                  <button
+                    className="h-8 px-unit-sm rounded-lg bg-surface-container-lowest text-on-surface border border-outline-variant/60 hover:bg-surface-container-low shadow-micro text-[12px] font-medium cursor-pointer disabled:opacity-50"
+                    disabled={extraValidating[extra.id]}
+                    onClick={() => void handleValidate(extra.id)}
+                    type="button"
+                  >
+                    {extraValidating[extra.id] ? 'Validating…' : 'Validate'}
+                  </button>
+                  <button
+                    className="h-8 px-unit-sm rounded-lg bg-surface-container-lowest text-on-surface border border-outline-variant/60 hover:bg-surface-container-low shadow-micro text-[12px] font-medium cursor-pointer"
+                    onClick={() => setRotatingExtraId(extra.id)}
+                    type="button"
+                  >
+                    Replace Credential
+                  </button>
+                  <button
+                    className="h-8 px-unit-sm rounded-lg bg-error-container/40 text-on-error-container border border-error-container hover:bg-error hover:text-on-error shadow-micro text-[12px] font-medium cursor-pointer disabled:opacity-50"
+                    disabled={extraDisconnecting[extra.id]}
+                    onClick={() => void handleDisconnect(extra.id)}
+                    type="button"
+                  >
+                    {extraDisconnecting[extra.id] ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                </div>
+              ) : (
+                <form
+                  className="flex flex-col gap-unit-sm max-w-md mt-unit-2xs"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleRotate(extra.id);
+                  }}
+                >
+                  {credentialFields(true)}
+                  <div className="flex gap-unit-sm">
+                    <button
+                      className="h-8 px-unit-md rounded-lg bg-primary text-on-primary text-[12px] font-medium hover:bg-tertiary transition-colors shadow-micro cursor-pointer disabled:opacity-50"
+                      disabled={actionState === 'rotating' || !credentialReady}
+                      type="submit"
+                    >
+                      Save replacement
+                    </button>
+                    <button
+                      className="h-8 px-unit-md rounded-lg bg-surface-container-lowest text-on-surface border border-outline-variant/60 hover:bg-surface-container-low shadow-micro text-[12px] cursor-pointer"
+                      onClick={() => {
+                        setRotatingExtraId(null);
+                        clearCredentialInputs();
+                      }}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          ))}
+
+          {/* Add Another Account button & form */}
+          {!showAddAccountForm ? (
+            <div className="mt-3 pt-3 border-t border-outline-variant/20">
+              <button
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-primary hover:text-tertiary transition-colors cursor-pointer"
+                onClick={() => setShowAddAccountForm(true)}
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                Add another {config.displayName} account
+              </button>
+            </div>
+          ) : (
+            <form
+              className="mt-3 pt-3 border-t border-outline-variant/20 flex flex-col gap-unit-sm max-w-md"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleConnect(addAccountLabel);
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-label-md text-label-md font-semibold text-on-surface">
+                  Connect additional {config.displayName} account
+                </span>
+              </div>
+              <label className="font-label-md text-label-md text-on-surface font-medium">
+                Account Label (optional)
+              </label>
+              <input
+                className="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-micro w-full"
+                onChange={(e) => setAddAccountLabel(e.target.value)}
+                placeholder={`e.g. ${config.displayName} - Account ${extraConnections.length + 2}`}
+                type="text"
+                value={addAccountLabel}
+              />
+              {credentialFields(false)}
+              {addAccountError && (
+                <p className="font-body-sm text-body-sm text-error" role="alert">
+                  {addAccountError}
+                </p>
+              )}
+              <div className="flex gap-unit-sm mt-1">
+                <button
+                  className="h-9 px-unit-lg rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-tertiary transition-colors shadow-micro cursor-pointer font-medium disabled:opacity-50"
+                  disabled={actionState === 'connecting' || !credentialReady}
+                  type="submit"
+                >
+                  {actionState === 'connecting' ? 'Connecting…' : 'Save and connect'}
+                </button>
+                <button
+                  className="h-9 px-unit-lg rounded-lg bg-surface-container-lowest text-on-surface border border-outline-variant/60 hover:bg-surface-container-low shadow-micro font-label-md text-label-md cursor-pointer"
+                  onClick={() => {
+                    setShowAddAccountForm(false);
+                    setAddAccountLabel('');
+                    setAddAccountError(null);
                     clearCredentialInputs();
                   }}
                   type="button"

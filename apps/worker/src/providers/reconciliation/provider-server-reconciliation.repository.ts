@@ -94,10 +94,13 @@ implements ProviderServerReconciliationTransaction {
     const matched = await this.findUnlinkedServerByIp(discovered.primaryIp);
     if (matched) return { ...matched, created: false };
 
+    const expiresAt = discovered.expiresAt ? new Date(discovered.expiresAt) : null;
+
     const [created] = await this.transaction
       .insert(servers)
       .values({
         createdAt: synchronizedAt,
+        expiresAt,
         hostname: discovered.hostname,
         inventoryState: 'TRACKED',
         name: discovered.canonicalName,
@@ -115,6 +118,36 @@ implements ProviderServerReconciliationTransaction {
       throw new ProviderReconciliationError('INTERNAL_INTEGRITY_ERROR');
     }
     return { ...created, created: true };
+  }
+
+  async updateServerExpiry(
+    nodeId: string,
+    expiresAt: string | null,
+    synchronizedAt: Date,
+  ): Promise<void> {
+    // Resolve server id from node id via inventory_nodes
+    const [node] = await this.transaction
+      .select({ entityId: inventoryNodes.entityId })
+      .from(inventoryNodes)
+      .where(
+        and(
+          eq(inventoryNodes.workspaceId, this.workspaceId),
+          eq(inventoryNodes.nodeId, nodeId),
+          eq(inventoryNodes.entityKind, 'SERVER'),
+        ),
+      )
+      .limit(1);
+    if (!node) return;
+    const parsedExpiry = expiresAt ? new Date(expiresAt) : null;
+    await this.transaction
+      .update(servers)
+      .set({ expiresAt: parsedExpiry, updatedAt: synchronizedAt })
+      .where(
+        and(
+          eq(servers.workspaceId, this.workspaceId),
+          eq(servers.id, node.entityId),
+        ),
+      );
   }
 
   async resolveServerNodeId(serverId: string): Promise<string | undefined> {

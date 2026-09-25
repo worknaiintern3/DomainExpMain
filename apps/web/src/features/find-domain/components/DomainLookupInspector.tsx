@@ -5,12 +5,14 @@ interface DomainLookupInspectorProps {
   details: DomainInspectionDetails;
   onToggleWatchlist?: (domain: string) => void;
   isSaved?: boolean;
+  onOpenFullWhois?: () => void;
 }
 
 export const DomainLookupInspector: React.FC<DomainLookupInspectorProps> = ({
   details,
   onToggleWatchlist,
   isSaved,
+  onOpenFullWhois,
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const isRegistered = details.status === 'registered';
@@ -145,10 +147,11 @@ export const DomainLookupInspector: React.FC<DomainLookupInspectorProps> = ({
           <div className="grid grid-cols-2 gap-unit-xs pt-1">
             <button
               type="button"
+              onClick={onOpenFullWhois}
               className="h-8 px-2 rounded-lg bg-surface-container hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center justify-center gap-1 transition-colors cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">fingerprint</span>
-              <span>RDAP Preview</span>
+              <span className="material-symbols-outlined text-[16px] text-primary">travel_explore</span>
+              <span>Full WHOIS</span>
             </button>
             <button
               type="button"

@@ -70,6 +70,7 @@ export {
   type ProviderSyncRun,
 } from './provider-sync';
 export {
+  platformRoleEnum,
   users,
   workspaceMembers,
   workspaceMembershipRoleEnum,
@@ -77,6 +78,7 @@ export {
   type NewUser,
   type NewWorkspace,
   type NewWorkspaceMember,
+  type PlatformRole,
   type User,
   type Workspace,
   type WorkspaceMember,
@@ -86,6 +88,7 @@ export {
   domainMetadataAttemptStatusEnum,
   domainRdapMetadata,
   domainTlsMetadata,
+  whoisRecords,
   type DomainDnsDsRecord,
   type DomainDnsMetadata,
   type DomainDnsMxRecord,
@@ -95,6 +98,8 @@ export {
   type NewDomainDnsMetadata,
   type NewDomainRdapMetadata,
   type NewDomainTlsMetadata,
+  type NewWhoisRecord,
+  type WhoisRecord,
 } from './metadata';
 export {
   alertEventStatusEnum,
@@ -116,3 +121,26 @@ export {
   type NewMonitoringRun,
   type NewMonitoringTarget,
 } from './monitoring';
+export {
+  mobileAnnouncements,
+  mobileAppConfig,
+  mobileAppVersions,
+  mobileAuditLogs,
+  mobileFeatureFlags,
+  mobileHomeConfig,
+  mobileNavigationConfig,
+  type MobileAnnouncementTable,
+  type MobileAppConfigTable,
+  type MobileAppVersionTable,
+  type MobileAuditLogTable,
+  type MobileFeatureFlagTable,
+  type MobileHomeConfigTable,
+  type MobileNavigationConfigTable,
+  type NewMobileAnnouncement,
+  type NewMobileAppConfig,
+  type NewMobileAppVersion,
+  type NewMobileAuditLog,
+  type NewMobileFeatureFlag,
+  type NewMobileHomeConfig,
+  type NewMobileNavigationConfig,
+} from './mobile';

@@ -121,7 +121,10 @@ export class PostgresRegistrationRepository implements RegistrationStore {
         throw error;
       }
 
-      throw new RegistrationPersistenceError();
+      const causeMsg = (error as any)?.cause?.message || (error as any)?.cause || '';
+      const msg = `${error instanceof Error ? error.message : String(error)} | CAUSE: ${causeMsg}`;
+      console.error('createRegistration DB ERROR:', error);
+      throw new RegistrationPersistenceError(`Registration DB query failed: ${msg}`);
     }
   }
 }

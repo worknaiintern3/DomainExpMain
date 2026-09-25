@@ -102,6 +102,7 @@ export interface DomainDiscoveryCapability {
 export interface DiscoveredProviderServer {
   readonly canonicalName: string;
   readonly externalResourceId: string;
+  readonly expiresAt: string | null;
   readonly hostname: string | null;
   readonly operatingSystem: string | null;
   readonly primaryIp: string | null;

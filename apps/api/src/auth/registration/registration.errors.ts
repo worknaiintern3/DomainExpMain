@@ -10,8 +10,8 @@ export class RegistrationEmailConflictError extends Error {
 export class RegistrationPersistenceError extends Error {
   readonly code = 'REGISTRATION_PERSISTENCE_ERROR';
 
-  constructor() {
-    super('Registration could not be completed');
+  constructor(message?: string) {
+    super(message || 'Registration could not be completed');
     this.name = 'RegistrationPersistenceError';
   }
 }

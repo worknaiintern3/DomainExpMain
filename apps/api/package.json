@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "predev": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database && tsc -p tsconfig.build.json",
-    "dev": "node --watch dist/main.js",
+    "dev": "node --env-file-if-exists=../../.env --env-file-if-exists=.env --watch dist/main.js",
     "dev:watch": "tsc -p tsconfig.build.json --watch",
     "prebuild": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/main.js",
+    "start": "node --env-file-if-exists=../../.env --env-file-if-exists=.env dist/main.js",
     "pretypecheck": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database",

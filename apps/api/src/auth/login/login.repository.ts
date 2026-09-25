@@ -59,8 +59,11 @@ export class PostgresLoginRepository implements LoginStore {
           updatedAt: row.updatedAt,
         },
       };
-    } catch {
-      throw new LoginPersistenceError();
+    } catch (error) {
+      const causeMsg = (error as any)?.cause?.message || (error as any)?.cause || '';
+      const msg = `${error instanceof Error ? error.message : String(error)} | CAUSE: ${causeMsg}`;
+      console.error('findCredentialByNormalizedEmail DB ERROR:', error);
+      throw new LoginPersistenceError(`Login DB query failed: ${msg}`);
     }
   }
 
