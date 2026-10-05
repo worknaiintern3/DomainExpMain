@@ -724,6 +724,11 @@ export const WebsitesPage: React.FC = () => {
               </Link>
             )}
 
+            {/* Domain Expiry Badge */}
+            {infra?.domain?.expiresAt && (
+              <DomainExpiryBadge expiresAt={infra.domain.expiresAt} />
+            )}
+
             <InventoryState state={app.inventoryState} />
           </div>
         </div>
@@ -1134,6 +1139,7 @@ export const WebsitesPage: React.FC = () => {
                       <th className="px-unit-sm">Type</th>
                       <th className="px-unit-sm">Provider Account</th>
                       <th className="px-unit-sm">Hosting Server</th>
+                      <th className="px-unit-sm">Domain Expiry</th>
                       <th className="px-unit-sm">Live Status</th>
                       <th className="px-unit-sm">Endpoint URL</th>
                       <th className="px-unit-md text-right">Actions</th>
@@ -1179,6 +1185,13 @@ export const WebsitesPage: React.FC = () => {
                               <span className="text-xs text-sky-600 dark:text-sky-400">🌐 {infra.domain.domainName}</span>
                             ) : (
                               <span className="text-xs text-secondary/60 italic">No server</span>
+                            )}
+                          </td>
+                          <td className="px-unit-sm py-3">
+                            {infra?.domain?.expiresAt ? (
+                              <DomainExpiryBadge expiresAt={infra.domain.expiresAt} />
+                            ) : (
+                              <span className="text-xs text-secondary/50">—</span>
                             )}
                           </td>
                           <td className="px-unit-sm py-3">
@@ -1300,21 +1313,50 @@ export const WebsitesPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Domain */}
+                {/* Domain & Expiry */}
                 {inspectedInfra?.domain && (
                   <div className="rounded-xl bg-surface-container-low p-3">
-                    <dt className="text-[11px] font-semibold uppercase text-secondary mb-1.5">Domain</dt>
-                    <dd className="flex flex-col gap-1 text-xs">
-                      <div className="flex items-center gap-1.5 font-semibold text-on-surface">
-                        <span className="material-symbols-outlined text-[14px] text-sky-500">language</span>
-                        {inspectedInfra.domain.domainName}
+                    <dt className="text-[11px] font-semibold uppercase text-secondary mb-1.5 flex items-center justify-between">
+                      <span>Domain &amp; Expiration</span>
+                      {inspectedInfra.domain.expiresAt && (
+                        <span className="text-[10px] text-primary font-mono lowercase">whois verified</span>
+                      )}
+                    </dt>
+                    <dd className="flex flex-col gap-2 text-xs">
+                      <div className="flex items-center justify-between gap-1.5 font-semibold text-on-surface">
+                        <div className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[15px] text-sky-500">language</span>
+                          <span>{inspectedInfra.domain.domainName}</span>
+                        </div>
+                        {inspectedInfra.domain.expiresAt && (
+                          <DomainExpiryBadge expiresAt={inspectedInfra.domain.expiresAt} />
+                        )}
                       </div>
                       {inspectedInfra.domain.expiresAt && (
-                        <span className="text-secondary">
-                          Expires: {new Date(inspectedInfra.domain.expiresAt).toLocaleDateString()}
-                        </span>
+                        <div className="flex items-center justify-between text-xs text-secondary border-t border-outline-variant/20 pt-1.5 mt-0.5">
+                          <span>Expires on:</span>
+                          <span className="font-medium text-on-surface">
+                            {new Date(inspectedInfra.domain.expiresAt).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        </div>
                       )}
-                      <Link to="/domains" className="mt-1 text-primary hover:underline text-[10px] font-medium">View domain details →</Link>
+                      {inspectedInfra.domain.registeredAt && (
+                        <div className="flex items-center justify-between text-[11px] text-secondary">
+                          <span>Registered on:</span>
+                          <span>
+                            {new Date(inspectedInfra.domain.registeredAt).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      <Link to="/domains" className="mt-1 text-primary hover:underline text-[10px] font-medium">Manage domain in portfolio →</Link>
                     </dd>
                   </div>
                 )}

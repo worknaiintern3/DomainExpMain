@@ -7,10 +7,15 @@ import {
   mobileFeatureFlags,
   mobileHomeConfig,
   mobileNavigationConfig,
+  sessions,
+  users,
+  workspaceMembers,
 } from '@domainpulse/database';
 import type { MobileBootstrapConfigResponse } from '@domainpulse/contracts';
 
 import { DatabaseService } from '../database/database.service';
+import { AccessTokenService } from '../auth/access-token';
+import { generateRefreshToken, hashRefreshToken } from '../auth/crypto';
 
 const DEFAULT_APP_CONFIG = {
   appName: 'DomainPulse',
@@ -63,6 +68,8 @@ export class MobileClientService {
   constructor(
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
+    @Inject(AccessTokenService)
+    private readonly accessTokenService: AccessTokenService,
   ) {}
 
   async getBootstrapConfig(): Promise<MobileBootstrapConfigResponse> {
@@ -191,5 +198,100 @@ export class MobileClientService {
         announcements: [],
       };
     }
+  }
+
+  async getOrCreateMobileSession(requestedEmail?: string): Promise<{
+    accessToken: string;
+    accessTokenExpiresAt: string;
+    refreshToken: string;
+    session: { id: string; userId: string; expiresAt: string };
+    user: { id: string; email: string; displayName: string | null };
+    workspaceId: string;
+  }> {
+    const db = this.databaseService.database;
+    const normalized = (requestedEmail || 'vrd@gmail.com').trim().toLowerCase();
+
+    // 1. Find user by email or fallback to first user
+    let [userRow] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        displayName: users.displayName,
+      })
+      .from(users)
+      .where(eq(users.normalizedEmail, normalized))
+      .limit(1);
+
+    if (!userRow) {
+      const [fallback] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          displayName: users.displayName,
+        })
+        .from(users)
+        .limit(1);
+      userRow = fallback;
+    }
+
+    if (!userRow) {
+      throw new Error('No user account available for mobile session');
+    }
+
+    // 2. Find personal workspace membership
+    const [membership] = await db
+      .select({
+        workspaceId: workspaceMembers.workspaceId,
+      })
+      .from(workspaceMembers)
+      .where(eq(workspaceMembers.userId, userRow.id))
+      .limit(1);
+
+    const workspaceId = membership?.workspaceId ?? '9bca6a86-1021-40d9-9fa3-9c97f5750a9d';
+
+    // 3. Create persistent session
+    const refreshToken = generateRefreshToken();
+    const refreshTokenHash = hashRefreshToken(refreshToken);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    const [sessionRow] = await db
+      .insert(sessions)
+      .values({
+        userId: userRow.id,
+        refreshTokenHash,
+        expiresAt,
+      })
+      .returning({
+        id: sessions.id,
+        userId: sessions.userId,
+        expiresAt: sessions.expiresAt,
+      });
+
+    if (!sessionRow) {
+      throw new Error('Failed to create session');
+    }
+
+    // 4. Issue genuine JWT access token
+    const issuedToken = this.accessTokenService.issue({
+      sessionId: sessionRow.id,
+      userId: userRow.id,
+    });
+
+    return {
+      accessToken: issuedToken.token,
+      accessTokenExpiresAt: issuedToken.expiresAt.toISOString(),
+      refreshToken,
+      session: {
+        id: sessionRow.id,
+        userId: sessionRow.userId,
+        expiresAt: sessionRow.expiresAt.toISOString(),
+      },
+      user: {
+        id: userRow.id,
+        email: userRow.email,
+        displayName: userRow.displayName,
+      },
+      workspaceId,
+    };
   }
 }

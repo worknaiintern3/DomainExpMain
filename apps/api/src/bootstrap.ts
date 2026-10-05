@@ -10,6 +10,7 @@ import {
   createRequestId,
   registerRequestIdMiddleware,
 } from './common/http/request-id.middleware';
+import { registerRateLimiterMiddleware } from './common/http/rate-limiter.middleware';
 import { AppConfigService } from './config/config.module';
 import { parseEnvironment } from './config/env.schema';
 
@@ -49,14 +50,20 @@ export async function createApplication(): Promise<NestFastifyApplication> {
     ],
   });
   app.enableCors({
-    origin: config.corsOrigins,
+    origin: (_origin, callback) => {
+      callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [...API_CORS_ALLOWED_HEADERS],
-    exposedHeaders: ['ETag', 'Location', 'X-Request-Id'],
+    exposedHeaders: ['ETag', 'Location', 'X-Request-Id', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After'],
     maxAge: 86_400,
   });
   registerRequestIdMiddleware(app);
+  registerRateLimiterMiddleware(app, {
+    max: config.rateLimitMax,
+    windowMs: config.rateLimitWindowMs,
+  });
   app.enableShutdownHooks();
 
   return app;

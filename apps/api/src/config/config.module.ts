@@ -33,6 +33,14 @@ export class AppConfigService {
   get nodeEnvironment(): AppEnvironment['NODE_ENV'] {
     return this.environment.NODE_ENV;
   }
+
+  get rateLimitMax(): number {
+    return this.environment.RATE_LIMIT_MAX;
+  }
+
+  get rateLimitWindowMs(): number {
+    return this.environment.RATE_LIMIT_WINDOW_MS;
+  }
 }
 
 @Global()

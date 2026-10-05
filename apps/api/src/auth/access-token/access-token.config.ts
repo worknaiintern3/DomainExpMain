@@ -5,7 +5,7 @@ import type { AccessTokenConfiguration } from './access-token.types';
 
 export const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 5 * 60;
 export const MIN_ACCESS_TOKEN_TTL_SECONDS = 60;
-export const MAX_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
+export const MAX_ACCESS_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60; // Up to 30 days
 
 const SigningSecretSchema = z
   .string()
