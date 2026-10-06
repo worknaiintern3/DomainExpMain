@@ -1,6 +1,4 @@
 import base64
-import copy
-import importlib.util
 import json
 import sys
 import unittest
@@ -126,6 +124,11 @@ class EnvironmentTests(unittest.TestCase):
     def test_placeholder_configuration_rejected(self):
         self.env['GOOGLE_OAUTH_CLIENT_SECRET'] = 'replace-me'
         with self.assertRaisesRegex(RuntimeError, 'GOOGLE_OAUTH_CLIENT_SECRET'):
+            validate(self.env)
+
+    def test_example_google_callback_is_not_a_production_callback(self):
+        self.env['GOOGLE_OAUTH_REDIRECT_URI'] = 'https://your-domain.com/auth/google/callback'
+        with self.assertRaisesRegex(RuntimeError, 'GOOGLE_OAUTH_REDIRECT_URI'):
             validate(self.env)
 
     def test_host_port_is_fixed(self):

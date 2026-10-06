@@ -37,7 +37,9 @@ def validate(env):
                 'GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_OAUTH_REDIRECT_URI']
     invalid = {key for key in required if not env.get(key)}
     for key, value in env.items():
-        if any(marker in value.lower() for marker in ('replace-me', 'db-host', 'your-web-client.example')):
+        if any(marker in value.lower() for marker in ('replace-me', 'db-host', 'your-web-client.example',
+                                                      'your-domain.com', 'your-client-id', 'your-client-secret',
+                                                      'your_client_id', 'your_client_secret')):
             invalid.add(key)
     for key, expected in {'BACKEND_HOST_PORT': '5011', 'NODE_ENV': 'production',
                           'API_HOST': '0.0.0.0', 'API_PORT': '4000',

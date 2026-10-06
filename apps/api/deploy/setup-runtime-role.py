@@ -17,6 +17,13 @@ def main():
     runtime = urlsplit(env['DATABASE_URL'])
     if owner.hostname != 'domainexp_app_postgres' or owner.path != runtime.path:
         raise RuntimeError('Unexpected production database targets')
+    # Fail immediately if CI owns the deployment lock; never race migration/replacement.
+    import fcntl
+    lock = envfile.with_name('.deploy.lock').open('a')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise RuntimeError('Another DomainExp deployment owns the lock; retry one-time setup afterwards')
     role = 'domainexp_app_runtime'
     def query(sql):
         result = subprocess.run(['docker', 'exec', '-i', 'domainexp_app_postgres', 'psql',
@@ -36,8 +43,6 @@ def main():
         raise RuntimeError('Runtime role exists with unknown credentials; refusing password reset')
     password = secrets.token_urlsafe(48)
     database = unquote(owner.path[1:]).replace('"', '""')
-    query(f"CREATE ROLE {role} LOGIN PASSWORD '{password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;\n"
-          f'GRANT CONNECT ON DATABASE "{database}" TO {role};\n')
     authority = role + ':' + quote(password, safe='') + '@' + owner.hostname + ':5432'
     new_url = urlunsplit((owner.scheme, authority, owner.path, owner.query, owner.fragment))
     lines = envfile.read_text().splitlines()
@@ -52,6 +57,12 @@ def main():
     with temporary.open('x') as output:
         os.chmod(temporary, 0o600)
         output.write('\n'.join(lines) + '\n')
+    try:
+        query(f"BEGIN; CREATE ROLE {role} LOGIN PASSWORD '{password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;\n"
+              f'GRANT CONNECT ON DATABASE "{database}" TO {role}; COMMIT;\n')
+    except RuntimeError:
+        temporary.unlink(missing_ok=True)
+        raise
     temporary.replace(envfile)
     print('One-time runtime role initialized; migration owner, JWT and encryption secrets preserved')
 
