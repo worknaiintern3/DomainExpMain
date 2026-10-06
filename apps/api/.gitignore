@@ -17,5 +17,6 @@ id_ed25519*
 deploy/.previous-commit
 deploy/.current-commit
 deploy/__pycache__/
+deploy/**/__pycache__/
 
 /deploy/.env

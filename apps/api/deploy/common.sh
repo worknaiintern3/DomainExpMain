@@ -7,31 +7,33 @@ export DOMAIN=app.domainexp.info
 export CENTRAL_NGINX=gymproplus-nginx-1
 export CONTAINER=domainexp_app_backend
 cd "$REPO_DIR"
+[[ "$REPO_DIR" == /opt/domainexp-app && ! -L "$DEPLOY_DIR/.env" ]] || {
+  echo 'Expected dedicated checkout /opt/domainexp-app and a regular production env file.' >&2; exit 1;
+}
 for command_name in docker git flock curl python3 ss; do command -v "$command_name" >/dev/null; done
 docker compose version >/dev/null
 [[ -f "$DEPLOY_DIR/.env" ]] || { echo 'Missing apps/api/deploy/.env' >&2; exit 1; }
 umask 077
-chmod 600 "$DEPLOY_DIR/.env"
-sed -E '/^[[:space:]]*(export[[:space:]]+)?MIGRATION_DATABASE_URL[[:space:]]*=/d' \
-  "$DEPLOY_DIR/.env" > "$DEPLOY_DIR/.env.runtime.$$"
-mv -- "$DEPLOY_DIR/.env.runtime.$$" "$DEPLOY_DIR/.env.runtime"
-compose() { docker compose --project-name domainexp_app --env-file "$DEPLOY_DIR/.env" -f "$REPO_DIR/apps/api/docker-compose.prod.yml" "$@"; }
+compose() {
+  local files=(-f "$REPO_DIR/apps/api/docker-compose.prod.yml")
+  if [[ -n "${NGINX_PROXY_NETWORK:-}" && -f "$REPO_DIR/apps/api/docker-compose.proxy.yml" ]]; then
+    files+=(-f "$REPO_DIR/apps/api/docker-compose.proxy.yml")
+  fi
+  docker compose --project-name domainexp_app --env-file "$DEPLOY_DIR/.env" "${files[@]}" "$@"
+}
 env_value() {
-  python3 - "$DEPLOY_DIR/.env" "$1" <<'PY'
-import sys
-from pathlib import Path
-for line in Path(sys.argv[1]).read_text().splitlines():
-    key, sep, value = line.partition('=')
-    if sep and key.strip() == sys.argv[2]:
-        print(value.strip().strip('\"\'')); break
-PY
+  python3 "$DEPLOY_DIR/environment.py" "$DEPLOY_DIR/.env" value "$1"
+}
+prepare_runtime_environment() {
+  python3 "$DEPLOY_DIR/environment.py" "$DEPLOY_DIR/.env" runtime
 }
 lock_deployment() {
   exec 9>"$DEPLOY_DIR/.deploy.lock"
   flock -w 600 9 || { echo 'Another DomainExp deployment is running.' >&2; exit 1; }
 }
 BACKEND_HOST_PORT="$(env_value BACKEND_HOST_PORT)"
-export BACKEND_HOST_PORT
+NGINX_PROXY_NETWORK="$(env_value NGINX_PROXY_NETWORK)"
+export BACKEND_HOST_PORT NGINX_PROXY_NETWORK
 verify_local() {
   local host_port
   host_port="$(env_value BACKEND_HOST_PORT)"

@@ -32,17 +32,17 @@ if [[ -f "$target" ]]; then
   backup="$target.domainexp-backup-$(date +%s)"
   cp -p -- "$target" "$backup"
 fi
-connected=0
-network_connected="$(docker inspect -f '{{json .NetworkSettings.Networks}}' "$CENTRAL_NGINX" | python3 -c 'import json,sys; print("yes" if "domainexp_app_proxy" in json.load(sys.stdin) else "no")')"
-if [[ "$network_connected" == no ]]; then
-  docker network connect domainexp_app_proxy "$CENTRAL_NGINX"
-  connected=1
-fi
+# The private database network accepts only backend/Postgres. Never attach Nginx to it.
+docker inspect "$CENTRAL_NGINX" "$CONTAINER" | python3 -c '
+import json,sys
+nginx,backend=json.load(sys.stdin)
+shared=set(nginx["NetworkSettings"]["Networks"]) & set(backend["NetworkSettings"]["Networks"])
+if not shared: raise SystemExit("Backend requires an explicitly authorized connection to the existing Nginx proxy network; central Nginx will not be modified")
+'
 restore() {
   local status=$?
   trap - ERR
   if [[ -n "$backup" ]]; then cp -p -- "$backup" "$target"; else rm -f -- "$target"; fi
-  if [[ "$connected" == 1 ]]; then docker network disconnect domainexp_app_proxy "$CENTRAL_NGINX" || true; fi
   echo 'Domain config restored; broken Nginx configuration was not reloaded.' >&2
   exit "$status"
 }

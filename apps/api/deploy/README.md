@@ -1,136 +1,93 @@
-# DomainExp production — existing central Nginx
+# DomainExp production
 
-Domain: https://app.domainexp.info → 200.234.45.233.
-Container: domainexp_app_backend; internal port: 4000.
-Compose project/image/network prefix: domainexp_app.
-Only central gymproplus-nginx-1 owns host 80/443. This project publishes a
-selected BACKEND_HOST_PORT on 127.0.0.1 only. Central Nginx reaches the backend
-on the dedicated domainexp_app_proxy network, which the installer connects once.
+Dedicated checkout: `/opt/domainexp-app`. Domain: `https://app.domainexp.info`.
+Backend: `domainexp_app_backend`, internal `0.0.0.0:4000`, host `127.0.0.1:5011`.
 
-## First VPS setup only
+## Persistent infrastructure
 
-Required: Docker Compose v2.20+, Git, Bash, Python 3, curl, ss, flock.
-Use a dedicated checkout with GitHub read access:
+Existing `domainexp_app_postgres` (`postgres:16-alpine`) and
+`domainexp_app_pgdata` are external infrastructure. This application Compose file
+never creates, replaces, removes or publishes PostgreSQL. The existing external
+`domainexp_app_proxy` accepts only the exact backend and PostgreSQL containers.
 
-```bash
-git clone https://github.com/worknaiintern3/DomainExpMain.git /opt/domainexp-app
-cd /opt/domainexp-app
-cp apps/api/deploy/.env.example apps/api/deploy/.env
-chmod 600 apps/api/deploy/.env
-ss -ltn
-docker ps --format 'table {{.Names}}\t{{.Ports}}'
-nano apps/api/deploy/.env
-```
+Central `gymproplus-nginx-1` retains its containers, mounts and networks.
+If authorized, set `NGINX_PROXY_NETWORK` to its existing proxy network. The
+optional Compose override attaches only the backend to that shared proxy network;
+Nginx is never attached to the private PostgreSQL network. Leaving this variable
+unset does not grant permission to modify any unrelated network.
 
-Choose an actually free BACKEND_HOST_PORT (1024–65535), not 80/443.
-Fill the real frontend CORS_ORIGINS, private/managed PostgreSQL URL, JWT signing
-secret (32 random bytes, base64url), a separate provider encryption key
-(32 bytes, standard base64), and Google OAuth credentials/real frontend callback.
-Preserve existing encryption keys. No database ports are published.
-RUN_MIGRATIONS defaults to false. For verified Drizzle migrations, back up/review
-the DB, provide the separate schema-owner MIGRATION_DATABASE_URL, and explicitly
-set RUN_MIGRATIONS=true when needed. No reset/seeding occurs; schema changes
-cannot be reversed by application rollback. The API's generated .env.runtime
-does not receive the migration-owner URL. Keep the runtime DB role non-owner,
-without SUPERUSER/BYPASSRLS.
+## Production configuration
 
-Commit/push the deployment files first; on the VPS:
+Keep `apps/api/deploy/.env` on the VPS only. It is ignored, never printed, and
+normal deployment does not rewrite it. `.env.example` lists required values.
+Preflight reports invalid/missing names, including required Google OAuth fields.
+Do not use fake OAuth credentials to bypass startup validation.
+
+Both database URLs target `domainexp_app_postgres:5432` and the same database.
+`RUN_MIGRATIONS=true` enables the controlled committed Drizzle migrations.
+Use a schema-owner `MIGRATION_DATABASE_URL` and a separate runtime `DATABASE_URL`
+with no SUPERUSER/BYPASSRLS or table ownership. The owner URL is stripped from the
+backend's generated `.env.runtime`. If the newly initialized database currently
+uses its owner for both URLs, run this explicit one-time setup:
 
 ```bash
-bash apps/api/deploy/preflight.sh
-DOMAINEXP_INITIAL_SETUP=1 bash apps/api/deploy/deploy.sh
+python3 apps/api/deploy/setup-runtime-role.py --initialize-runtime-role
 ```
 
-Initial mode verifies the backend only and leaves public installation pending;
-GitHub never enables this mode.
+It creates a new restricted login and changes only DATABASE_URL. It never resets
+an existing role's password, migration credentials, JWT or encryption secrets.
+Never call this initializer from normal CI.
 
-## First SSL and Nginx setup
+## One-time HTTPS setup
 
-DNS A: app.domainexp.info → 200.234.45.233. Remove incorrect AAAA records.
-First installation requires direct DNS rather than a CDN proxy.
-Obtain ONLY this domain's certificate through the existing central certificate
-setup. Reuse a valid existing certificate. Never stop central Nginx, replace
-other certificates, or run standalone Certbot with host ports 80/443.
-
-If the existing central certificate store has a directory mount at
-/etc/letsencrypt, this DNS-01 command takes no public port:
+DNS must resolve only to `200.234.45.233`. Central Nginx must already have its
+persistent conf.d, certificate and ACME webroot mounts. This setup takes no host
+ports and modifies only the DomainExp domain config and certificate:
 
 ```bash
-CERT_STORE=$(docker inspect gymproplus-nginx-1 | python3 -c 'import json,sys; m=[m for m in json.load(sys.stdin)[0]["Mounts"] if m["Destination"]=="/etc/letsencrypt"]; assert len(m)==1,"Find the central certificate directory mount first"; print(m[0]["Source"])')
-docker run --rm -it --name domainexp_app_certbot \
-  --mount "type=bind,src=$CERT_STORE,dst=/etc/letsencrypt" \
-  certbot/certbot:v5.0.0 certonly --manual --preferred-challenges dns \
-  --cert-name app.domainexp.info -d app.domainexp.info
+bash apps/api/deploy/setup-https.sh
 ```
 
-Follow the TXT challenge. Manual DNS certificates do NOT auto-renew: configure
-this domain in the existing central automated renewal system or its DNS-provider
-plugin before unattended operation. The DNS provider/central renewal mechanism
-was not supplied, so no credentials or plugin are guessed.
+It serves HTTP-01 through the existing central webroot, obtains this domain's
+certificate, installs its exact HTTP/HTTPS blocks, tests Nginx before graceful
+reload, and schedules only this certificate's renewal in
+`/etc/cron.d/domainexp-app-ssl`. Existing certificates and configs are retained.
+Renewal reloads Nginx only if the certificate changed and `nginx -t` succeeds.
+The ACME account is registered without an email; expiry alerts are unavailable.
 
-Once the certificate is visible in central Nginx:
+Application health is still required separately. Set real OAuth configuration
+and the explicitly authorized proxy-network setting before expecting CI success.
+For an already installed certificate, `install-nginx.sh` installs only this
+managed domain config after backend readiness and shared proxy connectivity.
 
-```bash
-bash apps/api/deploy/install-nginx.sh
-curl --fail https://app.domainexp.info/health
-```
+## Push deployment
 
-The installer finds the existing persistent directory mount for conf.d, checks
-DNS, certificates, exact routing and duplicates, backs up a previously managed
-same-name file, copies ONLY app.domainexp.info.conf, tests Nginx and gracefully
-reloads it. Validation failure restores the file without reloading broken
-config. Existing domain files are not rewritten. An unknown same-name file is
-refused. If central Nginx has only individual file mounts and no persistent
-writable conf.d directory, installation fails safely; it never recreates it.
+Set GitHub secrets VPS_HOST, VPS_USER, VPS_PORT, VPS_SSH_KEY, VPS_KNOWN_HOSTS and
+DEPLOY_PATH for the specified target. SSH host verification remains strict.
+Push `main` or dispatch the workflow manually. Actions checks out the triggering
+SHA, validates deployment tests, buffers that revision's deployment script into
+a private temporary remote file, and runs the single deployment implementation.
+This lets a new fix run even when the server's old preflight is broken.
 
-## GitHub secrets
+The deployment lock serializes migration and replacement. The script fetches
+main, verifies the requested SHA is in its history, checks out that exact SHA,
+checks ownership/configuration, snapshots protected infrastructure, builds,
+validates compiled runtime parsers, runs committed migrations once, and replaces
+only the backend. A newer main revision does not change the requested commit.
 
-VPS_HOST=200.234.45.233
-VPS_USER=<SSH user with Docker and dedicated checkout access>
-VPS_SSH_KEY=<dedicated automation private key>
-VPS_PORT=<SSH port; defaults to 22>
-DEPLOY_PATH=/opt/domainexp-app
-VPS_KNOWN_HOSTS=<verified OpenSSH host-key line>
+Success requires Docker readiness, local /health and /ready, and verified public
+HTTPS /health with the backend identity header. Normal CI never bypasses public
+health, changes Nginx or installs certificates. DOMAINEXP_INITIAL_SETUP is for
+explicit first setup only. PostgreSQL, .env, Nginx and existing container
+identities/mounts/network/start times are verified after application deployment.
 
-Install the automation public key in the user's authorized_keys. The VPS must
-also have read access to origin; a private repo needs its own read-only deploy
-key. Verify host-key fingerprints through a trusted console. A nonstandard port
-uses [200.234.45.233]:PORT in known_hosts.
+## Failure and rollback
 
-## Normal deployment
+Failures remain nonzero in GitHub Actions. Diagnostics redact production values
+and connection URLs. Application replacement failures restore the retained
+previous image using only the backend service; a failed first revision is removed
+by service name. Git checkout is restored. There is no Compose down, orphan
+removal, global prune, database restart/reset, or destructive schema rollback.
+Applied migrations remain applied, so releases must keep rollback compatibility.
 
-```bash
-git add .
-git commit -m "update"
-git push origin main
-```
-
-Only push to main triggers .github/workflows/deploy-production.yml.
-It SSHs to the VPS and runs ONE deployment script with the pushed commit SHA.
-The script refuses dirty source or a mismatched origin/main revision; locking
-serializes deployments. Preflight checks port/container/project/network ownership,
-domain collisions and central Nginx. Only this project is built/replaced.
-Normal push deployment never writes/reloads Nginx. Docker health, local health
-and DB readiness, public HTTPS backend identity and previously running unrelated
-containers are checked. Single-container replacement may briefly interrupt this
-backend. The root development Compose file and other apps are untouched.
-
-## Verify and rollback
-
-```bash
-curl --fail https://app.domainexp.info/health
-docker inspect -f '{{.State.Health.Status}}' domainexp_app_backend
-docker logs --tail 100 domainexp_app_backend
-```
-
-Failures reset only this dedicated checkout to its prior commit, restore its
-retained previous image and verify old local readiness. GitHub remains failed.
-There is no previous backend on first deployment. Images are never globally
-pruned. Manual recovery: inspect apps/api/deploy/.previous-commit and the failure,
-then restore its retained image through the same production Compose file;
-never roll back database migrations or stop unrelated projects.
-
-API base URL: https://app.domainexp.info/api/v1.
-Production disables the unauthenticated development mobile/session helper;
-mobile clients need password/OAuth login. Live Docker/VPS/SSL checks require
-server access; local shell/static checks do not establish live readiness.
+API base URL: `https://app.domainexp.info/api/v1`.

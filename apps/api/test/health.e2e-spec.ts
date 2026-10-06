@@ -5,7 +5,7 @@ import {
 } from '@domainpulse/contracts';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { InternalServerErrorException } from '@nestjs/common';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { createApplication } from '../src/bootstrap';
 import { toProblemDetails } from '../src/common/http/problem-details.filter';
@@ -20,6 +20,13 @@ describe('DomainPulse API foundation', () => {
   const originalJwtSecret = process.env.JWT_ACCESS_TOKEN_SECRET;
 
   beforeAll(async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('PROVIDER_CREDENTIAL_ENCRYPTION_KEY_V1', Buffer.from(
+      Array.from({ length: 32 }, (_, index) => index + 32),
+    ).toString('base64'));
+    vi.stubEnv('GOOGLE_OAUTH_CLIENT_ID', 'health-test-client');
+    vi.stubEnv('GOOGLE_OAUTH_CLIENT_SECRET', 'health-test-secret');
+    vi.stubEnv('GOOGLE_OAUTH_REDIRECT_URI', 'https://app.domainexp.info/auth/google/callback');
     process.env.DATABASE_URL =
       'postgresql://phase2_user:phase2_secret@127.0.0.1:1/domainpulse_test';
     process.env.DATABASE_CONNECTION_TIMEOUT_MS = '100';
@@ -35,6 +42,7 @@ describe('DomainPulse API foundation', () => {
 
   afterAll(async () => {
     await app.close();
+    vi.unstubAllEnvs();
 
     if (originalDatabaseUrl === undefined) {
       delete process.env.DATABASE_URL;

@@ -28,7 +28,7 @@ services:
     init: true
     stop_grace_period: 30s
     # Local probes only. Central Nginx reaches the dedicated Docker network.
-    ports: ['127.0.0.1:${BACKEND_HOST_PORT:?Choose a free VPS port}:4000']
+    ports: ['127.0.0.1:5011:4000']
   migrate:
     <<: *runtime
     env_file: deploy/.env
@@ -40,3 +40,4 @@ services:
 networks:
   domainexp_app_proxy:
     name: domainexp_app_proxy
+    external: true

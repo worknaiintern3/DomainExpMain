@@ -141,6 +141,13 @@
       "when": 1789850000000,
       "tag": "0019_whois_records",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790000000000,
+      "tag": "0020_server_expiry",
+      "breakpoints": true
     }
   ]
 }

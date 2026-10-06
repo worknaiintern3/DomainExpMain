@@ -33,9 +33,10 @@ COPY --from=build --chown=node:node /app/packages/contracts/dist/ ./packages/con
 COPY --from=build --chown=node:node /app/packages/database/dist/src/ ./packages/database/dist/src/
 COPY --from=build --chown=node:node /app/packages/database/migrations/ ./packages/database/migrations/
 COPY --chown=node:node apps/api/deploy/migrate.cjs ./apps/api/deploy/migrate.cjs
+COPY --chown=node:node apps/api/deploy/check-runtime.cjs ./apps/api/deploy/check-runtime.cjs
 USER node
 WORKDIR /app/apps/api
 EXPOSE 4000
-HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
     CMD node -e "fetch('http://127.0.0.1:4000/ready',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main.js"]
