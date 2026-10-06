@@ -18,6 +18,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Inject,
   Param,
   Query,
   Req,
@@ -92,7 +93,7 @@ function presentRelationships(
 @Controller()
 @UseGuards(AccessTokenGuard, WorkspaceContextGuard)
 export class InventoryReadModelsController {
-  constructor(private readonly service: InventoryReadModelService) {}
+  constructor(@Inject(InventoryReadModelService) private readonly service: InventoryReadModelService) {}
 
   @Get('projects/:id/resources')
   projectResources(

@@ -23,7 +23,8 @@ function loadAndApplyEnvFile(filePath: string): void {
       ) {
         val = val.slice(1, -1);
       }
-      process.env[key] = val;
+      // Container/server environment takes precedence over local env files.
+      process.env[key] ??= val;
     }
   } catch {
     // Continue searching

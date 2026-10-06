@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { MobileClientService } from '../src/mobile-client/mobile-client.service';
+import { AccessTokenService } from '../src/auth/access-token/access-token.service';
 
 describe('MobileClientService', () => {
   it('returns default bootstrap configuration when database tables are empty', async () => {
@@ -16,7 +17,13 @@ describe('MobileClientService', () => {
       },
     } as any;
 
-    const service = new MobileClientService(mockDbService);
+    const accessTokenService = new AccessTokenService({
+      audience: 'mobile-test-clients',
+      issuer: 'mobile-test-api',
+      signingKey: Buffer.from(Array.from({ length: 32 }, (_, index) => index + 1)),
+      ttlSeconds: 300,
+    });
+    const service = new MobileClientService(mockDbService, accessTokenService);
     const config = await service.getBootstrapConfig();
 
     expect(config).toBeDefined();

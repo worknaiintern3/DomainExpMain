@@ -3,6 +3,7 @@ import {
   ArgumentsHost,
   Catch,
   HttpException,
+  Inject,
   Injectable,
   Logger,
   type ExceptionFilter,
@@ -41,7 +42,7 @@ export function toProblemDetails(
       : 500;
   const title = STATUS_CODES[status] ?? 'Error';
   const detail =
-    status >= 500 && process.env.NODE_ENV === 'production'
+    status >= 500
       ? 'An unexpected error occurred.'
       : exception instanceof HttpException
       ? getHttpExceptionDetail(exception)
@@ -65,7 +66,7 @@ export function toProblemDetails(
 export class ProblemDetailsFilter implements ExceptionFilter {
   private readonly logger = new Logger(ProblemDetailsFilter.name);
 
-  constructor(private readonly adapterHost: HttpAdapterHost) {}
+  constructor(@Inject(HttpAdapterHost) private readonly adapterHost: HttpAdapterHost) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();

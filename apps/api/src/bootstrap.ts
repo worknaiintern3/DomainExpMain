@@ -37,7 +37,7 @@ export async function createApplication(): Promise<NestFastifyApplication> {
     new FastifyAdapter({
       genReqId: createRequestId,
       logger: fastifyLogger,
-      trustProxy: false,
+      trustProxy: (_address, hop) => hop < environment.API_TRUST_PROXY_HOPS,
     }),
     nestOptions,
   );
@@ -50,8 +50,8 @@ export async function createApplication(): Promise<NestFastifyApplication> {
     ],
   });
   app.enableCors({
-    origin: (_origin, callback) => {
-      callback(null, true);
+    origin: (origin, callback) => {
+      callback(null, origin === undefined || config.corsOrigins.includes(origin));
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

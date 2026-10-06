@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -35,7 +36,7 @@ function parseWorkspaceHeader(
 
 @Injectable()
 export class WorkspaceContextGuard implements CanActivate {
-  constructor(private readonly contextService: WorkspaceContextService) {}
+  constructor(@Inject(WorkspaceContextService) private readonly contextService: WorkspaceContextService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context
