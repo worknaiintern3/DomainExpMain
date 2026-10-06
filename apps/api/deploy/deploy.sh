@@ -48,7 +48,7 @@ rollback() {
   if [[ "$backend_changed" == 1 ]]; then
     if [[ -n "$previous_image" ]]; then
       export API_IMAGE="$previous_image"
-      if compose up -d --no-deps --wait --wait-timeout 180 backend && verify_local; then
+      if compose up -d --no-deps --wait --wait-timeout 180 backend && connect_backend_proxy && verify_local; then
         echo 'Previous backend restored and healthy.' >&2
       else
         echo 'Previous backend restoration failed health verification.' >&2
@@ -85,6 +85,7 @@ compose up -d --no-deps --wait --wait-timeout 180 backend
 [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER")" == true ]]
 [[ "$(docker inspect -f '{{.State.Health.Status}}' "$CONTAINER")" == healthy ]]
 verify_local
+connect_backend_proxy
 if [[ "${DOMAINEXP_INITIAL_SETUP:-0}" != 1 ]]; then verify_public; fi
 python3 "$DEPLOY_DIR/infrastructure.py" verify "$snapshot" "$DEPLOY_DIR/.env"
 printf '%s\n' "$PREVIOUS_COMMIT" > "$DEPLOY_DIR/.previous-commit"

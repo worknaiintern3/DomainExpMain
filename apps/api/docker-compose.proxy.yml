@@ -1,9 +1,0 @@
-# Enable only after explicitly authorizing the backend's shared proxy connection.
-# Central Nginx and its existing network are never recreated or reconnected.
-services:
-  backend:
-    networks: [domainexp_app_proxy, domainexp_nginx_proxy]
-networks:
-  domainexp_nginx_proxy:
-    external: true
-    name: ${NGINX_PROXY_NETWORK:?Configure the authorized existing Nginx network}

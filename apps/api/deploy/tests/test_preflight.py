@@ -92,6 +92,11 @@ class PreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'owned by another project'):
             self.check()
 
+    def test_shared_proxy_backend_alias_cannot_collide_with_other_app(self):
+        self.backend['NetworkSettings']['Networks']['gymproplus_livesale'] = {'Aliases': ['backend']}
+        with self.assertRaisesRegex(RuntimeError, 'ambiguous generic backend'):
+            self.check()
+
 
 class EnvironmentTests(unittest.TestCase):
     def setUp(self):

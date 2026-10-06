@@ -12,8 +12,10 @@ never creates, replaces, removes or publishes PostgreSQL. The existing external
 
 Central `gymproplus-nginx-1` retains its containers, mounts and networks.
 If authorized, set `NGINX_PROXY_NETWORK` to its existing proxy network. The
-optional Compose override attaches only the backend to that shared proxy network;
-Nginx is never attached to the private PostgreSQL network. Leaving this variable
+deployment attaches only the backend with its unique `domainexp_app_backend` DNS
+alias; it never adds Compose's generic `backend` alias, which could collide with
+the existing application's backend. Nginx is never attached to the private
+PostgreSQL network. Leaving this variable
 unset does not grant permission to modify any unrelated network.
 
 ## Production configuration

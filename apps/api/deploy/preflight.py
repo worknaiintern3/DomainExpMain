@@ -73,6 +73,9 @@ def main():
         bindings = own['HostConfig'].get('PortBindings') or {}
         if bindings != {'4000/tcp': [{'HostIp': '127.0.0.1', 'HostPort': port}]}:
             fail('Existing backend must publish only 127.0.0.1:5011 to internal port 4000')
+        endpoint = own['NetworkSettings']['Networks'].get(proxy_network, {})
+        if 'backend' in (endpoint.get('Aliases') or []):
+            fail('Shared proxy network must not contain the ambiguous generic backend DNS alias')
     own_ports = (own or {}).get('HostConfig', {}).get('PortBindings', {})
     own_port = bool(own and own['State']['Running'] and any(
         b.get('HostPort') == port for values in own_ports.values() for b in (values or [])))
