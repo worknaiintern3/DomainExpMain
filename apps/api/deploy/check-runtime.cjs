@@ -1,7 +1,8 @@
 // Validate compiled startup configuration without opening an HTTP port.
+const databaseParser = process.env.MONGODB_URI ? 'parseMongoEnvironment' : 'parseDatabaseEnvironment';
 const parsers = [
   ['./dist/config/env.schema.js', 'parseEnvironment'],
-  ['@domainpulse/database', 'parseDatabaseEnvironment'],
+  ['@domainpulse/database', databaseParser],
   ['@domainpulse/database', 'parseProviderCredentialEncryptionEnvironment'],
   ['./dist/auth/access-token/access-token.config.js', 'parseAccessTokenEnvironment'],
   ['./dist/auth/oauth/google-oauth.config.js', 'parseGoogleOAuthEnvironment'],
