@@ -760,3 +760,5 @@ export class PostgresInventoryRepository implements InventoryStore {
     }
   }
 }
+
+export { MongoInventoryRepository } from './mongo-inventory.repository';

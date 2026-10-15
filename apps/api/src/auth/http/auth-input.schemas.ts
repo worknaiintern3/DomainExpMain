@@ -9,7 +9,7 @@ export const RegisterRequestSchema = z
   .object({
     displayName: z.string().trim().min(1).max(100).optional(),
     email: EmailSchema,
-    password: BoundedPasswordSchema.min(12),
+    password: BoundedPasswordSchema.min(8),
   })
   .strict();
 
@@ -42,6 +42,6 @@ export const GoogleLinkStartRequestSchema = z.object({}).strict();
 /** Reuses the exact same password policy as registration (`RegisterRequestSchema`) -- Add Password is not a second, weaker policy. */
 export const AddPasswordRequestSchema = z
   .object({
-    password: BoundedPasswordSchema.min(12),
+    password: BoundedPasswordSchema.min(8),
   })
   .strict();

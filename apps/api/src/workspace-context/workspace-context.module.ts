@@ -2,23 +2,23 @@ import { Module } from '@nestjs/common';
 
 import { DatabaseModule } from '../database/database.module';
 import { DatabaseService } from '../database/database.service';
+import { MongoWorkspaceContextRepository } from './mongo-workspace-context.repository';
 import { WorkspaceContextGuard } from './workspace-context.guard';
-import { PostgresWorkspaceContextRepository } from './workspace-context.repository';
 import { WorkspaceContextService } from './workspace-context.service';
 
 @Module({
   imports: [DatabaseModule],
   providers: [
     {
-      provide: PostgresWorkspaceContextRepository,
+      provide: MongoWorkspaceContextRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresWorkspaceContextRepository(database),
+        new MongoWorkspaceContextRepository(database),
     },
     {
       provide: WorkspaceContextService,
-      inject: [PostgresWorkspaceContextRepository],
-      useFactory: (repository: PostgresWorkspaceContextRepository) =>
+      inject: [MongoWorkspaceContextRepository],
+      useFactory: (repository: MongoWorkspaceContextRepository) =>
         new WorkspaceContextService(repository),
     },
     WorkspaceContextGuard,

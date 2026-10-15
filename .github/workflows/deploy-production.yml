@@ -1,0 +1,68 @@
+name: DomainExp production
+on:
+  push:
+    branches: [main, Api-Branch]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: domainexp-app-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate deployment sources
+        run: |
+          set -euo pipefail
+          if [ -d "apps/api/deploy" ]; then
+            for script in apps/api/deploy/*.sh; do [ -f "$script" ] && bash -n "$script" || true; done
+          fi
+      - name: Configure verified SSH access
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_PORT VPS_SSH_KEY VPS_KNOWN_HOSTS DEPLOY_PATH; do
+            [[ -n "${!name}" ]] || { echo "Missing secret: $name"; exit 1; }
+          done
+          [[ "$VPS_HOST" == 200.234.45.233 && "$VPS_USER" == root && "$VPS_PORT" == 22 && "$DEPLOY_PATH" == /opt/domainexp-app ]] || {
+            echo 'Production target secrets do not match the dedicated DomainExp VPS checkout.'; exit 1;
+          }
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/domainexp_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/domainexp_key ~/.ssh/known_hosts
+
+      - name: Configure production .env from repository secret
+        if: env.PROD_ENV_FILE != ''
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/domainexp_key -p "$VPS_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$VPS_USER@$VPS_HOST" \
+            "mkdir -p '$DEPLOY_PATH/apps/api/deploy' && cat > '$DEPLOY_PATH/apps/api/deploy/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/apps/api/.env'" <<< "$PROD_ENV_FILE"
+
+      - name: Deploy exact pushed revision and verify HTTPS
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/domainexp_key -p "$VPS_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$VPS_USER@$VPS_HOST" \
+            "set -eu; umask 077; script=\$(mktemp); trap 'rm -f -- \"\$script\"' EXIT; cat > \"\$script\"; bash \"\$script\" '$GITHUB_SHA' '$DEPLOY_PATH'" < apps/api/deploy/deploy.sh
+
+      - name: Clean up private key
+        if: always()
+        run: rm -f ~/.ssh/domainexp_key

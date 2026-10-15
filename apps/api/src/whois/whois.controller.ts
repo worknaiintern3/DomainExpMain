@@ -17,7 +17,12 @@ import {
   type WorkspaceContextRequest,
 } from '../workspace-context';
 import { WhoisService } from './whois.service';
-import type { NormalizedWhoisData } from './whois.types';
+import type {
+  NormalizedWhoisData,
+  WhoisFreaksDnsResponse,
+  WhoisFreaksSslResponse,
+  WhoisFreaksHistoricalResponse,
+} from './whois.types';
 
 @Controller('whois')
 export class WhoisController {
@@ -34,6 +39,50 @@ export class WhoisController {
     }
     const workspaceId = request.workspacePrincipal?.workspaceId;
     return this.service.lookupLive(domain, workspaceId, domainId);
+  }
+
+  @Get('dns')
+  async dns(
+    @Query('domain') domain?: string,
+  ): Promise<WhoisFreaksDnsResponse> {
+    if (!domain || !domain.trim()) {
+      throw new BadRequestException('Query parameter "domain" is required');
+    }
+    return this.service.lookupDnsLive(domain);
+  }
+
+  @Get('ssl')
+  async ssl(
+    @Query('domain') domain?: string,
+  ): Promise<WhoisFreaksSslResponse> {
+    if (!domain || !domain.trim()) {
+      throw new BadRequestException('Query parameter "domain" is required');
+    }
+    return this.service.lookupSslLive(domain);
+  }
+
+  @Get('historical')
+  async historical(
+    @Query('domain') domain?: string,
+  ): Promise<WhoisFreaksHistoricalResponse> {
+    if (!domain || !domain.trim()) {
+      throw new BadRequestException('Query parameter "domain" is required');
+    }
+    return this.service.lookupHistorical(domain);
+  }
+
+  @Get('availability')
+  async availability(
+    @Query('query') query?: string,
+    @Query('tlds') tlds?: string,
+  ): Promise<Array<{ domain: string; tld: string; available: boolean; nameservers: string[] }>> {
+    if (!query || !query.trim()) {
+      throw new BadRequestException('Query parameter "query" is required');
+    }
+    const tldList = tlds
+      ? tlds.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
+      : ['.com', '.in', '.ai', '.io', '.dev', '.app', '.tech', '.org'];
+    return this.service.checkAvailability(query.trim(), tldList);
   }
 
   @Get('history')

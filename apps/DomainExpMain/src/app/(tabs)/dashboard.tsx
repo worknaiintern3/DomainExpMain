@@ -22,6 +22,7 @@ import { fetchApplicationsList } from '../../services/applications';
 import { fetchWebsitesList } from '../../services/websites';
 import { fetchProviderAccountsList } from '../../services/accounts';
 import { fetchAlertsList, fetchActivitiesList, deleteActivity, clearAllActivities } from '../../services/monitoring';
+import { syncAllConnectedProviders } from '../../services/providerSync';
 import type { InventorySummary, DomainItem, ServerItem, ApplicationItem, AlertItem, WebsiteItem, ProviderAccount } from '../../types';
 
 // Micro vertical bar-chart component matching the mockup UI
@@ -74,17 +75,18 @@ export default function DashboardScreen() {
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isRefresh = false) => {
     try {
       const [sumData, domList, srvList, appList, webList, provList, altList] = await Promise.all([
-        fetchInventorySummary(),
-        fetchDomainsList(),
-        fetchServersList(),
-        fetchApplicationsList(),
-        fetchWebsitesList(),
-        fetchProviderAccountsList(),
-        fetchActivitiesList(),
+        fetchInventorySummary({ forceRefresh: isRefresh }),
+        fetchDomainsList({ forceRefresh: isRefresh }),
+        fetchServersList({ forceRefresh: isRefresh }),
+        fetchApplicationsList({ forceRefresh: isRefresh }),
+        fetchWebsitesList({ forceRefresh: isRefresh }),
+        fetchProviderAccountsList({ forceRefresh: isRefresh }),
+        fetchActivitiesList({ forceRefresh: isRefresh }),
       ]);
+
       setSummary(sumData);
       setDomains(domList);
       setServers(srvList);
@@ -97,19 +99,18 @@ export default function DashboardScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadData(false);
     }, [loadData])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    try {
+      await syncAllConnectedProviders();
+    } catch {}
+    await loadData(true);
     setRefreshing(false);
   };
 
@@ -170,6 +171,11 @@ export default function DashboardScreen() {
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <View style={[styles.headerBar, { borderBottomColor: colors.borderSubtle }]}>
         <View style={styles.headerLeft}>
+          <Image
+            source={require('../../../assets/images/icon.png')}
+            style={{ width: 26, height: 26, borderRadius: 6 }}
+            resizeMode="contain"
+          />
           <Text style={[styles.brandText, { color: colors.text }]}>DomainPulse</Text>
         </View>
 
@@ -484,14 +490,17 @@ export default function DashboardScreen() {
           <View style={styles.sectionHeaderLeft}>
             <Text style={styles.sectionIcon}>📈</Text>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+            {alerts.length > 0 && (
+              <View style={[styles.activityBadge, { backgroundColor: colors.primaryMuted }]}>
+                <Text style={[styles.activityBadgeText, { color: colors.primary }]}>{alerts.length}</Text>
+              </View>
+            )}
           </View>
-          {alerts.length > 4 && (
-            <TouchableOpacity onPress={() => setShowAllActivities((prev) => !prev)} activeOpacity={0.7}>
-              <Text style={[styles.viewAllLink, { color: colors.primary }]}>
-                {showAllActivities ? 'Show Less ↑' : 'View All →'}
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={() => router.push('/activities' as any)} activeOpacity={0.7}>
+            <Text style={[styles.viewAllLink, { color: colors.primary }]}>
+              View All →
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {alerts.length === 0 ? (
@@ -510,7 +519,7 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {(showAllActivities ? alerts : alerts.slice(0, 5)).map((item, idx) => {
+            {alerts.slice(0, 5).map((item, idx) => {
               const handleActivityPress = () => {
                 if (item.domainId) {
                   router.push(`/domain/${item.domainId}` as any);
@@ -570,13 +579,47 @@ export default function DashboardScreen() {
                         </Text>
                       ) : null}
                     </View>
-                    <Text style={[styles.activityTime, { color: colors.textMuted }]}>
-                      {formatRelativeTime(item.createdAt)}
-                    </Text>
+                    <View style={{ alignItems: 'flex-end', justifyContent: 'center', gap: 4 }}>
+                      <TouchableOpacity
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 10,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                        }}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleDeleteActivity(item.id);
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        activeOpacity={0.6}
+                      >
+                        <Ionicons name="close" size={12} color={colors.textMuted} />
+                      </TouchableOpacity>
+                      <Text style={[styles.activityTime, { color: colors.textMuted }]}>
+                        {formatRelativeTime(item.createdAt)}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 </React.Fragment>
               );
             })}
+            {alerts.length > 5 && (
+              <TouchableOpacity
+                style={[
+                  styles.seeAllActivitiesBtn,
+                  { borderTopColor: isDark ? colors.borderSubtle : '#f1f5f9' },
+                ]}
+                onPress={() => router.push('/activities' as any)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.seeAllActivitiesText, { color: colors.primary }]}>
+                  View all {alerts.length} activities & event stream →
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </ScrollView>
@@ -931,5 +974,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  activityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  activityBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  seeAllActivitiesBtn: {
+    borderTopWidth: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  seeAllActivitiesText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

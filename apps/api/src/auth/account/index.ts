@@ -6,6 +6,7 @@ export {
   PasswordAlreadySetError,
 } from './account.errors';
 export { PostgresPasswordCredentialRepository } from './password-credential.repository';
+export { MongoPasswordCredentialRepository } from './mongo-password-credential.repository';
 export type {
   PasswordCredentialDatabaseHost,
   PasswordCredentialStore,

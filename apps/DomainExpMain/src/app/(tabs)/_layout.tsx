@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 import { useTheme } from '../../store/theme-context';
+import { useAuth } from '../../store/auth-context';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
@@ -344,6 +345,12 @@ function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarPr
 }
 
 export default function TabsLayout() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (!isLoading && !isAuthenticated) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs
       tabBar={(props) => <CustomAnimatedTabBar {...props} />}

@@ -3,6 +3,7 @@ export {
   IdentityPersistenceError,
 } from './identity.errors';
 export { PostgresIdentityRepository } from './identity.repository';
+export { MongoIdentityRepository } from './mongo-identity.repository';
 export { IdentityService } from './identity.service';
 export type {
   AuthenticatedUser,

@@ -9,14 +9,14 @@ import { CloudResourcesController } from './cloud-resources/cloud-resources.cont
 import { DomainsController } from './domains/domains.controller';
 import { EmailAccountsController } from './email-accounts/email-accounts.controller';
 import { InventoryService } from './inventory.service';
-import { PostgresInventoryRepository } from './inventory.repository';
+import { MongoInventoryRepository } from './inventory.repository';
 import { ProjectsController } from './projects/projects.controller';
 import { ProviderAccountsController } from './provider-accounts/provider-accounts.controller';
 import { InventoryReadModelsController } from './read-models/inventory-read-models.controller';
-import { PostgresInventoryReadModelRepository } from './read-models/inventory-read-models.repository';
+import { MongoInventoryReadModelRepository } from './read-models/inventory-read-models.repository';
 import { InventoryReadModelService } from './read-models/inventory-read-models.service';
 import { InventoryRelationshipsController } from './relationships/relationships.controller';
-import { PostgresInventoryRelationshipRepository } from './relationships/relationships.repository';
+import { MongoInventoryRelationshipRepository } from './relationships/relationships.repository';
 import { InventoryRelationshipService } from './relationships/relationships.service';
 import { ServersController } from './servers/servers.controller';
 
@@ -35,39 +35,39 @@ import { ServersController } from './servers/servers.controller';
   ],
   providers: [
     {
-      provide: PostgresInventoryRepository,
+      provide: MongoInventoryRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresInventoryRepository(database),
+        new MongoInventoryRepository(database),
     },
     {
       provide: InventoryService,
-      inject: [PostgresInventoryRepository],
-      useFactory: (repository: PostgresInventoryRepository) =>
+      inject: [MongoInventoryRepository],
+      useFactory: (repository: MongoInventoryRepository) =>
         new InventoryService(repository),
     },
     {
-      provide: PostgresInventoryRelationshipRepository,
+      provide: MongoInventoryRelationshipRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresInventoryRelationshipRepository(database),
+        new MongoInventoryRelationshipRepository(database),
     },
     {
       provide: InventoryRelationshipService,
-      inject: [PostgresInventoryRelationshipRepository],
-      useFactory: (repository: PostgresInventoryRelationshipRepository) =>
+      inject: [MongoInventoryRelationshipRepository],
+      useFactory: (repository: MongoInventoryRelationshipRepository) =>
         new InventoryRelationshipService(repository),
     },
     {
-      provide: PostgresInventoryReadModelRepository,
+      provide: MongoInventoryReadModelRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresInventoryReadModelRepository(database),
+        new MongoInventoryReadModelRepository(database),
     },
     {
       provide: InventoryReadModelService,
-      inject: [PostgresInventoryReadModelRepository],
-      useFactory: (repository: PostgresInventoryReadModelRepository) =>
+      inject: [MongoInventoryReadModelRepository],
+      useFactory: (repository: MongoInventoryReadModelRepository) =>
         new InventoryReadModelService(repository),
     },
   ],

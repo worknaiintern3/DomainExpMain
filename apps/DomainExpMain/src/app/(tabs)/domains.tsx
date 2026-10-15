@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   ScrollView,
+  FlatList,
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
@@ -17,7 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
-import { fetchDomainsList, createDomain } from '../../services/domains';
+import { useAuth } from '../../store/auth-context';
+import { fetchDomainsList, createDomain, deleteDomain } from '../../services/domains';
+import { fetchServersList } from '../../services/servers';
+import { syncAllConnectedProviders } from '../../services/providerSync';
 import { getDomainLogoUrl } from '../../services/liveDomainLookup';
 import { DomainLogoImage } from '../../components/ui/DomainLogoImage';
 import type { DomainItem } from '../../types';
@@ -37,8 +41,10 @@ export default function DomainsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { user } = useAuth();
 
   const [domains, setDomains] = useState<DomainItem[]>([]);
+  const [serversCount, setServersCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'All' | 'Expiring' | 'Healthy' | 'Issues'>('All');
   const [refreshing, setRefreshing] = useState(false);
@@ -49,24 +55,48 @@ export default function DomainsScreen() {
   const [newRegistrar, setNewRegistrar] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  const loadDomains = useCallback(async () => {
-    const list = await fetchDomainsList();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const loadDomains = useCallback(async (isRefresh = false) => {
+    const list = await fetchDomainsList({ forceRefresh: isRefresh });
     setDomains(list);
+    try {
+      const srvs = await fetchServersList({ forceRefresh: isRefresh });
+      setServersCount(srvs.length);
+    } catch {}
+
+    // Non-blocking background sync if portfolio is currently empty
+    if (list.length === 0) {
+      syncAllConnectedProviders()
+        .then(() => fetchDomainsList({ forceRefresh: true }))
+        .then((fresh) => {
+          if (fresh.length > 0) setDomains(fresh);
+        })
+        .catch(() => {});
+    }
   }, []);
 
-  useEffect(() => {
-    loadDomains();
-  }, [loadDomains]);
+  const handleSyncProviders = async () => {
+    setIsSyncing(true);
+    try {
+      await syncAllConnectedProviders();
+    } catch {}
+    await loadDomains(true);
+    setIsSyncing(false);
+  };
 
   useFocusEffect(
     useCallback(() => {
-      loadDomains();
+      loadDomains(false);
     }, [loadDomains])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadDomains();
+    try {
+      await syncAllConnectedProviders();
+    } catch {}
+    await loadDomains(true);
     setRefreshing(false);
   };
 
@@ -101,12 +131,34 @@ export default function DomainsScreen() {
     }
   };
 
+  const handleDeleteDomain = async (id: string) => {
+    setDomains((prev) => prev.filter((d) => d.id !== id));
+    try {
+      await deleteDomain(id);
+    } catch {}
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#0b0f19' : '#f8fafc', paddingTop: insets.top }]}>
       {/* Header Bar */}
       <View style={styles.headerBar}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Domains</Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[
+              styles.finderButton,
+              {
+                backgroundColor: isDark ? '#111827' : '#f8fafc',
+                borderColor: isDark ? '#1f2937' : '#e2e8f0',
+              },
+            ]}
+            onPress={handleSyncProviders}
+            disabled={isSyncing}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="sync-outline" size={19} color={colors.primary} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.finderButton,
@@ -203,14 +255,80 @@ export default function DomainsScreen() {
       </View>
 
       {/* Domain Cards List */}
-      <ScrollView
-        contentContainerStyle={[styles.scrollList, { paddingBottom: Spacing.xxxl + 120 }]}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {filteredDomains.length === 0 ? (
+      <FlatList
+        data={filteredDomains}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item: domain }) => {
+          const logoUri = domain.logoUrl || getDomainLogoUrl(domain.name);
+          const expTime = domain.expiresAt ? new Date(domain.expiresAt).getTime() : NaN;
+          const daysCount = !isNaN(expTime)
+            ? Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)))
+            : domain.daysRemaining ?? 365;
+
+          return (
+            <TouchableOpacity
+              key={domain.id}
+              style={[
+                styles.domainCard,
+                {
+                  backgroundColor: isDark ? '#111827' : '#ffffff',
+                  borderColor: isDark ? '#1f2937' : '#f1f5f9',
+                },
+              ]}
+              onPress={() => router.push(`/domain/${domain.id}` as any)}
+              activeOpacity={0.8}
+            >
+              <DomainLogoImage
+                domainName={domain.name}
+                logoUrl={logoUri}
+                size={48}
+                borderRadius={14}
+              />
+
+              <View style={styles.domainInfoCol}>
+                <Text style={[styles.domainName, { color: colors.text }]} numberOfLines={1}>
+                  {domain.name}
+                </Text>
+                <Text style={[styles.registrarLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+                  ● {domain.registrar}
+                </Text>
+                <View style={styles.expiryRow}>
+                  <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.expiryDateText, { color: colors.textSecondary }]}>
+                    {formatExpiryDate(domain.expiresAt)}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ alignItems: 'flex-end', justifyContent: 'space-between', minHeight: 48 }}>
+                <TouchableOpacity
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                  }}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteDomain(domain.id);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons name="close" size={13} color={colors.textMuted} />
+                </TouchableOpacity>
+
+                <View style={styles.daysBadgePill}>
+                  <View style={styles.daysBadgeDot} />
+                  <Text style={styles.daysBadgePillText}>{daysCount}d</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
           <View
             style={[
               styles.emptyCard,
@@ -224,61 +342,38 @@ export default function DomainsScreen() {
             <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
               {searchQuery
                 ? `No matches for "${searchQuery}" in your portfolio.`
+                : serversCount > 0
+                ? `You have ${serversCount} connected server(s) in the Servers tab. Pull down to refresh or map domains from your VPS nodes.`
                 : 'Track or register your first domain.'}
             </Text>
-          </View>
-        ) : (
-          filteredDomains.map((domain) => {
-            const logoUri = domain.logoUrl || getDomainLogoUrl(domain.name);
-            const expTime = domain.expiresAt ? new Date(domain.expiresAt).getTime() : NaN;
-            const daysCount = !isNaN(expTime)
-              ? Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)))
-              : domain.daysRemaining ?? 365;
-
-            return (
+            {serversCount > 0 && !searchQuery && (
               <TouchableOpacity
-                key={domain.id}
-                style={[
-                  styles.domainCard,
-                  {
-                    backgroundColor: isDark ? '#111827' : '#ffffff',
-                    borderColor: isDark ? '#1f2937' : '#f1f5f9',
-                  },
-                ]}
-                onPress={() => router.push(`/domain/${domain.id}` as any)}
-                activeOpacity={0.8}
+                style={{
+                  marginTop: 14,
+                  backgroundColor: '#0284c7',
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                }}
+                onPress={() => router.push('/(tabs)/servers' as any)}
               >
-                <DomainLogoImage
-                  domainName={domain.name}
-                  logoUrl={logoUri}
-                  size={48}
-                  borderRadius={14}
-                />
-
-                <View style={styles.domainInfoCol}>
-                  <Text style={[styles.domainName, { color: colors.text }]} numberOfLines={1}>
-                    {domain.name}
-                  </Text>
-                  <Text style={[styles.registrarLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-                    ● {domain.registrar}
-                  </Text>
-                  <View style={styles.expiryRow}>
-                    <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                    <Text style={[styles.expiryDateText, { color: colors.textSecondary }]}>
-                      {formatExpiryDate(domain.expiresAt)}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.daysBadgePill}>
-                  <View style={styles.daysBadgeDot} />
-                  <Text style={styles.daysBadgePillText}>{daysCount}d</Text>
-                </View>
+                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
+                  View Connected Servers ({serversCount}) →
+                </Text>
               </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
+            )}
+          </View>
+        }
+        contentContainerStyle={[styles.scrollList, { paddingBottom: Spacing.xxxl + 120 }]}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
 
       {/* Add Domain Modal */}
       <Modal

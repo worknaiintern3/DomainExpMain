@@ -55,14 +55,21 @@ function requireProviderConnectionWriteAccess(principal: { role: string }): void
 }
 
 function isUniqueViolation(error: unknown): boolean {
+  if (error && typeof error === 'object') {
+    const errObj = error as { code?: unknown; message?: string };
+    if (errObj.code === 11000 || errObj.code === '11000' || errObj.code === '23505') {
+      return true;
+    }
+    if (typeof errObj.message === 'string' && (errObj.message.includes('11000') || errObj.message.includes('duplicate key') || errObj.message.includes('23505'))) {
+      return true;
+    }
+  }
   const code = getPostgreSqlErrorCode(error);
   if (code !== undefined) {
-    return code === '23505';
+    return code === '23505' || code === '11000';
   }
-  // Fallback only for shapes the cause-chain walk can't resolve a code
-  // from; the code-based check above is always tried first.
   return error instanceof Error
-    && (error.message.includes('23505') || error.message.includes('duplicate key'));
+    && (error.message.includes('23505') || error.message.includes('duplicate key') || error.message.includes('11000'));
 }
 
 function deriveInternalIdempotencyKey(connectionId: string, userKey: string): string {

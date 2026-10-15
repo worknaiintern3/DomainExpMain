@@ -4,6 +4,7 @@ export {
   RegistrationPersistenceError,
 } from './registration.errors';
 export { PostgresRegistrationRepository } from './registration.repository';
+export { MongoRegistrationRepository } from './mongo-registration.repository';
 export { RegistrationService } from './registration.service';
 export type {
   PersistRegistrationInput,

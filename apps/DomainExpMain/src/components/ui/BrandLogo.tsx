@@ -1,14 +1,14 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet, StyleProp, ViewStyle, ImageStyle } from 'react-native';
 
 interface BrandLogoProps {
   size?: number;
+  style?: StyleProp<ViewStyle>;
+  imageStyle?: StyleProp<ImageStyle>;
 }
 
-export function BrandLogo({ size = 72 }: BrandLogoProps) {
-  const scale = size / 72;
-  const outerRadius = 18 * scale;
-  const innerRadius = 9 * scale;
+export function BrandLogo({ size = 72, style, imageStyle }: BrandLogoProps) {
+  const borderRadius = Math.round(size * 0.22);
 
   return (
     <View
@@ -17,53 +17,24 @@ export function BrandLogo({ size = 72 }: BrandLogoProps) {
         {
           width: size,
           height: size,
-          borderRadius: outerRadius,
-          shadowRadius: 16 * scale,
+          borderRadius,
         },
+        style,
       ]}
     >
-      {/* Outer D Shape */}
-      <View
+      <Image
+        source={require('../../../assets/images/icon.png')}
         style={[
-          styles.outerD,
+          styles.image,
           {
-            width: size * 0.86,
-            height: size * 0.86,
-            borderTopRightRadius: size * 0.43,
-            borderBottomRightRadius: size * 0.43,
-            borderTopLeftRadius: 10 * scale,
-            borderBottomLeftRadius: 10 * scale,
+            width: size,
+            height: size,
+            borderRadius,
           },
+          imageStyle,
         ]}
-      >
-        {/* Inner cutout to form the 'D' */}
-        <View
-          style={[
-            styles.innerCutout,
-            {
-              width: size * 0.42,
-              height: size * 0.46,
-              borderTopRightRadius: innerRadius * 2,
-              borderBottomRightRadius: innerRadius * 2,
-              borderTopLeftRadius: 4 * scale,
-              borderBottomLeftRadius: 4 * scale,
-            },
-          ]}
-        />
-
-        {/* Pulse center node */}
-        <View
-          style={[
-            styles.pulseNode,
-            {
-              width: size * 0.22,
-              height: 7 * scale,
-              borderRadius: 3.5 * scale,
-              left: size * 0.16,
-            },
-          ]}
-        />
-      </View>
+        resizeMode="contain"
+      />
     </View>
   );
 }
@@ -72,24 +43,13 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1877F2',
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: '#38bdf8',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
-    elevation: 8,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  outerD: {
-    backgroundColor: '#1877F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  innerCutout: {
-    backgroundColor: '#ffffff',
-    position: 'absolute',
-    left: '26%',
-  },
-  pulseNode: {
-    backgroundColor: '#1877F2',
-    position: 'absolute',
+  image: {
+    overflow: 'hidden',
   },
 });

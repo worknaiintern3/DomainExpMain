@@ -470,3 +470,5 @@ export class PostgresProviderConnectionsRepository implements ProviderConnection
     return row;
   }
 }
+
+export { MongoProviderConnectionsRepository } from './mongo-provider-connections.repository';

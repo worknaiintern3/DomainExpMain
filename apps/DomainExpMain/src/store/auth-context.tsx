@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { getItem, STORAGE_KEYS, setActiveUserId } from '../services/storage';
-import { initApiClient } from '../services/api';
+import { initApiClient, isJwtExpired } from '../services/api';
 import {
   loginUser,
   registerUser,
@@ -11,6 +11,10 @@ import {
   type LoginPayload,
   type RegisterPayload,
 } from '../services/auth';
+import {
+  registerForPushNotificationsAsync,
+  unregisterPushNotificationsAsync,
+} from '../services/notifications';
 import type { User } from '../types';
 
 interface AuthContextValue {
@@ -40,15 +44,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (storedUserData && accessToken) {
           const parsedUser = JSON.parse(storedUserData) as User;
-          if (parsedUser?.id) {
+          if (parsedUser?.id && !isJwtExpired(accessToken)) {
             setActiveUserId(parsedUser.id);
+            setUser(parsedUser);
+            registerForPushNotificationsAsync().catch(() => {});
+            return;
           }
-          setUser(parsedUser);
-        } else {
-          setActiveUserId(null);
         }
+        setActiveUserId(null);
+        setUser(null);
       } catch {
-        // ignore
+        setActiveUserId(null);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -62,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await loginUser(payload);
       setUser(result.user);
+      registerForPushNotificationsAsync().catch(() => {});
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await registerUser(payload);
       setUser(result.user);
+      registerForPushNotificationsAsync().catch(() => {});
     } finally {
       setIsLoading(false);
     }
@@ -79,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      await unregisterPushNotificationsAsync().catch(() => {});
       await logoutUser();
     } catch {
       // ignore
@@ -89,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const deleteAccount = async () => {
     try {
+      await unregisterPushNotificationsAsync().catch(() => {});
       await deleteUserAccount();
     } catch {
       // ignore

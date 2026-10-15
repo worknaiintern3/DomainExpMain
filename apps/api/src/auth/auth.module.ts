@@ -6,26 +6,35 @@ import {
   AccessTokenService,
   parseAccessTokenEnvironment,
 } from './access-token';
-import { AccountService, PostgresPasswordCredentialRepository } from './account';
+import {
+  AccountService,
+  MongoPasswordCredentialRepository,
+} from './account';
 import { AuthController, AccessTokenGuard } from './http';
-import { IdentityService, PostgresIdentityRepository } from './identity';
-import { LoginService, PostgresLoginRepository } from './login';
+import {
+  IdentityService,
+  MongoIdentityRepository,
+} from './identity';
+import {
+  LoginService,
+  MongoLoginRepository,
+} from './login';
 import {
   GoogleIdTokenVerifier,
   GoogleOAuthService,
   GoogleTokenExchangeClient,
-  PostgresOAuthIdentityRepository,
-  PostgresOAuthTransactionRepository,
+  MongoOAuthIdentityRepository,
+  MongoOAuthTransactionRepository,
   parseGoogleOAuthEnvironment,
 } from './oauth';
 import {
-  PostgresRegistrationRepository,
+  MongoRegistrationRepository,
   RegistrationService,
 } from './registration';
 import { AuthenticationService } from './runtime';
 import {
   LogoutService,
-  PostgresSessionRepository,
+  MongoSessionRepository,
   RefreshTokenService,
 } from './session';
 
@@ -39,59 +48,59 @@ import {
         new AccessTokenService(parseAccessTokenEnvironment(process.env)),
     },
     {
-      provide: PostgresRegistrationRepository,
+      provide: MongoRegistrationRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresRegistrationRepository(database),
+        new MongoRegistrationRepository(database),
     },
     {
       provide: RegistrationService,
-      inject: [PostgresRegistrationRepository],
-      useFactory: (repository: PostgresRegistrationRepository) =>
+      inject: [MongoRegistrationRepository],
+      useFactory: (repository: MongoRegistrationRepository) =>
         new RegistrationService(repository),
     },
     {
-      provide: PostgresLoginRepository,
+      provide: MongoLoginRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresLoginRepository(database),
+        new MongoLoginRepository(database),
     },
     {
       provide: LoginService,
-      inject: [PostgresLoginRepository],
-      useFactory: (repository: PostgresLoginRepository) =>
+      inject: [MongoLoginRepository],
+      useFactory: (repository: MongoLoginRepository) =>
         new LoginService(repository),
     },
     {
-      provide: PostgresSessionRepository,
+      provide: MongoSessionRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresSessionRepository(database),
+        new MongoSessionRepository(database),
     },
     {
       provide: RefreshTokenService,
-      inject: [PostgresSessionRepository, AccessTokenService],
+      inject: [MongoSessionRepository, AccessTokenService],
       useFactory: (
-        repository: PostgresSessionRepository,
+        repository: MongoSessionRepository,
         accessTokenService: AccessTokenService,
       ) => new RefreshTokenService(repository, accessTokenService),
     },
     {
       provide: LogoutService,
-      inject: [PostgresSessionRepository],
-      useFactory: (repository: PostgresSessionRepository) =>
+      inject: [MongoSessionRepository],
+      useFactory: (repository: MongoSessionRepository) =>
         new LogoutService(repository),
     },
     {
-      provide: PostgresIdentityRepository,
+      provide: MongoIdentityRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresIdentityRepository(database),
+        new MongoIdentityRepository(database),
     },
     {
       provide: IdentityService,
-      inject: [PostgresIdentityRepository],
-      useFactory: (repository: PostgresIdentityRepository) =>
+      inject: [MongoIdentityRepository],
+      useFactory: (repository: MongoIdentityRepository) =>
         new IdentityService(repository),
     },
     {
@@ -109,16 +118,16 @@ import {
         ),
     },
     {
-      provide: PostgresOAuthTransactionRepository,
+      provide: MongoOAuthTransactionRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresOAuthTransactionRepository(database),
+        new MongoOAuthTransactionRepository(database),
     },
     {
-      provide: PostgresOAuthIdentityRepository,
+      provide: MongoOAuthIdentityRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresOAuthIdentityRepository(database),
+        new MongoOAuthIdentityRepository(database),
     },
     {
       provide: GoogleTokenExchangeClient,
@@ -131,22 +140,19 @@ import {
     {
       provide: GoogleOAuthService,
       inject: [
-        PostgresOAuthTransactionRepository,
-        PostgresOAuthIdentityRepository,
+        MongoOAuthTransactionRepository,
+        MongoOAuthIdentityRepository,
         GoogleTokenExchangeClient,
         GoogleIdTokenVerifier,
-        PostgresLoginRepository,
+        MongoLoginRepository,
         AccessTokenService,
       ],
       useFactory: (
-        transactionStore: PostgresOAuthTransactionRepository,
-        identityStore: PostgresOAuthIdentityRepository,
+        transactionStore: MongoOAuthTransactionRepository,
+        identityStore: MongoOAuthIdentityRepository,
         tokenExchangeClient: GoogleTokenExchangeClient,
         idTokenVerifier: GoogleIdTokenVerifier,
-        // Structurally satisfies OAuthSessionIssuer (see google-oauth.types.ts)
-        // -- reuses the exact session-row-creation primitive password login
-        // already uses, with zero changes to the login module itself.
-        sessionIssuer: PostgresLoginRepository,
+        sessionIssuer: MongoLoginRepository,
         accessTokenService: AccessTokenService,
       ) =>
         new GoogleOAuthService(
@@ -160,17 +166,17 @@ import {
         ),
     },
     {
-      provide: PostgresPasswordCredentialRepository,
+      provide: MongoPasswordCredentialRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresPasswordCredentialRepository(database),
+        new MongoPasswordCredentialRepository(database),
     },
     {
       provide: AccountService,
-      inject: [PostgresPasswordCredentialRepository, PostgresOAuthIdentityRepository],
+      inject: [MongoPasswordCredentialRepository, MongoOAuthIdentityRepository],
       useFactory: (
-        passwordCredentialStore: PostgresPasswordCredentialRepository,
-        identityStore: PostgresOAuthIdentityRepository,
+        passwordCredentialStore: MongoPasswordCredentialRepository,
+        identityStore: MongoOAuthIdentityRepository,
       ) => new AccountService(passwordCredentialStore, identityStore),
     },
     AccessTokenGuard,

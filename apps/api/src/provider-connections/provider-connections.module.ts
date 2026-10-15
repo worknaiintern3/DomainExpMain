@@ -14,10 +14,10 @@ import { GoDaddyTokenValidator } from './godaddy-token-validator';
 import { HetznerTokenValidator } from './hetzner-token-validator';
 import { HostingerTokenValidator } from './hostinger-token-validator';
 import { LinodeTokenValidator } from './linode-token-validator';
+import { MongoProviderConnectionsRepository } from './mongo-provider-connections.repository';
 import { NamecheapTokenValidator } from './namecheap-token-validator';
 import { VultrTokenValidator } from './vultr-token-validator';
 import { ProviderConnectionsController } from './provider-connections.controller';
-import { PostgresProviderConnectionsRepository } from './provider-connections.repository';
 import { ProviderConnectionsService } from './provider-connections.service';
 import type { ProviderConnectionAuthType } from './provider-connections.types';
 import type {
@@ -32,10 +32,10 @@ const PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY = Symbol('PROVIDER_CREDENTIAL_VALID
   imports: [AuthModule, DatabaseModule, WorkspaceContextModule],
   providers: [
     {
-      provide: PostgresProviderConnectionsRepository,
+      provide: MongoProviderConnectionsRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresProviderConnectionsRepository(database),
+        new MongoProviderConnectionsRepository(database),
     },
     {
       provide: PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY,
@@ -56,9 +56,9 @@ const PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY = Symbol('PROVIDER_CREDENTIAL_VALID
     },
     {
       provide: ProviderConnectionsService,
-      inject: [PostgresProviderConnectionsRepository, PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY],
+      inject: [MongoProviderConnectionsRepository, PROVIDER_CREDENTIAL_VALIDATOR_REGISTRY],
       useFactory: (
-        repository: PostgresProviderConnectionsRepository,
+        repository: MongoProviderConnectionsRepository,
         validators: ProviderCredentialValidatorRegistry,
       ) =>
         new ProviderConnectionsService(

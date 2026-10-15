@@ -6,7 +6,7 @@ import { DatabaseService } from '../database/database.service';
 import { WorkspaceContextModule } from '../workspace-context/workspace-context.module';
 import { DnsClient } from './dns/dns.client';
 import { MetadataController } from './metadata.controller';
-import { PostgresMetadataRepository } from './metadata.repository';
+import { MongoMetadataRepository } from './metadata.repository';
 import { MetadataService } from './metadata.service';
 import { RdapClient } from './rdap/rdap.client';
 import { TlsClient } from './tls/tls.client';
@@ -19,15 +19,16 @@ import { TlsClient } from './tls/tls.client';
     { provide: DnsClient, useFactory: () => new DnsClient() },
     { provide: TlsClient, useFactory: () => new TlsClient() },
     {
-      provide: PostgresMetadataRepository,
+      provide: MongoMetadataRepository,
       inject: [DatabaseService],
-      useFactory: (database: DatabaseService) => new PostgresMetadataRepository(database),
+      useFactory: (database: DatabaseService) =>
+        new MongoMetadataRepository(database),
     },
     {
       provide: MetadataService,
-      inject: [PostgresMetadataRepository, RdapClient, DnsClient, TlsClient],
+      inject: [MongoMetadataRepository, RdapClient, DnsClient, TlsClient],
       useFactory: (
-        repository: PostgresMetadataRepository,
+        repository: MongoMetadataRepository,
         rdapClient: RdapClient,
         dnsClient: DnsClient,
         tlsClient: TlsClient,

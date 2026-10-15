@@ -212,3 +212,5 @@ export class PostgresInventoryRelationshipRepository
     }
   }
 }
+
+export { MongoInventoryRelationshipRepository } from './mongo-inventory-relationships.repository';

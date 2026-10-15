@@ -282,4 +282,11 @@ export class InventoryReadModelsController {
       ),
     );
   }
+
+  @Get('inventory/summary')
+  summary(@Req() request: WorkspaceContextRequest) {
+    return executeInventoryOperation(async () =>
+      this.service.getInventorySummary(getPrincipal(request)),
+    );
+  }
 }

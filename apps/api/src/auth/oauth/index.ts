@@ -27,6 +27,7 @@ export type {
 } from './google-oauth.types';
 export { GoogleTokenExchangeClient } from './google-token-exchange';
 export { PostgresOAuthIdentityRepository } from './oauth-identity.repository';
+export { MongoOAuthIdentityRepository } from './mongo-oauth-identity.repository';
 export type {
   AttachOAuthIdentityToExistingUserInput,
   CreateOAuthIdentityWithNewUserInput,
@@ -39,6 +40,7 @@ export type {
   TouchOAuthIdentityInput,
 } from './oauth-identity.types';
 export { PostgresOAuthTransactionRepository } from './oauth-transaction.repository';
+export { MongoOAuthTransactionRepository } from './mongo-oauth-transaction.repository';
 export type {
   ConsumedOAuthTransaction,
   CreateOAuthTransactionInput,

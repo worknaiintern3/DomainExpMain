@@ -5,6 +5,7 @@ export {
 export { WorkspaceContextGuard } from './workspace-context.guard';
 export { WorkspaceContextModule } from './workspace-context.module';
 export { PostgresWorkspaceContextRepository } from './workspace-context.repository';
+export { MongoWorkspaceContextRepository } from './mongo-workspace-context.repository';
 export type { WorkspaceContextRequest } from './workspace-context.request';
 export { WorkspaceContextService } from './workspace-context.service';
 export type {

@@ -1,6 +1,8 @@
 import { getUserItem, setUserItem, STORAGE_KEYS } from './storage';
 import { apiGet, apiPost, apiPatch, apiDelete } from './api';
 import { fetchLiveDomainDetails, getDomainLogoUrl } from './liveDomainLookup';
+import { isInfrastructureDomain } from './providerSync';
+import { fetchWithCache, invalidateCache } from './dataCache';
 import type { BackendDomain, CursorPage, DomainItem, DomainMetadataResponse } from '../types';
 
 export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
@@ -34,6 +36,8 @@ export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
     tags: [d.inventoryState === 'ARCHIVED' ? 'Archived' : 'Live'],
     notes: d.notes || undefined,
     logoUrl,
+    providerAccountId: d.registrarProviderAccountId || undefined,
+    dnsProviderAccountId: d.dnsProviderAccountId || undefined,
   };
 }
 
@@ -43,8 +47,8 @@ async function getStoredDomains(): Promise<DomainItem[]> {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
-          .filter((d) => d && typeof d.name === 'string' && d.name.trim().length > 0)
+        const cleaned = parsed
+          .filter((d) => d && typeof d.name === 'string' && d.name.trim().length > 0 && !isInfrastructureDomain(d.name))
           .map((d) => ({
             ...d,
             logoUrl: d.logoUrl || getDomainLogoUrl(d.name),
@@ -60,6 +64,10 @@ async function getStoredDomains(): Promise<DomainItem[]> {
                 ? 499
                 : 899,
           }));
+        if (cleaned.length !== parsed.length) {
+          saveStoredDomains(cleaned).catch(() => {});
+        }
+        return cleaned;
       }
     }
   } catch {}
@@ -72,35 +80,118 @@ async function saveStoredDomains(items: DomainItem[]): Promise<void> {
   } catch {}
 }
 
-export async function fetchDomainsList(): Promise<DomainItem[]> {
-  // 1. Try fetching live from backend API (mirroring web app listInventory('domains'))
+async function getStoredServerDomains(): Promise<DomainItem[]> {
   try {
-    const response = await apiGet<CursorPage<BackendDomain>>('/domains?limit=100');
-    if (response?.items && Array.isArray(response.items)) {
-      const mapped = response.items.map(mapBackendDomainToDomainItem);
-      // Merge with any cached live telemetry details
-      const localList = await getStoredDomains();
-      const localMap = new Map(localList.map((d) => [d.name.toLowerCase(), d]));
-      const combined = mapped.map((m) => {
-        const local = localMap.get(m.name.toLowerCase());
-        if (local) {
-          return {
-            ...m,
-            nameservers: local.nameservers && local.nameservers.length > 0 ? local.nameservers : m.nameservers,
-            registrar: local.registrar && !local.registrar.includes('Provider (') ? local.registrar : m.registrar,
-          };
+    const raw = await getUserItem(STORAGE_KEYS.SERVERS_LIST);
+    if (!raw) return [];
+    const servers: any[] = JSON.parse(raw);
+    const domainItems: DomainItem[] = [];
+    for (const s of servers) {
+      const candidates = new Set<string>();
+      if (Array.isArray(s.connectedDomains)) {
+        for (const cd of s.connectedDomains) {
+          const dom = (cd || '').trim().toLowerCase();
+          if (dom.includes('.') && !isInfrastructureDomain(dom)) candidates.add(dom);
         }
-        return m;
-      });
+      }
+      if (s.name && s.name.includes('.')) {
+        const clean = s.name.trim().toLowerCase();
+        if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(clean) && !/^(\d{1,3}\.){3}\d{1,3}$/.test(clean) && !isInfrastructureDomain(clean)) {
+          candidates.add(clean);
+        }
+      }
 
-      await saveStoredDomains(combined);
-      return combined;
+      for (const dom of candidates) {
+        const ext = dom.includes('.') ? `.${dom.split('.').pop()}` : '.com';
+        domainItems.push({
+          id: `dom-srv-${dom.replace(/[^a-z0-9]/g, '-')}`,
+          name: dom,
+          tld: ext,
+          registrar: `${s.provider || 'VPS'} (${s.name})`,
+          autoRenew: true,
+          registrationDate: new Date().toISOString().split('T')[0],
+          expiresAt: new Date(Date.now() + 365 * 86400000).toISOString(),
+          daysRemaining: 365,
+          renewalPrice: 899,
+          currency: '₹',
+          status: 'safe',
+          dnsProvider: `${s.provider || 'VPS'} DNS`,
+          sslStatus: 'active',
+          httpStatus: '200 OK',
+          rdapStatus: 'Synchronized',
+          nameservers: [],
+          tags: ['Live', 'VPS Server Endpoint'],
+          logoUrl: getDomainLogoUrl(dom),
+        });
+      }
     }
+    return domainItems;
   } catch {
-    // Backend offline / network unreachable -> graceful fallback to local cache
+    return [];
   }
+}
 
-  return getStoredDomains();
+const isValidUuid = (val?: string | null): boolean =>
+  Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val));
+
+export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Promise<DomainItem[]> {
+  return fetchWithCache(
+    'domains_list',
+    async () => {
+      // 1. Try fetching live from backend API (mirroring web app listInventory('domains'))
+      try {
+        const response = await apiGet<CursorPage<BackendDomain>>('/domains?limit=100');
+        if (response?.items && Array.isArray(response.items)) {
+          const mapped = response.items.map(mapBackendDomainToDomainItem);
+          const localList = await getStoredDomains();
+          const combinedMap = new Map<string, DomainItem>();
+
+          // 1. Seed with locally stored and provider-discovered domains (Hostinger, AWS, Cloudflare, etc.)
+          for (const loc of localList) {
+            if (loc?.name) {
+              combinedMap.set(loc.name.toLowerCase().trim(), loc);
+            }
+          }
+
+          // 2. Overlay / update with canonical backend domain items
+          for (const m of mapped) {
+            const key = m.name.toLowerCase().trim();
+            const existing = combinedMap.get(key);
+            if (existing) {
+              combinedMap.set(key, {
+                ...existing,
+                ...m,
+                id: m.id || existing.id,
+                nameservers: existing.nameservers && existing.nameservers.length > 0 ? existing.nameservers : m.nameservers,
+                registrar: existing.registrar && !existing.registrar.includes('Provider (') ? existing.registrar : m.registrar,
+                logoUrl: existing.logoUrl || m.logoUrl,
+              });
+            } else {
+              combinedMap.set(key, m);
+            }
+          }
+
+          const combined = Array.from(combinedMap.values());
+          await saveStoredDomains(combined);
+          return combined;
+        }
+      } catch {
+        // Backend offline / network unreachable -> graceful fallback to local cache
+      }
+
+      const stored = await getStoredDomains();
+      const serverDoms = await getStoredServerDomains();
+      const domainMap = new Map(stored.map((d) => [d.name.toLowerCase(), d]));
+      let updated = [...stored];
+      for (const sDom of serverDoms) {
+        if (!domainMap.has(sDom.name.toLowerCase()) && !isInfrastructureDomain(sDom.name)) {
+          updated.push(sDom);
+        }
+      }
+      return updated.filter((d) => !isInfrastructureDomain(d.name));
+    },
+    { forceRefresh: options?.forceRefresh, ttlMs: 30_000 }
+  );
 }
 
 export async function createDomain(data: {
@@ -126,8 +217,8 @@ export async function createDomain(data: {
       domainName: cleanName,
       autoRenew: data.autoRenew ?? true,
       notes: data.notes || null,
-      registrarProviderAccountId: data.registrarProviderAccountId || null,
-      dnsProviderAccountId: data.dnsProviderAccountId || null,
+      registrarProviderAccountId: isValidUuid(data.registrarProviderAccountId) ? data.registrarProviderAccountId : null,
+      dnsProviderAccountId: isValidUuid(data.dnsProviderAccountId) ? data.dnsProviderAccountId : null,
     });
     if (res?.id) {
       backendId = res.id;
@@ -161,6 +252,8 @@ export async function createDomain(data: {
   const current = await getStoredDomains();
   const updated = [newDomain, ...current.filter((d) => d.name.toLowerCase() !== cleanName)];
   await saveStoredDomains(updated);
+  invalidateCache('domains_list');
+  invalidateCache('inventory_summary');
 
   // Background live RDAP/DNS telemetry sync
   (async () => {
@@ -199,6 +292,8 @@ export async function updateDomainRecord(id: string, patch: Partial<DomainItem>)
   if (index !== -1) {
     current[index] = { ...current[index], ...patch };
     await saveStoredDomains(current);
+    invalidateCache('domains_list');
+    invalidateCache('inventory_summary');
   }
 
   // Update on backend if tracked
@@ -212,6 +307,8 @@ export async function deleteDomain(id: string): Promise<void> {
   const current = await getStoredDomains();
   const updated = current.filter((d) => d.id !== id);
   await saveStoredDomains(updated);
+  invalidateCache('domains_list');
+  invalidateCache('inventory_summary');
   try {
     await apiDelete(`/domains/${encodeURIComponent(id)}`);
   } catch {}

@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   ScrollView,
+  FlatList,
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
@@ -15,9 +16,12 @@ import {
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
+import { useAuth } from '../../store/auth-context';
 import { fetchServersList, createServer, deleteServer } from '../../services/servers';
+import { syncAllConnectedProviders } from '../../services/providerSync';
 import type { ServerItem } from '../../types';
 
 const PROVIDER_LOGOS: Record<string, any> = {
@@ -61,6 +65,7 @@ export default function ServersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { user } = useAuth();
 
   const [servers, setServers] = useState<ServerItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,20 +84,23 @@ export default function ServersScreen() {
   const [memory, setMemory] = useState('8 GB');
   const [formError, setFormError] = useState('');
 
-  const loadServers = useCallback(async () => {
-    const list = await fetchServersList();
+  const loadServers = useCallback(async (isRefresh = false) => {
+    const list = await fetchServersList({ forceRefresh: isRefresh });
     setServers(list);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadServers();
+      loadServers(false);
     }, [loadServers])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadServers();
+    try {
+      await syncAllConnectedProviders();
+    } catch {}
+    await loadServers(true);
     setRefreshing(false);
   };
 
@@ -138,6 +146,13 @@ export default function ServersScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDeleteServer = async (id: string) => {
+    setServers((prev) => prev.filter((s) => s.id !== id));
+    try {
+      await deleteServer(id);
+    } catch {}
   };
 
   const getProviderKey = (p: string) => {
@@ -245,78 +260,64 @@ export default function ServersScreen() {
       </View>
 
       {/* Servers List */}
-      <ScrollView
-        contentContainerStyle={styles.scrollList}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        {filteredServers.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.emptyIconBox, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe' }]}>
-              <Text style={{ fontSize: 32 }}>🖥️</Text>
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No servers found</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              {searchQuery ? `No matches found for "${searchQuery}"` : 'You have no connected server nodes yet.'}
-            </Text>
+      <FlatList
+        data={filteredServers}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item: server }) => {
+          const providerKey =
+            getProviderKey(server.provider) ||
+            (server.name.toLowerCase().includes('aws') || (server.os && server.os.toLowerCase().includes('ec2'))
+              ? 'aws'
+              : server.name.toLowerCase().includes('hstgr')
+              ? 'hostinger'
+              : null);
+          const cpuPercent = server.cpuUsagePercent ?? 30;
+          const ramPercent = server.memoryUsagePercent ?? 50;
+
+          return (
             <TouchableOpacity
-              style={[styles.emptyAddBtn, { backgroundColor: colors.primary }]}
-              onPress={handleOpenAddModal}
-              activeOpacity={0.85}
+              key={server.id}
+              style={[
+                styles.serverCard,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                  borderColor: isDark ? colors.border : '#e2e8f0',
+                },
+              ]}
+              onPress={() => router.push(`/server/${server.id}` as any)}
+              activeOpacity={0.8}
             >
-              <Text style={styles.emptyAddBtnText}>+ Connect Your First Server</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          filteredServers.map((server) => {
-            const providerKey = getProviderKey(server.provider);
-            const cpuPercent = server.cpuUsagePercent ?? 30;
-            const ramPercent = server.memoryUsagePercent ?? 50;
-
-            return (
-              <TouchableOpacity
-                key={server.id}
-                style={[
-                  styles.serverCard,
-                  {
-                    backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
-                    borderColor: isDark ? colors.border : '#e2e8f0',
-                  },
-                ]}
-                onPress={() => router.push(`/server/${server.id}` as any)}
-                activeOpacity={0.8}
-              >
-                {/* Card Top Row */}
-                <View style={styles.serverCardTop}>
-                  <View style={styles.serverLeft}>
-                    <View
-                      style={[
-                        styles.serverIconBox,
-                        {
-                          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc',
-                          borderColor: isDark ? colors.border : '#e2e8f0',
-                        },
-                      ]}
-                    >
-                      {providerKey && PROVIDER_LOGOS[providerKey] ? (
-                        <Image
-                          source={PROVIDER_LOGOS[providerKey]}
-                          style={{ width: 26, height: 26 }}
-                          contentFit="contain"
-                        />
-                      ) : (
-                        <Text style={styles.serverIconGlyph}>🖥️</Text>
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.serverName, { color: colors.text }]}>{server.name}</Text>
-                      <Text style={[styles.serverSubtext, { color: colors.textMuted }]}>
-                        {server.ipAddress} • {server.provider}
-                      </Text>
-                    </View>
+              {/* Card Top Row */}
+              <View style={styles.serverCardTop}>
+                <View style={styles.serverLeft}>
+                  <View
+                    style={[
+                      styles.serverIconBox,
+                      {
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc',
+                        borderColor: isDark ? colors.border : '#e2e8f0',
+                      },
+                    ]}
+                  >
+                    {providerKey && PROVIDER_LOGOS[providerKey] ? (
+                      <Image
+                        source={PROVIDER_LOGOS[providerKey]}
+                        style={{ width: 26, height: 26 }}
+                        contentFit="contain"
+                      />
+                    ) : (
+                      <Text style={styles.serverIconGlyph}>🖥️</Text>
+                    )}
                   </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.serverName, { color: colors.text }]}>{server.name}</Text>
+                    <Text style={[styles.serverSubtext, { color: colors.textMuted }]}>
+                      {server.ipAddress} • {server.provider}
+                    </Text>
+                  </View>
+                </View>
 
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View
                     style={[
                       styles.statusBadge,
@@ -359,69 +360,114 @@ export default function ServersScreen() {
                       {server.status === 'healthy' ? 'Healthy' : server.status === 'warning' ? 'Warning' : 'Offline'}
                     </Text>
                   </View>
+
+                  <TouchableOpacity
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                    }}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDeleteServer(server.id);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    activeOpacity={0.6}
+                  >
+                    <Ionicons name="close" size={13} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Specs / Meta Badges Row */}
+              <View style={styles.specBadgesRow}>
+                <View style={[styles.specBadge, { backgroundColor: isDark ? colors.surfaceHighlight : '#f1f5f9' }]}>
+                  <Text style={[styles.specBadgeText, { color: colors.textSecondary }]}>📍 {server.region}</Text>
+                </View>
+                <View style={[styles.specBadge, { backgroundColor: isDark ? colors.surfaceHighlight : '#f1f5f9' }]}>
+                  <Text style={[styles.specBadgeText, { color: colors.textSecondary }]}>⚙️ {server.cpu}</Text>
+                </View>
+                <View style={[styles.specBadge, { backgroundColor: isDark ? colors.surfaceHighlight : '#f1f5f9' }]}>
+                  <Text style={[styles.specBadgeText, { color: colors.textSecondary }]}>🧠 {server.memory}</Text>
+                </View>
+              </View>
+
+              {/* Resource Gauges */}
+              <View style={[styles.resourceGaugesRow, { borderTopColor: isDark ? colors.border : '#f1f5f9' }]}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View style={styles.gaugeHeader}>
+                    <Text style={[styles.gaugeLabel, { color: colors.textMuted }]}>CPU</Text>
+                    <Text style={[styles.gaugeValue, { color: colors.text }]}>{cpuPercent}%</Text>
+                  </View>
+                  <View style={[styles.progressBarTrack, { backgroundColor: isDark ? colors.surfaceHighlight : '#e2e8f0' }]}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        {
+                          width: `${cpuPercent}%`,
+                          backgroundColor: cpuPercent > 80 ? colors.rose : cpuPercent > 60 ? colors.amber : colors.primary,
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
 
-                {/* Specs / Meta Badges Row */}
-                <View style={styles.specBadgesRow}>
-                  <View style={[styles.specBadge, { backgroundColor: isDark ? colors.surfaceHighlight : '#f1f5f9' }]}>
-                    <Text style={[styles.specBadgeText, { color: colors.textSecondary }]}>📍 {server.region}</Text>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View style={styles.gaugeHeader}>
+                    <Text style={[styles.gaugeLabel, { color: colors.textMuted }]}>RAM</Text>
+                    <Text style={[styles.gaugeValue, { color: colors.text }]}>{ramPercent}%</Text>
                   </View>
-                  <View style={[styles.specBadge, { backgroundColor: isDark ? colors.surfaceHighlight : '#f1f5f9' }]}>
-                    <Text style={[styles.specBadgeText, { color: colors.textSecondary }]}>⚙️ {server.cpu}</Text>
-                  </View>
-                  <View style={[styles.specBadge, { backgroundColor: isDark ? colors.surfaceHighlight : '#f1f5f9' }]}>
-                    <Text style={[styles.specBadgeText, { color: colors.textSecondary }]}>🧠 {server.memory}</Text>
-                  </View>
-                </View>
-
-                {/* Resource Gauges */}
-                <View style={[styles.resourceGaugesRow, { borderTopColor: isDark ? colors.border : '#f1f5f9' }]}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <View style={styles.gaugeHeader}>
-                      <Text style={[styles.gaugeLabel, { color: colors.textMuted }]}>CPU</Text>
-                      <Text style={[styles.gaugeValue, { color: colors.text }]}>{cpuPercent}%</Text>
-                    </View>
-                    <View style={[styles.progressBarTrack, { backgroundColor: isDark ? colors.surfaceHighlight : '#e2e8f0' }]}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            width: `${cpuPercent}%`,
-                            backgroundColor: cpuPercent > 80 ? colors.rose : cpuPercent > 60 ? colors.amber : colors.primary,
-                          },
-                        ]}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <View style={styles.gaugeHeader}>
-                      <Text style={[styles.gaugeLabel, { color: colors.textMuted }]}>RAM</Text>
-                      <Text style={[styles.gaugeValue, { color: colors.text }]}>{ramPercent}%</Text>
-                    </View>
-                    <View style={[styles.progressBarTrack, { backgroundColor: isDark ? colors.surfaceHighlight : '#e2e8f0' }]}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            width: `${ramPercent}%`,
-                            backgroundColor: ramPercent > 85 ? colors.rose : ramPercent > 70 ? colors.amber : '#10b981',
-                          },
-                        ]}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.uptimeBadge}>
-                    <Text style={[styles.uptimeLabel, { color: colors.textMuted }]}>Uptime</Text>
-                    <Text style={[styles.uptimeValue, { color: '#10b981' }]}>{server.uptime || '99.9%'}</Text>
+                  <View style={[styles.progressBarTrack, { backgroundColor: isDark ? colors.surfaceHighlight : '#e2e8f0' }]}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        {
+                          width: `${ramPercent}%`,
+                          backgroundColor: ramPercent > 85 ? colors.rose : ramPercent > 70 ? colors.amber : '#10b981',
+                        },
+                      ]}
+                    />
                   </View>
                 </View>
-              </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
+
+                <View style={styles.uptimeBadge}>
+                  <Text style={[styles.uptimeLabel, { color: colors.textMuted }]}>Uptime</Text>
+                  <Text style={[styles.uptimeValue, { color: '#10b981' }]}>{server.uptime || '99.9%'}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.emptyIconBox, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe' }]}>
+              <Text style={{ fontSize: 32 }}>🖥️</Text>
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No servers found</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+              {searchQuery ? `No matches found for "${searchQuery}"` : 'You have no connected server nodes yet.'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.emptyAddBtn, { backgroundColor: colors.primary }]}
+              onPress={handleOpenAddModal}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.emptyAddBtnText}>+ Connect Your First Server</Text>
+            </TouchableOpacity>
+          </View>
+        }
+        contentContainerStyle={styles.scrollList}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
 
       {/* Add Server Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => setShowAddModal(false)}>

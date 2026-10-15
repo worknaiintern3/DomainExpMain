@@ -59,7 +59,7 @@ export default function ServerDetailsScreen() {
         cpuUsagePercent: 24,
         memoryUsagePercent: 48,
         diskUsagePercent: 36,
-        connectedDomains: ['uweservices.com', 'pulsecloud.io'],
+        connectedDomains: [],
       });
     }
   }, [id]);

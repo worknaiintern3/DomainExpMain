@@ -1,16 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
-import {
-  mobileAnnouncements,
-  mobileAppConfig,
-  mobileAppVersions,
-  mobileFeatureFlags,
-  mobileHomeConfig,
-  mobileNavigationConfig,
-  sessions,
-  users,
-  workspaceMembers,
-} from '@domainpulse/database';
+import { randomUUID } from 'node:crypto';
+
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { MobileBootstrapConfigResponse } from '@domainpulse/contracts';
 
 import { DatabaseService } from '../database/database.service';
@@ -58,7 +48,7 @@ const DEFAULT_APP_VERSION = {
   latestVersion: '1.0.0',
   forceUpdate: false,
   updateUrl: null,
-  releaseNotes: null,
+  releaseNotes: 'Initial release',
 };
 
 @Injectable()
@@ -74,112 +64,107 @@ export class MobileClientService {
 
   async getBootstrapConfig(): Promise<MobileBootstrapConfigResponse> {
     try {
-      const db = this.databaseService.database;
+      const cols = this.databaseService.collections;
+      const configRow = await cols?.mobileAppConfig.findOne({});
+      const app = configRow
+        ? {
+            appName: configRow.appName,
+            logoUrl: configRow.logoUrl,
+            primaryColor: configRow.primaryColor,
+            secondaryColor: configRow.secondaryColor,
+            maintenanceMode: configRow.maintenanceMode,
+            maintenanceMessage: configRow.maintenanceMessage,
+          }
+        : DEFAULT_APP_CONFIG;
 
-      // 1. App config
-    const [configRow] = await db.select().from(mobileAppConfig).limit(1);
-    const app = configRow
-      ? {
-          appName: configRow.appName,
-          logoUrl: configRow.logoUrl,
-          primaryColor: configRow.primaryColor,
-          secondaryColor: configRow.secondaryColor,
-          maintenanceMode: configRow.maintenanceMode,
-          maintenanceMessage: configRow.maintenanceMessage,
-        }
-      : DEFAULT_APP_CONFIG;
+      const flagRows = (await cols?.mobileFeatureFlags.find({}).toArray()) || [];
+      const featureFlags =
+        flagRows.length > 0
+          ? flagRows.map((f: any) => ({
+              key: f.key,
+              name: f.name,
+              description: f.description,
+              enabled: f.enabled,
+              minAppVersion: f.minAppVersion,
+            }))
+          : DEFAULT_FEATURE_FLAGS;
 
-    // 2. Feature flags
-    const flagRows = await db.select().from(mobileFeatureFlags);
-    const featureFlags =
-      flagRows.length > 0
-        ? flagRows.map((f) => ({
-            key: f.key,
-            name: f.name,
-            description: f.description,
-            enabled: f.enabled,
-            minAppVersion: f.minAppVersion,
-          }))
-        : DEFAULT_FEATURE_FLAGS;
+      const features: Record<string, boolean> = {};
+      for (const flag of featureFlags) {
+        features[flag.key] = flag.enabled;
+      }
 
-    const features: Record<string, boolean> = {};
-    for (const flag of featureFlags) {
-      features[flag.key] = flag.enabled;
-    }
+      const navRows =
+        (await cols?.mobileNavigationConfig
+          .find({})
+          .sort({ sortOrder: 1 })
+          .toArray()) || [];
+      const navigation =
+        navRows.length > 0
+          ? navRows.map((n: any) => ({
+              key: n.key,
+              label: n.label,
+              icon: n.icon,
+              route: n.route,
+              sortOrder: n.sortOrder,
+              enabled: n.enabled,
+              badge: n.badge,
+            }))
+          : DEFAULT_NAVIGATION_ITEMS;
 
-    // 3. Navigation
-    const navRows = await db
-      .select()
-      .from(mobileNavigationConfig)
-      .orderBy(asc(mobileNavigationConfig.sortOrder));
-    const navigation =
-      navRows.length > 0
-        ? navRows.map((n) => ({
-            key: n.key,
-            label: n.label,
-            icon: n.icon,
-            route: n.route,
-            sortOrder: n.sortOrder,
-            enabled: n.enabled,
-            badge: n.badge,
-          }))
-        : DEFAULT_NAVIGATION_ITEMS;
+      const homeRows =
+        (await cols?.mobileHomeConfig
+          .find({})
+          .sort({ sortOrder: 1 })
+          .toArray()) || [];
+      const homeSections =
+        homeRows.length > 0
+          ? homeRows.map((h: any) => ({
+              sectionKey: h.sectionKey,
+              title: h.title,
+              sortOrder: h.sortOrder,
+              enabled: h.enabled,
+              configJson: (h.configJson as Record<string, unknown> | null) ?? null,
+            }))
+          : DEFAULT_HOME_SECTIONS;
 
-    // 4. Home sections
-    const homeRows = await db
-      .select()
-      .from(mobileHomeConfig)
-      .orderBy(asc(mobileHomeConfig.sortOrder));
-    const homeSections =
-      homeRows.length > 0
-        ? homeRows.map((h) => ({
-            sectionKey: h.sectionKey,
-            title: h.title,
-            sortOrder: h.sortOrder,
-            enabled: h.enabled,
-            configJson: (h.configJson as Record<string, unknown> | null) ?? null,
-          }))
-        : DEFAULT_HOME_SECTIONS;
+      const versionRow = await cols?.mobileAppVersions.findOne({});
+      const version = versionRow
+        ? {
+            platform: (versionRow.platform as 'ios' | 'android' | 'all') || 'all',
+            minimumVersion: versionRow.minimumVersion,
+            latestVersion: versionRow.latestVersion,
+            forceUpdate: versionRow.forceUpdate,
+            updateUrl: versionRow.updateUrl,
+            releaseNotes: versionRow.releaseNotes,
+          }
+        : DEFAULT_APP_VERSION;
 
-    // 5. Versions
-    const [versionRow] = await db.select().from(mobileAppVersions).limit(1);
-    const version = versionRow
-      ? {
-          platform: (versionRow.platform as 'ios' | 'android' | 'all') || 'all',
-          minimumVersion: versionRow.minimumVersion,
-          latestVersion: versionRow.latestVersion,
-          forceUpdate: versionRow.forceUpdate,
-          updateUrl: versionRow.updateUrl,
-          releaseNotes: versionRow.releaseNotes,
-        }
-      : DEFAULT_APP_VERSION;
+      const announcementRows =
+        (await cols?.mobileAnnouncements
+          .find({ isActive: true } as any)
+          .toArray()) || [];
+      const announcements = announcementRows.map((a: any) => ({
+        id: a.id,
+        title: a.title,
+        message: a.message,
+        type: (a.type as 'info' | 'warning' | 'critical' | 'promo') || 'info',
+        actionUrl: a.actionUrl,
+        actionLabel: a.actionLabel,
+        isActive: a.isActive,
+        startsAt: a.startsAt?.toISOString() ?? null,
+        expiresAt: a.expiresAt?.toISOString() ?? null,
+      }));
 
-    // 6. Active Announcements
-    const announcementRows = await db
-      .select()
-      .from(mobileAnnouncements)
-      .where(eq(mobileAnnouncements.isActive, true));
-    const announcements = announcementRows.map((a) => ({
-      id: a.id,
-      title: a.title,
-      message: a.message,
-      type: (a.type as 'info' | 'warning' | 'critical' | 'promo') || 'info',
-      actionUrl: a.actionUrl,
-      actionLabel: a.actionLabel,
-      isActive: a.isActive,
-      startsAt: a.startsAt?.toISOString() ?? null,
-      expiresAt: a.expiresAt?.toISOString() ?? null,
-    }));
-
-    return {
-      app,
-      features,
-      featureFlags,
-      navigation,
-      homeSections,
-      version,
-      announcements,
-    };
+      return {
+        app,
+        features,
+        featureFlags,
+        navigation,
+        homeSections,
+        version,
+        announcements,
+      };
     } catch (error) {
       this.logger.warn(
         `Failed to fetch remote mobile config from database; falling back to default bootstrap config: ${error instanceof Error ? error.message : String(error)}`,
@@ -208,72 +193,35 @@ export class MobileClientService {
     user: { id: string; email: string; displayName: string | null };
     workspaceId: string;
   }> {
-    const db = this.databaseService.database;
     const normalized = (requestedEmail || 'vrd@gmail.com').trim().toLowerCase();
+    const cols = this.databaseService.collections;
+    if (!cols) throw new Error('MongoDB collections not available');
 
-    // 1. Find user by email or fallback to first user
-    let [userRow] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        displayName: users.displayName,
-      })
-      .from(users)
-      .where(eq(users.normalizedEmail, normalized))
-      .limit(1);
-
+    const userRow = await cols.users.findOne({ normalizedEmail: normalized });
     if (!userRow) {
-      const [fallback] = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          displayName: users.displayName,
-        })
-        .from(users)
-        .limit(1);
-      userRow = fallback;
+      throw new NotFoundException(`User account not found for email: ${requestedEmail || normalized}`);
     }
 
-    if (!userRow) {
-      throw new Error('No user account available for mobile session');
-    }
+    const membership = await cols.workspaceMembers.findOne({ userId: userRow.id });
+    const workspaceId = membership?.workspaceId ?? userRow.personalWorkspaceId;
 
-    // 2. Find personal workspace membership
-    const [membership] = await db
-      .select({
-        workspaceId: workspaceMembers.workspaceId,
-      })
-      .from(workspaceMembers)
-      .where(eq(workspaceMembers.userId, userRow.id))
-      .limit(1);
-
-    const workspaceId = membership?.workspaceId ?? '9bca6a86-1021-40d9-9fa3-9c97f5750a9d';
-
-    // 3. Create persistent session
     const refreshToken = generateRefreshToken();
     const refreshTokenHash = hashRefreshToken(refreshToken);
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const sessionId = randomUUID();
 
-    const [sessionRow] = await db
-      .insert(sessions)
-      .values({
-        userId: userRow.id,
-        refreshTokenHash,
-        expiresAt,
-      })
-      .returning({
-        id: sessions.id,
-        userId: sessions.userId,
-        expiresAt: sessions.expiresAt,
-      });
+    await cols.sessions.insertOne({
+      id: sessionId,
+      userId: userRow.id,
+      refreshTokenHash,
+      expiresAt,
+      revokedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any);
 
-    if (!sessionRow) {
-      throw new Error('Failed to create session');
-    }
-
-    // 4. Issue genuine JWT access token
     const issuedToken = this.accessTokenService.issue({
-      sessionId: sessionRow.id,
+      sessionId,
       userId: userRow.id,
     });
 
@@ -282,14 +230,14 @@ export class MobileClientService {
       accessTokenExpiresAt: issuedToken.expiresAt.toISOString(),
       refreshToken,
       session: {
-        id: sessionRow.id,
-        userId: sessionRow.userId,
-        expiresAt: sessionRow.expiresAt.toISOString(),
+        id: sessionId,
+        userId: userRow.id,
+        expiresAt: expiresAt.toISOString(),
       },
       user: {
         id: userRow.id,
         email: userRow.email,
-        displayName: userRow.displayName,
+        displayName: userRow.displayName ?? null,
       },
       workspaceId,
     };

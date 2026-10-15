@@ -218,3 +218,5 @@ export class PostgresMetadataRepository implements MetadataStore {
     });
   }
 }
+
+export { MongoMetadataRepository } from './mongo-metadata.repository';

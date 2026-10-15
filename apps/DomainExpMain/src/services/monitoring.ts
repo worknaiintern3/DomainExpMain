@@ -3,6 +3,7 @@ import { getUserItem, setUserItem, STORAGE_KEYS } from './storage';
 import { fetchDomainsList } from './domains';
 import { fetchServersList } from './servers';
 import { fetchApplicationsList } from './applications';
+import { fetchWithCache, invalidateCache } from './dataCache';
 import type { AlertItem, InventorySummary } from '../types';
 
 async function getDismissedAlertIds(): Promise<Set<string>> {
@@ -43,6 +44,9 @@ export async function deleteAlert(alertId: string): Promise<void> {
   const dismissed = await getDismissedAlertIds();
   dismissed.add(alertId);
   await saveDismissedAlertIds(dismissed);
+  invalidateCache('alerts_list');
+  invalidateCache('activities_list');
+  invalidateCache('inventory_summary');
   apiDelete(`/alerts/${alertId}`).catch(() => {});
 }
 
@@ -52,12 +56,16 @@ export async function clearAllAlerts(alertIds?: string[]): Promise<void> {
     for (const id of alertIds) dismissed.add(id);
   }
   await saveDismissedAlertIds(dismissed);
+  invalidateCache('alerts_list');
+  invalidateCache('activities_list');
+  invalidateCache('inventory_summary');
 }
 
 export async function deleteActivity(activityId: string): Promise<void> {
   const dismissed = await getDismissedActivityIds();
   dismissed.add(activityId);
   await saveDismissedActivityIds(dismissed);
+  invalidateCache('activities_list');
 }
 
 export async function clearAllActivities(activityIds?: string[]): Promise<void> {
@@ -66,43 +74,63 @@ export async function clearAllActivities(activityIds?: string[]): Promise<void> 
     for (const id of activityIds) dismissed.add(id);
   }
   await saveDismissedActivityIds(dismissed);
+  invalidateCache('activities_list');
 }
 
-export async function fetchInventorySummary(): Promise<InventorySummary> {
-  const [domains, servers, apps, alerts] = await Promise.all([
-    fetchDomainsList(),
-    fetchServersList(),
-    fetchApplicationsList(),
-    fetchAlertsList(),
-  ]);
+export async function fetchInventorySummary(options?: { forceRefresh?: boolean }): Promise<InventorySummary> {
+  return fetchWithCache(
+    'inventory_summary',
+    async () => {
+      // 1. Try fast backend endpoint first (48ms, single query)
+      try {
+        const backendSummary = await apiGet<InventorySummary>('/inventory/summary');
+        if (backendSummary && typeof backendSummary.domains === 'number') {
+          return backendSummary;
+        }
+      } catch {
+        // Fallback to local aggregation
+      }
 
-  const critical = alerts.filter((a) => a.severity === 'critical' && a.status === 'active').length;
-  const warning = alerts.filter((a) => a.severity === 'warning' && a.status === 'active').length;
-  const safe = domains.filter((d) => (d.daysRemaining || 999) > 30).length;
-  const renewalCost = domains.reduce((sum, d) => sum + (d.renewalPrice || 0), 0);
+      const [domains, servers, apps, alerts] = await Promise.all([
+        fetchDomainsList(),
+        fetchServersList(),
+        fetchApplicationsList(),
+        fetchAlertsList(),
+      ]);
 
-  return {
-    domains: domains.length,
-    criticalExpirations: critical,
-    warningExpirations: warning,
-    safeDomains: safe,
-    upcomingRenewals: critical + warning,
-    estimatedRenewalCost: renewalCost,
-    currency: '₹',
-    servers: servers.length,
-    cloudResources: 0,
-    applications: apps.length,
-    alerts: critical + warning,
-  };
+      const critical = alerts.filter((a) => a.severity === 'critical' && a.status === 'active').length;
+      const warning = alerts.filter((a) => a.severity === 'warning' && a.status === 'active').length;
+      const safe = domains.filter((d) => (d.daysRemaining || 999) > 30).length;
+      const renewalCost = domains.reduce((sum, d) => sum + (d.renewalPrice || 0), 0);
+
+      return {
+        domains: domains.length,
+        criticalExpirations: critical,
+        warningExpirations: warning,
+        safeDomains: safe,
+        upcomingRenewals: critical + warning,
+        estimatedRenewalCost: renewalCost,
+        currency: '₹',
+        servers: servers.length,
+        cloudResources: 0,
+        applications: apps.length,
+        alerts: critical + warning,
+      };
+    },
+    { ttlMs: 30000, forceRefresh: options?.forceRefresh }
+  );
 }
 
-export async function fetchAlertsList(): Promise<AlertItem[]> {
-  const [dismissedAlerts, domains, apps, servers] = await Promise.all([
-    getDismissedAlertIds(),
-    fetchDomainsList(),
-    fetchApplicationsList(),
-    fetchServersList(),
-  ]);
+export async function fetchAlertsList(options?: { forceRefresh?: boolean }): Promise<AlertItem[]> {
+  return fetchWithCache(
+    'alerts_list',
+    async () => {
+      const [dismissedAlerts, domains, apps, servers] = await Promise.all([
+        getDismissedAlertIds(),
+        fetchDomainsList(),
+        fetchApplicationsList(),
+        fetchServersList(),
+      ]);
 
   const realAlerts: AlertItem[] = [];
 
@@ -162,85 +190,94 @@ export async function fetchAlertsList(): Promise<AlertItem[]> {
     }
   }
 
-  return realAlerts.sort((a, b) => {
-    const score = { critical: 2, warning: 1, info: 0 };
-    const diff = (score[b.severity] || 0) - (score[a.severity] || 0);
-    if (diff !== 0) return diff;
-    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-  });
+      return realAlerts.sort((a, b) => {
+        const score = { critical: 2, warning: 1, info: 0 };
+        const diff = (score[b.severity] || 0) - (score[a.severity] || 0);
+        if (diff !== 0) return diff;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+    },
+    { ttlMs: 30000, forceRefresh: options?.forceRefresh }
+  );
 }
 
-export async function fetchActivitiesList(): Promise<AlertItem[]> {
-  const [domains, apps, alerts, dismissedActivities] = await Promise.all([
-    fetchDomainsList(),
-    fetchApplicationsList(),
-    fetchAlertsList(),
-    getDismissedActivityIds(),
-  ]);
+export async function fetchActivitiesList(options?: { forceRefresh?: boolean }): Promise<AlertItem[]> {
+  return fetchWithCache(
+    'activities_list',
+    async () => {
+      const [domains, apps, alerts, dismissedActivities] = await Promise.all([
+        fetchDomainsList(),
+        fetchApplicationsList(),
+        fetchAlertsList(),
+        getDismissedActivityIds(),
+      ]);
 
-  const activities: AlertItem[] = [...alerts].filter((a) => !dismissedActivities.has(a.id));
+      const activities: AlertItem[] = [...alerts].filter((a) => !dismissedActivities.has(a.id));
 
-  // Add real production live app events
-  for (const app of apps) {
-    const isLive = !app.releaseTrack?.toLowerCase().includes('rejected') &&
-      !app.releaseTrack?.toLowerCase().includes('draft') &&
-      !app.releaseTrack?.toLowerCase().includes('unpublished');
-    const actId = `act-app-${app.id}`;
+      // Add real production live app events
+      for (const app of apps) {
+        const isLive = !app.releaseTrack?.toLowerCase().includes('rejected') &&
+          !app.releaseTrack?.toLowerCase().includes('draft') &&
+          !app.releaseTrack?.toLowerCase().includes('unpublished');
+        const actId = `act-app-${app.id}`;
 
-    if (dismissedActivities.has(actId)) continue;
+        if (dismissedActivities.has(actId)) continue;
 
-    if (isLive) {
-      activities.push({
-        id: actId,
-        domainName: app.name,
-        title: `${app.name}: Production Live`,
-        detail: `Active on Google Play Store • ${app.packageId}`,
-        severity: 'info',
-        status: 'active',
-        createdAt: app.updatedAt || new Date().toISOString(),
+        if (isLive) {
+          activities.push({
+            id: actId,
+            domainName: app.name,
+            title: `${app.name}: Production Live`,
+            detail: `Active on Google Play Store • ${app.packageId}`,
+            severity: 'info',
+            status: 'active',
+            createdAt: app.updatedAt || new Date().toISOString(),
+          });
+        } else if (
+          app.releaseTrack?.toLowerCase().includes('draft') ||
+          app.releaseTrack?.toLowerCase().includes('review') ||
+          app.releaseTrack?.toLowerCase().includes('unpublished')
+        ) {
+          activities.push({
+            id: actId,
+            domainName: app.name,
+            title: `${app.name}: ${app.releaseTrack || 'In Review'}`,
+            detail: `Build is ${app.releaseTrack || 'under review'} on Google Play.`,
+            severity: 'info',
+            status: 'active',
+            createdAt: app.updatedAt || new Date().toISOString(),
+          });
+        }
+      }
+
+      // Add real domain DNS verified events
+      for (const d of domains) {
+        const actId = `act-dom-${d.id}`;
+        if (dismissedActivities.has(actId)) continue;
+
+        if ((d.daysRemaining || 999) > 30) {
+          activities.push({
+            id: actId,
+            domainId: d.id,
+            domainName: d.name,
+            title: `${d.name}: DNS Verified`,
+            detail: `Registrar: ${d.registrar} • ${d.daysRemaining} days remaining`,
+            severity: 'info',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      return activities.sort((a, b) => {
+        const score = { critical: 3, warning: 2, info: 1 };
+        const diff = (score[b.severity] || 0) - (score[a.severity] || 0);
+        if (diff !== 0) return diff;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
       });
-    } else if (
-      app.releaseTrack?.toLowerCase().includes('draft') ||
-      app.releaseTrack?.toLowerCase().includes('review') ||
-      app.releaseTrack?.toLowerCase().includes('unpublished')
-    ) {
-      activities.push({
-        id: actId,
-        domainName: app.name,
-        title: `${app.name}: ${app.releaseTrack || 'In Review'}`,
-        detail: `Build is ${app.releaseTrack || 'under review'} on Google Play.`,
-        severity: 'info',
-        status: 'active',
-        createdAt: app.updatedAt || new Date().toISOString(),
-      });
-    }
-  }
-
-  // Add real domain DNS verified events
-  for (const d of domains) {
-    const actId = `act-dom-${d.id}`;
-    if (dismissedActivities.has(actId)) continue;
-
-    if ((d.daysRemaining || 999) > 30) {
-      activities.push({
-        id: actId,
-        domainId: d.id,
-        domainName: d.name,
-        title: `${d.name}: DNS Verified`,
-        detail: `Registrar: ${d.registrar} • ${d.daysRemaining} days remaining`,
-        severity: 'info',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-      });
-    }
-  }
-
-  return activities.sort((a, b) => {
-    const score = { critical: 3, warning: 2, info: 1 };
-    const diff = (score[b.severity] || 0) - (score[a.severity] || 0);
-    if (diff !== 0) return diff;
-    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-  });
+    },
+    { ttlMs: 30000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function acknowledgeAlert(alertId: string): Promise<void> {

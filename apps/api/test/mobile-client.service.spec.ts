@@ -16,7 +16,7 @@ describe('MobileClientService', () => {
       },
     } as any;
 
-    const service = new MobileClientService(mockDbService);
+    const service = new MobileClientService(mockDbService, {} as any);
     const config = await service.getBootstrapConfig();
 
     expect(config).toBeDefined();

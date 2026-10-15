@@ -145,3 +145,5 @@ export class PostgresInventoryReadModelRepository
     );
   }
 }
+
+export { MongoInventoryReadModelRepository } from './mongo-inventory-read-models.repository';

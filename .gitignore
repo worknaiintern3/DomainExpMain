@@ -49,3 +49,6 @@ Thumbs.db
 
 .serena/
 apps/DomainExp/
+backups/
+*.dump
+scratch/

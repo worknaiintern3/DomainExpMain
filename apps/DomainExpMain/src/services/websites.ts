@@ -1,6 +1,7 @@
 import { getUserItem, setUserItem, STORAGE_KEYS } from './storage';
 import { getDomainLogoUrl } from './liveDomainLookup';
 import { apiGet, apiPost, apiPatch, apiDelete } from './api';
+import { fetchWithCache, invalidateCache } from './dataCache';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import type { WebsiteItem, BackendApplication, CursorPage } from '../types';
@@ -22,6 +23,36 @@ export function extractDomainFromUrl(rawUrl: string): string {
   } catch {
     return rawUrl.trim().toLowerCase();
   }
+}
+
+export function isWebsiteItem(
+  item: Partial<WebsiteItem> | Partial<BackendApplication> | null | undefined
+): boolean {
+  if (!item) return false;
+
+  const kind = (item as any).kind;
+  if (kind === 'MOBILE_APPLICATION') return false;
+
+  const srv = (item as any).serverName;
+  if (srv === 'Google Play Console') return false;
+
+  const playUrl = (item as any).playStoreUrl || '';
+  if (playUrl && playUrl.includes('play.google.com')) return false;
+
+  const url = (item as any).url || (item as any).primaryUrl || '';
+  if (url && (url.includes('play.google.com') || url.startsWith('https://com.') || url.startsWith('http://com.'))) {
+    return false;
+  }
+
+  const pkg = ((item as any).packageId || (item as any).notes || '').trim();
+  if (pkg && /^(com|in|org|net|io)\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/.test(pkg)) {
+    return false;
+  }
+
+  const name = ((item as any).name || '').trim();
+  if (name.endsWith('.apk') || name.endsWith('.aab')) return false;
+
+  return true;
 }
 
 export const WORKNAI_APPLICATION_WEBSITES: WebsiteItem[] = [
@@ -265,13 +296,94 @@ export const WORKNAI_APPLICATION_WEBSITES: WebsiteItem[] = [
   },
 ];
 
-async function getStoredWebsites(): Promise<WebsiteItem[]> {
+export function getFriendlyBrandName(domain: string): string {
+  const base = domain.replace(/^www\./i, '').split('.')[0];
+  if (!base) return domain;
+  const known: Record<string, string> = {
+    worknai: 'WorknAi Client Portal',
+    worknaihrms: 'WorknAI HRMS',
+    billpay: 'BillPay Business',
+    robosinfo: 'RobosInfo Portal',
+    aitourism: 'AiTourism Travel & Cabs',
+    anyworkservices: 'AnyWork Services',
+    blooddonation: 'Blood Donation Online',
+    goairclass: 'GoAirClass Online',
+    gymproplus: 'GymProPlus',
+    healthyfood: 'HealthyFood Cafe',
+    itjobx: 'ITJobX Tech Jobs',
+    inquiryexperts: 'Inquiry Experts',
+    lovenzea: 'LovenZea Social',
+    mobilepay: 'MobilePay Cafe',
+    namasteyyy: 'Namastey Meditation',
+    omenxis: 'OMENXIS Chess Arena',
+    onlinego: 'Online Go Hyperlocal',
+    onlinegologistics: 'OnlineGo Logistics',
+    pginfo: 'PGinfo Online Living',
+  };
+  const key = base.toLowerCase();
+  if (known[key]) return known[key];
+  return base.charAt(0).toUpperCase() + base.slice(1);
+}
+
+export async function syncDiscoveredWebsites(domains: string[], providerLabel: string): Promise<WebsiteItem[]> {
+  const current = await getStoredWebsites();
+  const webMap = new Map<string, WebsiteItem>();
+  for (const w of current) {
+    const d = extractDomainFromUrl(w.url);
+    if (d) webMap.set(d.toLowerCase(), w);
+  }
+
+  let hasChanges = false;
+  for (const dom of domains) {
+    const cleanDom = dom.toLowerCase().trim();
+    if (!cleanDom || !cleanDom.includes('.')) continue;
+
+    if (!webMap.has(cleanDom)) {
+      const siteName = getFriendlyBrandName(cleanDom);
+      const url = `https://${cleanDom}`;
+      const newSite: WebsiteItem = {
+        id: `web-${cleanDom.replace(/[^a-z0-9]/g, '-')}`,
+        name: siteName,
+        url,
+        category: 'Production',
+        status: 'healthy',
+        sslStatus: 'active',
+        httpStatus: '200 OK',
+        responseTimeMs: Math.floor(Math.random() * 20) + 18,
+        logoUrl: getDomainLogoUrl(cleanDom),
+        tags: [providerLabel, 'Production', 'Synced'],
+        notes: `Live website hosted on ${providerLabel} (${cleanDom})`,
+        createdAt: new Date().toISOString(),
+        lastCheckedAt: new Date().toISOString(),
+      };
+      webMap.set(cleanDom, newSite);
+      hasChanges = true;
+
+      apiPost<BackendApplication>('/applications', {
+        name: siteName,
+        kind: 'WEBSITE',
+        primaryUrl: url,
+        notes: `Discovered from ${providerLabel}`,
+      }).catch(() => {});
+    }
+  }
+
+  const updatedList = Array.from(webMap.values());
+  if (hasChanges || current.length === 0) {
+    await saveStoredWebsites(updatedList);
+    invalidateCache('websites_list');
+  }
+  return updatedList;
+}
+
+export async function getStoredWebsites(): Promise<WebsiteItem[]> {
   try {
     const raw = await getUserItem(STORAGE_KEYS.WEBSITES_LIST);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        const cleaned = parsed.filter(isWebsiteItem);
+        return cleaned;
       }
     }
 
@@ -290,45 +402,85 @@ async function getStoredWebsites(): Promise<WebsiteItem[]> {
   return [];
 }
 
-async function saveStoredWebsites(items: WebsiteItem[]): Promise<void> {
+export async function saveStoredWebsites(items: WebsiteItem[]): Promise<void> {
   try {
-    await setUserItem(STORAGE_KEYS.WEBSITES_LIST, JSON.stringify(items));
+    const websitesOnly = items.filter(isWebsiteItem);
+    await setUserItem(STORAGE_KEYS.WEBSITES_LIST, JSON.stringify(websitesOnly));
   } catch {}
 }
 
-export async function fetchWebsitesList(): Promise<WebsiteItem[]> {
-  try {
-    const res = await apiGet<CursorPage<BackendApplication>>('/applications?limit=100');
-    if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
-      const websiteApps = res.items.map((a) => {
-        const url = normalizeWebsiteUrl(a.primaryUrl || `https://${a.name}`);
-        const domain = extractDomainFromUrl(url);
-        const item: WebsiteItem = {
-          id: a.id,
-          name: a.name,
-          url,
-          category: a.kind === 'WEBSITE' ? 'Production' : a.kind === 'WEB_APPLICATION' ? 'Production' : 'Client',
-          status: a.inventoryState === 'ARCHIVED' ? 'error' : 'healthy',
-          sslStatus: 'active',
-          httpStatus: '200 OK',
-          responseTimeMs: Math.floor(Math.random() * 20) + 15,
-          logoUrl: getDomainLogoUrl(domain),
-          tags: [a.kind ? a.kind.split('_').join(' ') : 'Web'],
-          notes: a.notes || '',
-          createdAt: a.createdAt,
-          lastCheckedAt: a.updatedAt,
-        };
-        return item;
-      });
+export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): Promise<WebsiteItem[]> {
+  return fetchWithCache(
+    'websites_list',
+    async () => {
+      const localList = (await getStoredWebsites()).filter(isWebsiteItem);
+      try {
+        const res = await apiGet<CursorPage<BackendApplication>>('/applications?limit=100');
+        if (res?.items && Array.isArray(res.items)) {
+          // 1. Strictly filter backend items to ONLY WEBSITES / WEB APPS (exclude all mobile applications)
+          const websiteAppsOnly = res.items.filter(isWebsiteItem);
+          const websiteApps = websiteAppsOnly.map((a) => {
+            const url = normalizeWebsiteUrl(a.primaryUrl || `https://${a.name}`);
+            const domain = extractDomainFromUrl(url);
+            const item: WebsiteItem = {
+              id: a.id,
+              name: a.name,
+              url,
+              category: a.kind === 'WEBSITE' ? 'Production' : a.kind === 'WEB_APPLICATION' ? 'Production' : 'Client',
+              status: a.inventoryState === 'ARCHIVED' ? 'error' : 'healthy',
+              sslStatus: 'active',
+              httpStatus: '200 OK',
+              responseTimeMs: Math.floor(Math.random() * 20) + 15,
+              logoUrl: getDomainLogoUrl(domain),
+              tags: [a.kind ? a.kind.split('_').join(' ') : 'Web'],
+              notes: a.notes || '',
+              createdAt: a.createdAt,
+              lastCheckedAt: a.updatedAt,
+            };
+            return item;
+          });
 
-      await saveStoredWebsites(websiteApps);
-      return websiteApps;
-    }
-  } catch {
-    // Offline fallback
-  }
+          // Filter to ensure legitimate website domains and deduplicate
+          const seen = new Set<string>();
+          const deduped: WebsiteItem[] = [];
+          for (const site of websiteApps) {
+            if (!isWebsiteItem(site)) continue;
+            const dom = extractDomainFromUrl(site.url).toLowerCase();
+            if (!dom || dom.includes('play.google.com') || dom.startsWith('com.')) continue;
+            if (!seen.has(dom)) {
+              seen.add(dom);
+              deduped.push(site);
+            }
+          }
 
-  return await getStoredWebsites();
+          // Merge backend items with local items so discovered provider websites are never erased!
+          const webMap = new Map<string, WebsiteItem>();
+          for (const loc of localList) {
+            if (isWebsiteItem(loc)) {
+              const dom = extractDomainFromUrl(loc.url).toLowerCase();
+              if (dom) webMap.set(dom, loc);
+            }
+          }
+          for (const site of deduped) {
+            const dom = extractDomainFromUrl(site.url).toLowerCase();
+            if (dom) {
+              const existing = webMap.get(dom);
+              webMap.set(dom, existing ? { ...existing, ...site, id: site.id || existing.id } : site);
+            }
+          }
+
+          const mergedWebsites = Array.from(webMap.values());
+          await saveStoredWebsites(mergedWebsites);
+          return mergedWebsites;
+        }
+      } catch {
+        // Offline fallback
+      }
+
+      return localList;
+    },
+    { ttlMs: 30000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function createWebsite(data: {
@@ -374,6 +526,7 @@ export async function createWebsite(data: {
   const current = await getStoredWebsites();
   const updated = [newWebsite, ...current.filter((w) => w.url.toLowerCase() !== normalizedUrl.toLowerCase())];
   await saveStoredWebsites(updated);
+  invalidateCache('websites_list');
   return newWebsite;
 }
 
@@ -396,6 +549,7 @@ export async function updateWebsite(id: string, patch: Partial<WebsiteItem>): Pr
 
   current[index] = updated;
   await saveStoredWebsites(current);
+  invalidateCache('websites_list');
 
   apiPatch(`/applications/${encodeURIComponent(id)}`, {
     name: patch.name,
@@ -410,6 +564,7 @@ export async function deleteWebsite(id: string): Promise<void> {
   const current = await getStoredWebsites();
   const updated = current.filter((w) => w.id !== id);
   await saveStoredWebsites(updated);
+  invalidateCache('websites_list');
   try {
     await apiDelete(`/applications/${encodeURIComponent(id)}`);
   } catch {}

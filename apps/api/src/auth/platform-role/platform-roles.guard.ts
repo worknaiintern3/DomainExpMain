@@ -7,8 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { eq } from 'drizzle-orm';
-import { users, type PlatformRole } from '@domainpulse/database';
+import type { PlatformRole } from '@domainpulse/database';
 
 import { DatabaseService } from '../../database/database.service';
 import type { AuthenticatedRequest } from '../http/auth-request';
@@ -40,21 +39,17 @@ export class PlatformRolesGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
-    const rows = await this.databaseService.database
-      .select({
-        id: users.id,
-        platformRole: users.platformRole,
-      })
-      .from(users)
-      .where(eq(users.id, principal.userId))
-      .limit(1);
-
-    const user = rows[0];
+    const user = await this.databaseService.collections.users.findOne({
+      id: principal.userId,
+    });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+    const platformRole: PlatformRole = (
+      user.platformRole ? (user.platformRole.toString().toUpperCase() as PlatformRole) : 'USER'
+    );
 
-    if (!requiredRoles.includes(user.platformRole)) {
+    if (!requiredRoles.includes(platformRole)) {
       throw new ForbiddenException(
         `Forbidden: Requires platform role ${requiredRoles.join(' or ')}`,
       );

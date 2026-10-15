@@ -13,6 +13,7 @@
     "expo-image": "~57.0.5",
     "expo-linking": "~57.0.11",
     "expo-navigation-bar": "~57.0.3",
+    "expo-notifications": "~57.0.23",
     "expo-router": "~57.0.23",
     "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.9",
@@ -20,7 +21,6 @@
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
     "expo-web-browser": "~57.0.3",
-    "myfirstapp": "file:",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -43,7 +43,11 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build:android": "npx eas-cli build --platform android --profile production",
+    "build:android:local": "npx eas-cli build --platform android --profile production --local",
+    "build:apk": "npx eas-cli build --platform android --profile preview",
+    "build:apk:local": "npx eas-cli build --platform android --profile preview --local"
   },
   "private": true
 }

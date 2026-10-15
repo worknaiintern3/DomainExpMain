@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   ImageBackground,
   Share,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -23,7 +24,7 @@ import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
 import { useAuth } from '../../store/auth-context';
 import { useSettings } from '../../store/settings-context';
-import { fetchDomainsList, importDomainsBatch } from '../../services/domains';
+import { fetchDomainsList, importDomainsBatch, deleteDomain } from '../../services/domains';
 import {
   fetchProviderAccountsList,
   createProviderAccount,
@@ -31,11 +32,21 @@ import {
   fetchEmailAccountsList,
   createEmailAccount,
   deleteEmailAccount,
+  deduplicateProviderAccounts,
 } from '../../services/accounts';
-import { getEffectiveApiUrl, setCustomApiUrl, apiGet } from '../../services/api';
-import { syncConsoleAccount, syncDomainRegistrar, syncCloudServers } from '../../services/providerSync';
+import { getEffectiveApiUrl, setCustomApiUrl, apiGet, apiPatch } from '../../services/api';
+import { syncConsoleAccount, syncDomainRegistrar, syncCloudServers, syncProviderAccount, syncAllConnectedProviders } from '../../services/providerSync';
+import { saveProviderToken, getProviderToken } from '../../services/storage';
 import { API_CONFIG } from '../../constants/config';
-import type { ProviderAccount, EmailAccount } from '../../types';
+import {
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  registerForPushNotificationsAsync,
+  triggerExpirySimulation,
+  sendLocalTestNotificationAsync,
+  type NotificationPreferences,
+} from '../../services/notifications';
+import type { ProviderAccount, EmailAccount, DomainItem } from '../../types';
 
 const PROVIDER_LOGOS: Record<string, any> = {
   'google-play': require('../../../assets/images/google-play.png'),
@@ -64,6 +75,83 @@ type ModalType =
   | 'about'
   | null;
 
+const MODAL_CONFIG: Record<
+  Exclude<ModalType, null>,
+  {
+    title: string;
+    subtitle: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    iconColor: string;
+    iconBg: string;
+    heightPercentage: `${number}%`;
+  }
+> = {
+  profile: {
+    title: 'User Profile',
+    subtitle: 'Manage personal details and workspace identity',
+    icon: 'person',
+    iconColor: '#0284c7',
+    iconBg: 'rgba(2, 132, 199, 0.15)',
+    heightPercentage: '86%',
+  },
+  providers: {
+    title: 'Provider Connections',
+    subtitle: 'DNS registries, cloud servers & portfolio sync',
+    icon: 'link',
+    iconColor: '#10b981',
+    iconBg: 'rgba(16, 185, 129, 0.15)',
+    heightPercentage: '93%',
+  },
+  import_export: {
+    title: 'Import / Export',
+    subtitle: 'Bulk import or export your domain portfolio',
+    icon: 'swap-horizontal',
+    iconColor: '#f59e0b',
+    iconBg: 'rgba(245, 158, 11, 0.15)',
+    heightPercentage: '92%',
+  },
+  settings: {
+    title: 'App Settings',
+    subtitle: 'Themes, notifications, currency & preferences',
+    icon: 'settings',
+    iconColor: '#8b5cf6',
+    iconBg: 'rgba(139, 92, 246, 0.15)',
+    heightPercentage: '90%',
+  },
+  security: {
+    title: 'Security & Auth',
+    subtitle: 'Password changes, sessions & account protection',
+    icon: 'shield-checkmark',
+    iconColor: '#f43f5e',
+    iconBg: 'rgba(244, 63, 94, 0.15)',
+    heightPercentage: '86%',
+  },
+  billing: {
+    title: 'Subscription & Billing',
+    subtitle: 'Tier plan, features, seat limits & invoices',
+    icon: 'card',
+    iconColor: '#f97316',
+    iconBg: 'rgba(249, 115, 22, 0.15)',
+    heightPercentage: '88%',
+  },
+  help: {
+    title: 'Help & Support',
+    subtitle: '24/7 technical assistance and ticket submission',
+    icon: 'help-circle',
+    iconColor: '#06b6d4',
+    iconBg: 'rgba(6, 182, 212, 0.15)',
+    heightPercentage: '88%',
+  },
+  about: {
+    title: 'About DomainPulse',
+    subtitle: 'Version details, build information & licensing',
+    icon: 'information-circle',
+    iconColor: '#6366f1',
+    iconBg: 'rgba(99, 102, 241, 0.15)',
+    heightPercentage: '85%',
+  },
+};
+
 export default function MoreScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -84,6 +172,88 @@ export default function MoreScreen() {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const currentPassInputRef = useRef<TextInput>(null);
   const newPassInputRef = useRef<TextInput>(null);
+
+  // Production Expiry Push Notification Preferences
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>({
+    pushEnabled: true,
+    reminderThresholds: [15, 7, 3, 1, 0],
+    notifyDomains: true,
+    notifyServers: true,
+    notifyHosting: true,
+    notifySsl: true,
+    timeZone: 'Asia/Kolkata',
+    preferredHour: 9,
+  });
+  const [isSimulatingNotif, setIsSimulatingNotif] = useState(false);
+  const [simulationStatus, setSimulationStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeModal === 'settings') {
+      getNotificationPreferences()
+        .then((prefs) => {
+          if (prefs) setNotifPrefs(prefs);
+        })
+        .catch(() => {});
+    }
+  }, [activeModal]);
+
+  const toggleThreshold = async (threshold: number) => {
+    const current = notifPrefs.reminderThresholds ?? [15, 7, 3, 1, 0];
+    const updated = current.includes(threshold)
+      ? current.filter((t) => t !== threshold)
+      : [...current, threshold].sort((a, b) => b - a);
+    setNotifPrefs((prev) => ({ ...prev, reminderThresholds: updated }));
+    await updateNotificationPreferences({ reminderThresholds: updated }).catch(() => {});
+  };
+
+  const handleTogglePref = async (key: keyof NotificationPreferences, val: boolean) => {
+    setNotifPrefs((prev) => ({ ...prev, [key]: val }));
+    if (key === 'pushEnabled' && val) {
+      registerForPushNotificationsAsync().catch(() => {});
+    }
+    await updateNotificationPreferences({ [key]: val } as any).catch(() => {});
+  };
+
+  const handleTestAlert = async (days: number) => {
+    setIsSimulatingNotif(true);
+    setSimulationStatus(null);
+    try {
+      const [_, localRes] = await Promise.all([
+        triggerExpirySimulation(days).catch((e) => ({ error: e?.message })),
+        sendLocalTestNotificationAsync(days),
+      ]);
+
+      if (localRes && typeof localRes === 'object' && localRes.permissionGranted === false) {
+        Alert.alert(
+          '🔔 Notification Permission Required',
+          'Notifications are currently disabled on your device. Please open Android Settings -> Apps -> Expo Go -> Notifications and toggle "Allow notifications" ON to see push banners.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        const title = days === 0 ? '🚨 URGENT: Asset Expiring Today!' : `⚠️ Expiry Warning: ${days} Days Remaining`;
+        const body = days === 0
+          ? 'domainpulse.org expires today! Renew immediately to prevent DNS suspension.'
+          : `domainpulse.org will expire in ${days} days. Tap to review renewal options.`;
+
+        Alert.alert(
+          title,
+          `${body}\n\n✓ A system push notification has also been dispatched to your device's notification bar and saved to your Alerts feed.`,
+          [
+            { text: 'View Alerts Feed', onPress: () => router.push('/(tabs)/alerts') },
+            { text: 'Dismiss', style: 'cancel' },
+          ]
+        );
+      }
+
+      setSimulationStatus(`Simulated ${days === 0 ? 'expiry today' : days + 'd reminder'} sent! Check notification tray & alerts.`);
+      setTimeout(() => setSimulationStatus(null), 5000);
+    } catch (err: any) {
+      setSimulationStatus(`Simulation failed: ${err.message || 'Error'}`);
+      setTimeout(() => setSimulationStatus(null), 4000);
+    } finally {
+      setIsSimulatingNotif(false);
+    }
+  };
 
   // Committed Profile State (Displayed on screen)
   const [profileName, setProfileName] = useState(user?.displayName || (user?.email ? user.email.split('@')[0] : 'User Profile'));
@@ -150,6 +320,10 @@ export default function MoreScreen() {
   // Live Provider & Email Accounts State
   const [providerAccounts, setProviderAccounts] = useState<ProviderAccount[]>([]);
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
+  const [allDomains, setAllDomains] = useState<DomainItem[]>([]);
+  const [selectedAccountForDomains, setSelectedAccountForDomains] = useState<ProviderAccount | null>(null);
+  const [domainSearchQuery, setDomainSearchQuery] = useState('');
+  const [domainFilterStatus, setDomainFilterStatus] = useState<'all' | 'safe' | 'warning' | 'critical'>('all');
   const [accountsView, setAccountsView] = useState<'providers' | 'emails'>('providers');
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [newAccType, setNewAccType] = useState<'provider' | 'email'>('provider');
@@ -159,6 +333,51 @@ export default function MoreScreen() {
   const [newAccEmail, setNewAccEmail] = useState('');
   const [newAccNotes, setNewAccNotes] = useState('');
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [syncingProviderId, setSyncingProviderId] = useState<string | null>(null);
+  const [editingTokenAccount, setEditingTokenAccount] = useState<ProviderAccount | null>(null);
+  const [editingTokenValue, setEditingTokenValue] = useState('');
+  const [isSavingToken, setIsSavingToken] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+
+  // Structured Credentials State for Add Account Modal
+  const [newAwsAccessKeyId, setNewAwsAccessKeyId] = useState('');
+  const [newAwsSecretAccessKey, setNewAwsSecretAccessKey] = useState('');
+  const [newAwsSessionToken, setNewAwsSessionToken] = useState('');
+  const [newAwsRegions, setNewAwsRegions] = useState('us-east-1, ap-south-1');
+
+  const [newNamecheapApiKey, setNewNamecheapApiKey] = useState('');
+  const [newNamecheapApiUser, setNewNamecheapApiUser] = useState('');
+  const [newNamecheapClientIp, setNewNamecheapClientIp] = useState('');
+  const [newNamecheapUserName, setNewNamecheapUserName] = useState('');
+
+  const [newGcpProjectId, setNewGcpProjectId] = useState('');
+  const [newGcpClientEmail, setNewGcpClientEmail] = useState('');
+  const [newGcpPrivateKey, setNewGcpPrivateKey] = useState('');
+
+  const [newAzureTenantId, setNewAzureTenantId] = useState('');
+  const [newAzureClientId, setNewAzureClientId] = useState('');
+  const [newAzureClientSecret, setNewAzureClientSecret] = useState('');
+  const [newAzureSubscriptionId, setNewAzureSubscriptionId] = useState('');
+
+  // Structured Credentials State for Edit Modal
+  const [editAwsAccessKeyId, setEditAwsAccessKeyId] = useState('');
+  const [editAwsSecretAccessKey, setEditAwsSecretAccessKey] = useState('');
+  const [editAwsSessionToken, setEditAwsSessionToken] = useState('');
+  const [editAwsRegions, setEditAwsRegions] = useState('us-east-1');
+
+  const [editNamecheapApiKey, setEditNamecheapApiKey] = useState('');
+  const [editNamecheapApiUser, setEditNamecheapApiUser] = useState('');
+  const [editNamecheapClientIp, setEditNamecheapClientIp] = useState('');
+  const [editNamecheapUserName, setEditNamecheapUserName] = useState('');
+
+  const [editGcpProjectId, setEditGcpProjectId] = useState('');
+  const [editGcpClientEmail, setEditGcpClientEmail] = useState('');
+  const [editGcpPrivateKey, setEditGcpPrivateKey] = useState('');
+
+  const [editAzureTenantId, setEditAzureTenantId] = useState('');
+  const [editAzureClientId, setEditAzureClientId] = useState('');
+  const [editAzureClientSecret, setEditAzureClientSecret] = useState('');
+  const [editAzureSubscriptionId, setEditAzureSubscriptionId] = useState('');
 
   // API Server Config State
   const [currentApiUrl, setCurrentApiUrl] = useState(getEffectiveApiUrl());
@@ -168,14 +387,70 @@ export default function MoreScreen() {
 
   const loadAccounts = useCallback(async () => {
     try {
-      const [pList, eList] = await Promise.all([
+      const [pList, eList, dList] = await Promise.all([
         fetchProviderAccountsList(),
         fetchEmailAccountsList(),
+        fetchDomainsList(),
       ]);
-      setProviderAccounts(pList);
+      setProviderAccounts(deduplicateProviderAccounts(pList));
       setEmailAccounts(eList);
+      setAllDomains(dList || []);
     } catch {}
   }, []);
+
+  const getDomainsForAccount = useCallback((account: ProviderAccount, domainsList: DomainItem[]): DomainItem[] => {
+    if (!account) return [];
+    const pKey = (account.providerKey || '').toLowerCase().trim();
+    const pLabel = (account.label || '').toLowerCase().trim();
+    const pId = (account.id || '').toLowerCase().trim();
+    const pExtId = (account.externalAccountId || '').toLowerCase().trim();
+
+    return domainsList.filter((d) => {
+      const registrar = (d.registrar || '').toLowerCase();
+      const dns = (d.dnsProvider || '').toLowerCase();
+      const tags = (d.tags || []).map((t) => t.toLowerCase());
+      const notes = (d.notes || '').toLowerCase();
+
+      // 1. Direct ID match
+      if (pId && (registrar.includes(`(${pId})`) || dns.includes(`(${pId})`) || notes.includes(pId))) {
+        return true;
+      }
+      // 2. Direct external ID / token match
+      if (pExtId && pExtId.length > 5 && (notes.includes(pExtId) || registrar.includes(pExtId))) {
+        return true;
+      }
+      // 3. Provider key match (e.g., 'hostinger', 'cloudflare', 'godaddy', 'namecheap', 'aws')
+      if (pKey && pKey !== 'other') {
+        if (registrar.includes(pKey) || dns.includes(pKey) || tags.some((t) => t.includes(pKey))) return true;
+      }
+      // 4. Provider label match (e.g., 'Hostinger Production VPS')
+      if (pLabel && (registrar.includes(pLabel) || dns.includes(pLabel) || tags.some((t) => t.includes(pLabel)))) {
+        return true;
+      }
+      return false;
+    });
+  }, []);
+
+  const displayedProviderAccounts = useMemo(() => {
+    return deduplicateProviderAccounts(providerAccounts);
+  }, [providerAccounts]);
+
+  const handleSyncAllProviders = async () => {
+    setIsSyncingAll(true);
+    try {
+      const res = await syncAllConnectedProviders();
+      await loadAccounts();
+      showFeedback(
+        'Portfolio Synced',
+        `Discovered ${res.totalDomains} domains and ${res.totalServers} servers across connected providers.`,
+        'success'
+      );
+    } catch (err: any) {
+      showFeedback('Sync Error', err?.message || 'Failed to sync providers.', 'error');
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
 
   useEffect(() => {
     loadAccounts();
@@ -220,18 +495,232 @@ export default function MoreScreen() {
     await loadAccounts();
   };
 
+  const handleOpenEditToken = async (p: ProviderAccount) => {
+    setEditingTokenAccount(p);
+    const existing = (await getProviderToken(p.id)) || (await getProviderToken(p.providerKey)) || p.externalAccountId || '';
+    setEditingTokenValue(existing);
+
+    if (p.providerKey === 'aws') {
+      try {
+        const parsed = JSON.parse(existing);
+        setEditAwsAccessKeyId(parsed.accessKeyId || '');
+        setEditAwsSecretAccessKey(parsed.secretAccessKey || '');
+        setEditAwsSessionToken(parsed.sessionToken || '');
+        setEditAwsRegions(Array.isArray(parsed.regions) ? parsed.regions.join(', ') : (parsed.regions || 'us-east-1'));
+      } catch {
+        setEditAwsAccessKeyId(existing.startsWith('AKIA') ? existing : '');
+        setEditAwsSecretAccessKey('');
+        setEditAwsSessionToken('');
+        setEditAwsRegions('us-east-1');
+      }
+    } else if (p.providerKey === 'namecheap') {
+      try {
+        const parsed = JSON.parse(existing);
+        setEditNamecheapApiKey(parsed.apiKey || '');
+        setEditNamecheapApiUser(parsed.apiUser || '');
+        setEditNamecheapClientIp(parsed.clientIp || '');
+        setEditNamecheapUserName(parsed.userName || '');
+      } catch {
+        setEditNamecheapApiKey(existing);
+        setEditNamecheapApiUser('');
+        setEditNamecheapClientIp('');
+        setEditNamecheapUserName('');
+      }
+    } else if (p.providerKey === 'gcp') {
+      try {
+        const parsed = JSON.parse(existing);
+        setEditGcpProjectId(parsed.projectId || '');
+        setEditGcpClientEmail(parsed.clientEmail || '');
+        setEditGcpPrivateKey(parsed.privateKey || '');
+      } catch {
+        setEditGcpProjectId('');
+        setEditGcpClientEmail('');
+        setEditGcpPrivateKey(existing);
+      }
+    } else if (p.providerKey === 'azure') {
+      try {
+        const parsed = JSON.parse(existing);
+        setEditAzureTenantId(parsed.tenantId || '');
+        setEditAzureClientId(parsed.clientId || '');
+        setEditAzureClientSecret(parsed.clientSecret || '');
+        setEditAzureSubscriptionId(parsed.subscriptionId || '');
+      } catch {
+        setEditAzureTenantId('');
+        setEditAzureClientId('');
+        setEditAzureClientSecret(existing);
+        setEditAzureSubscriptionId('');
+      }
+    }
+  };
+
+  const handleSaveAndSyncToken = async () => {
+    if (!editingTokenAccount) return;
+    let tokenToSave = editingTokenValue.trim();
+
+    if (editingTokenAccount.providerKey === 'aws') {
+      if (!editAwsAccessKeyId.trim()) {
+        showFeedback('Missing Access Key', 'Please enter your AWS Access Key ID (e.g. AKIA...).', 'error');
+        return;
+      }
+      if (!editAwsSecretAccessKey.trim()) {
+        showFeedback('Missing Secret Key', 'Please enter your AWS Secret Access Key.', 'error');
+        return;
+      }
+      const regionsList = (editAwsRegions.trim() || 'us-east-1, ap-south-1')
+        .split(',')
+        .map((r) => r.trim().toLowerCase())
+        .filter(Boolean);
+      tokenToSave = JSON.stringify({
+        accessKeyId: editAwsAccessKeyId.trim(),
+        secretAccessKey: editAwsSecretAccessKey.trim(),
+        ...(editAwsSessionToken.trim() ? { sessionToken: editAwsSessionToken.trim() } : {}),
+        regions: regionsList.length > 0 ? regionsList : ['us-east-1', 'ap-south-1'],
+      });
+    } else if (editingTokenAccount.providerKey === 'namecheap') {
+      if (!editNamecheapApiKey.trim() || !editNamecheapApiUser.trim()) {
+        showFeedback('Missing Credentials', 'Please enter your Namecheap API Key and API User.', 'error');
+        return;
+      }
+      tokenToSave = JSON.stringify({
+        apiKey: editNamecheapApiKey.trim(),
+        apiUser: editNamecheapApiUser.trim(),
+        clientIp: editNamecheapClientIp.trim() || '1.1.1.1',
+        userName: editNamecheapUserName.trim() || editNamecheapApiUser.trim(),
+      });
+    } else if (editingTokenAccount.providerKey === 'gcp') {
+      if (!editGcpProjectId.trim() || !editGcpClientEmail.trim() || !editGcpPrivateKey.trim()) {
+        showFeedback('Missing Credentials', 'Please fill in Project ID, Service Account Email, and Private Key.', 'error');
+        return;
+      }
+      tokenToSave = JSON.stringify({
+        projectId: editGcpProjectId.trim(),
+        clientEmail: editGcpClientEmail.trim(),
+        privateKey: editGcpPrivateKey.trim(),
+      });
+    } else if (editingTokenAccount.providerKey === 'azure') {
+      if (!editAzureTenantId.trim() || !editAzureClientId.trim() || !editAzureClientSecret.trim()) {
+        showFeedback('Missing Credentials', 'Please fill in Tenant ID, Client ID, and Client Secret.', 'error');
+        return;
+      }
+      tokenToSave = JSON.stringify({
+        tenantId: editAzureTenantId.trim(),
+        clientId: editAzureClientId.trim(),
+        clientSecret: editAzureClientSecret.trim(),
+        subscriptionId: editAzureSubscriptionId.trim(),
+      });
+    } else {
+      if (!tokenToSave) {
+        showFeedback('Token Required', 'Please enter a valid API token or key.', 'error');
+        return;
+      }
+    }
+
+    setIsSavingToken(true);
+    try {
+      await saveProviderToken(editingTokenAccount.id, tokenToSave);
+      const existingGeneric = await getProviderToken(editingTokenAccount.providerKey);
+      if (!existingGeneric) {
+        await saveProviderToken(editingTokenAccount.providerKey, tokenToSave);
+      }
+      if (!editingTokenAccount.id.startsWith('pa-')) {
+        apiPatch(`/provider-accounts/${encodeURIComponent(editingTokenAccount.id)}`, {
+          externalAccountId: tokenToSave,
+        }).catch(() => {});
+      }
+      const res = await syncProviderAccount({
+        providerKey: editingTokenAccount.providerKey,
+        accountName: editingTokenAccount.label,
+        apiKey: tokenToSave,
+        providerAccountId: editingTokenAccount.id,
+      });
+      await loadAccounts();
+      setEditingTokenAccount(null);
+      setEditingTokenValue('');
+      showFeedback(
+        res.success ? 'Token Saved & Synced' : 'Sync Notice',
+        res.message,
+        res.success ? 'success' : 'error'
+      );
+    } catch (err: any) {
+      showFeedback('Error', err?.message || 'Failed to save token and sync.', 'error');
+    } finally {
+      setIsSavingToken(false);
+    }
+  };
+
   const handleCreateAccount = async () => {
     if (newAccType === 'provider') {
       if (!newAccLabel.trim()) {
         showFeedback('Missing Label', 'Please enter a descriptive label for this provider account.', 'error');
         return;
       }
+
+      let credentialToken = newAccExternalId.trim();
+      let externalAccountIdToStore = newAccExternalId.trim();
+
+      if (newAccProviderKey === 'aws') {
+        if (!newAwsAccessKeyId.trim()) {
+          showFeedback('Missing Access Key', 'Please enter your AWS Access Key ID (e.g. AKIA...).', 'error');
+          return;
+        }
+        if (!newAwsSecretAccessKey.trim()) {
+          showFeedback('Missing Secret Key', 'Please enter your AWS Secret Access Key.', 'error');
+          return;
+        }
+        const regionsList = (newAwsRegions.trim() || 'us-east-1, ap-south-1')
+          .split(',')
+          .map((r) => r.trim().toLowerCase())
+          .filter(Boolean);
+        credentialToken = JSON.stringify({
+          accessKeyId: newAwsAccessKeyId.trim(),
+          secretAccessKey: newAwsSecretAccessKey.trim(),
+          ...(newAwsSessionToken.trim() ? { sessionToken: newAwsSessionToken.trim() } : {}),
+          regions: regionsList.length > 0 ? regionsList : ['us-east-1', 'ap-south-1'],
+        });
+        externalAccountIdToStore = newAwsAccessKeyId.trim();
+      } else if (newAccProviderKey === 'namecheap') {
+        if (!newNamecheapApiKey.trim() || !newNamecheapApiUser.trim()) {
+          showFeedback('Missing Credentials', 'Please enter your Namecheap API Key and API User.', 'error');
+          return;
+        }
+        credentialToken = JSON.stringify({
+          apiKey: newNamecheapApiKey.trim(),
+          apiUser: newNamecheapApiUser.trim(),
+          clientIp: newNamecheapClientIp.trim() || '1.1.1.1',
+          userName: newNamecheapUserName.trim() || newNamecheapApiUser.trim(),
+        });
+        externalAccountIdToStore = newNamecheapApiUser.trim();
+      } else if (newAccProviderKey === 'gcp') {
+        if (!newGcpProjectId.trim() || !newGcpClientEmail.trim() || !newGcpPrivateKey.trim()) {
+          showFeedback('Missing Credentials', 'Please fill in Project ID, Service Account Email, and Private Key.', 'error');
+          return;
+        }
+        credentialToken = JSON.stringify({
+          projectId: newGcpProjectId.trim(),
+          clientEmail: newGcpClientEmail.trim(),
+          privateKey: newGcpPrivateKey.trim(),
+        });
+        externalAccountIdToStore = newGcpProjectId.trim();
+      } else if (newAccProviderKey === 'azure') {
+        if (!newAzureTenantId.trim() || !newAzureClientId.trim() || !newAzureClientSecret.trim()) {
+          showFeedback('Missing Credentials', 'Please fill in Tenant ID, Client ID, and Client Secret.', 'error');
+          return;
+        }
+        credentialToken = JSON.stringify({
+          tenantId: newAzureTenantId.trim(),
+          clientId: newAzureClientId.trim(),
+          clientSecret: newAzureClientSecret.trim(),
+          subscriptionId: newAzureSubscriptionId.trim(),
+        });
+        externalAccountIdToStore = newAzureClientId.trim();
+      }
+
       setIsCreatingAccount(true);
       try {
-        await createProviderAccount({
+        const createdAcc = await createProviderAccount({
           providerKey: newAccProviderKey,
           label: newAccLabel.trim(),
-          externalAccountId: newAccExternalId.trim() || undefined,
+          externalAccountId: credentialToken || externalAccountIdToStore || undefined,
           notes: newAccNotes.trim() || undefined,
         });
 
@@ -240,18 +729,24 @@ export default function MoreScreen() {
           await syncConsoleAccount({
             developerName: newAccExternalId.trim() || newAccLabel.trim() || 'WorknAi Technologies India Pvt Ltd',
           });
-        } else if (['cloudflare', 'godaddy', 'namecheap', 'hostinger'].includes(newAccProviderKey)) {
-          await syncDomainRegistrar({
+          showFeedback(
+            'Account Connected',
+            `Successfully linked Google Play Console for ${newAccLabel}!`,
+            'success'
+          );
+        } else {
+          const res = await syncProviderAccount({
             providerKey: newAccProviderKey,
             accountName: newAccLabel.trim(),
-            apiKey: newAccExternalId.trim() || undefined,
+            apiKey: credentialToken || undefined,
+            notes: newAccNotes.trim() || undefined,
+            providerAccountId: createdAcc?.id,
           });
-        } else if (['aws', 'digitalocean', 'hetzner'].includes(newAccProviderKey)) {
-          await syncCloudServers({
-            providerKey: newAccProviderKey,
-            accountName: newAccLabel.trim(),
-            apiKey: newAccExternalId.trim() || undefined,
-          });
+          showFeedback(
+            res.success ? 'Account Connected & Synced' : 'Connection Notice',
+            res.message,
+            res.success ? 'success' : 'error'
+          );
         }
 
         await loadAccounts();
@@ -259,11 +754,21 @@ export default function MoreScreen() {
         setNewAccLabel('');
         setNewAccExternalId('');
         setNewAccNotes('');
-        showFeedback(
-          'Account Connected & Synced',
-          `Successfully linked ${newAccLabel} to DomainPulse and synchronized inventory!`,
-          'success'
-        );
+        setNewAwsAccessKeyId('');
+        setNewAwsSecretAccessKey('');
+        setNewAwsSessionToken('');
+        setNewAwsRegions('us-east-1');
+        setNewNamecheapApiKey('');
+        setNewNamecheapApiUser('');
+        setNewNamecheapClientIp('');
+        setNewNamecheapUserName('');
+        setNewGcpProjectId('');
+        setNewGcpClientEmail('');
+        setNewGcpPrivateKey('');
+        setNewAzureTenantId('');
+        setNewAzureClientId('');
+        setNewAzureClientSecret('');
+        setNewAzureSubscriptionId('');
       } catch (err: any) {
         showFeedback('Failed', err?.message || 'Could not connect provider account.', 'error');
       } finally {
@@ -938,7 +1443,7 @@ export default function MoreScreen() {
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <TouchableOpacity
             style={styles.backdropTouchable}
@@ -951,6 +1456,9 @@ export default function MoreScreen() {
           <View
             style={[
               styles.modalSheet,
+              activeModal && MODAL_CONFIG[activeModal]
+                ? { height: MODAL_CONFIG[activeModal].heightPercentage, maxHeight: '95%' }
+                : { height: '88%', maxHeight: '95%' },
               {
                 backgroundColor: colors.surface,
                 paddingBottom: Math.max(insets.bottom, 24),
@@ -998,233 +1506,499 @@ export default function MoreScreen() {
                     <Text style={[styles.importExportCircleBtnText, { color: colors.text, fontSize: 14 }]}>✕</Text>
                   </TouchableOpacity>
                 </View>
-              ) : activeModal === 'providers' ? (
-                <View style={styles.providerHeaderRow}>
-                  <View style={[styles.providerHeaderIconBox, { backgroundColor: '#0284c7' }]}>
-                    <Text style={styles.providerHeaderIconGlyph}>🔗</Text>
+              ) : activeModal && MODAL_CONFIG[activeModal] ? (
+                <View style={[styles.providerHeaderRow, { borderBottomColor: colors.borderSubtle }]}>
+                  <View style={[styles.providerHeaderIconBox, { backgroundColor: MODAL_CONFIG[activeModal].iconBg }]}>
+                    <Ionicons
+                      name={MODAL_CONFIG[activeModal].icon}
+                      size={20}
+                      color={MODAL_CONFIG[activeModal].iconColor}
+                    />
                   </View>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={[styles.providerHeaderTitle, { color: colors.text }]}>Provider Connections</Text>
+                  <View style={{ flex: 1, paddingRight: 4 }}>
+                    <Text style={[styles.providerHeaderTitle, { color: colors.text }]}>
+                      {MODAL_CONFIG[activeModal].title}
+                    </Text>
                     <Text style={[styles.providerHeaderSubtitle, { color: colors.textSecondary }]}>
-                      Manage synced DNS registries and cloud providers to auto-discover domains and servers.
+                      {MODAL_CONFIG[activeModal].subtitle}
                     </Text>
                   </View>
                   <TouchableOpacity
-                    style={[styles.providerCloseBtn, { backgroundColor: isDark ? colors.surfaceHighlight : '#f1f5f9' }]}
+                    style={[
+                      styles.providerCloseBtn,
+                      {
+                        backgroundColor: isDark ? colors.surfaceHighlight : '#f1f5f9',
+                        borderColor: colors.borderSubtle,
+                      },
+                    ]}
                     onPress={() => setActiveModal(null)}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    activeOpacity={0.7}
                   >
-                    <Text style={[styles.providerCloseText, { color: colors.text }]}>✕</Text>
+                    <Ionicons name="close" size={17} color={colors.text} />
                   </TouchableOpacity>
                 </View>
-              ) : (
-                <View style={[styles.sheetHeader, { borderBottomColor: colors.borderSubtle }]}>
-                  <Text style={[styles.sheetTitle, { color: colors.text }]}>
-                    {activeModal === 'profile' && 'User Profile'}
-                    {activeModal === 'settings' && 'App Settings'}
-                    {activeModal === 'security' && 'Security & Auth'}
-                    {activeModal === 'billing' && 'Subscription & Billing'}
-                    {activeModal === 'help' && 'Help & Support'}
-                    {activeModal === 'about' && 'About DomainPulse'}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.closeBtn}
-                    onPress={() => setActiveModal(null)}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  >
-                    <Text style={[styles.closeBtnText, { color: colors.textMuted }]}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              ) : null}
 
               <ScrollView
+                style={{ flex: 1 }}
                 contentContainerStyle={[
                   styles.sheetBody,
-                  { paddingBottom: Spacing.xxl },
+                  { paddingBottom: activeModal === 'providers' ? Math.max(insets.bottom + 48, 64) : Spacing.xxl },
                 ]}
                 showsVerticalScrollIndicator={true}
                 keyboardShouldPersistTaps="handled"
               >
                 {/* 1. PROFILE */}
                 {activeModal === 'profile' && (
-                  <View style={styles.formGroup}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>Full Name</Text>
-                    <TextInput
-                      style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                      value={draftName}
-                      onChangeText={setDraftName}
-                      placeholder="Your Name"
-                      placeholderTextColor={colors.textMuted}
-                    />
-
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.md }]}>
-                      Email Address
-                    </Text>
-                    <TextInput
-                      style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                      value={draftEmail}
-                      onChangeText={setDraftEmail}
-                      placeholder="email@example.com"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      placeholderTextColor={colors.textMuted}
-                    />
-
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.md }]}>
-                      Organization / Company
-                    </Text>
-                    <TextInput
-                      style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                      value={draftOrg}
-                      onChangeText={setDraftOrg}
-                      placeholder="Organization Name"
-                      placeholderTextColor={colors.textMuted}
-                    />
-
-                    <TouchableOpacity
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
-                      onPress={handleSaveProfile}
+                  <View style={{ gap: Spacing.md }}>
+                    {/* User Identity Hero Card */}
+                    <View
+                      style={[
+                        styles.profileModalHeroCard,
+                        {
+                          backgroundColor: isDark ? 'rgba(2, 132, 199, 0.12)' : '#f0f9ff',
+                          borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : '#bae6fd',
+                        },
+                      ]}
                     >
-                      <Text style={styles.primaryActionBtnText}>Save Profile Changes</Text>
-                    </TouchableOpacity>
+                      <View style={styles.profileModalAvatarRow}>
+                        <View style={[styles.profileModalAvatarBox, { backgroundColor: colors.primary }]}>
+                          <Text style={styles.profileModalAvatarText}>
+                            {(draftName || profileName || 'KI').substring(0, 2).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={[styles.profileModalHeroName, { color: colors.text }]}>
+                              {draftName || profileName}
+                            </Text>
+                            <Ionicons name="checkmark-circle" size={17} color="#10b981" />
+                          </View>
+                          <Text style={[styles.profileModalHeroEmail, { color: colors.textSecondary }]}>
+                            {draftEmail || profileEmail}
+                          </Text>
+                          <View style={styles.profileModalBadgeRow}>
+                            <View
+                              style={[
+                                styles.profileModalBadge,
+                                { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#dcfce7' },
+                              ]}
+                            >
+                              <Text style={[styles.profileModalBadgeText, { color: '#10b981' }]}>Workspace Owner</Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.profileModalBadge,
+                                { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.2)' : '#e0f2fe' },
+                              ]}
+                            >
+                              <Text style={[styles.profileModalBadgeText, { color: colors.primary }]}>Active</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Quick Stats Row */}
+                    <View style={styles.profileStatsRow}>
+                      <View
+                        style={[
+                          styles.profileStatCard,
+                          {
+                            backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                            borderColor: colors.borderSubtle,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.profileStatNum, { color: colors.primary }]}>{allDomains.length}</Text>
+                        <Text style={[styles.profileStatLabel, { color: colors.textSecondary }]}>Domains</Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.profileStatCard,
+                          {
+                            backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                            borderColor: colors.borderSubtle,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.profileStatNum, { color: '#10b981' }]}>{providerAccounts.length}</Text>
+                        <Text style={[styles.profileStatLabel, { color: colors.textSecondary }]}>Providers</Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.profileStatCard,
+                          {
+                            backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                            borderColor: colors.borderSubtle,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.profileStatNum, { color: '#f59e0b' }]}>{emailAccounts.length}</Text>
+                        <Text style={[styles.profileStatLabel, { color: colors.textSecondary }]}>Emails</Text>
+                      </View>
+                    </View>
+
+                    {/* Personal Information Form Card */}
+                    <View
+                      style={[
+                        styles.profileModalFormCard,
+                        {
+                          backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                          borderColor: colors.borderSubtle,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.profileModalSectionTitle, { color: colors.text }]}>
+                        Edit Profile Details
+                      </Text>
+                      <Text style={[styles.profileModalSectionSubtitle, { color: colors.textSecondary }]}>
+                        Changes will reflect immediately across your mobile and web dashboard.
+                      </Text>
+
+                      <View style={styles.formGroup}>
+                        <Text style={[styles.label, { color: colors.textSecondary }]}>Full Name</Text>
+                        <View
+                          style={[
+                            styles.profileInputWrapper,
+                            {
+                              borderColor: colors.border,
+                              backgroundColor: isDark ? colors.surfaceHighlight : '#f8fafc',
+                            },
+                          ]}
+                        >
+                          <Ionicons name="person-outline" size={17} color={colors.textMuted} style={{ marginRight: 8 }} />
+                          <TextInput
+                            style={[styles.profileInput, { color: colors.text }]}
+                            value={draftName}
+                            onChangeText={setDraftName}
+                            placeholder="Your Name"
+                            placeholderTextColor={colors.textMuted}
+                          />
+                        </View>
+
+                        <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.md }]}>
+                          Email Address
+                        </Text>
+                        <View
+                          style={[
+                            styles.profileInputWrapper,
+                            {
+                              borderColor: colors.border,
+                              backgroundColor: isDark ? colors.surfaceHighlight : '#f8fafc',
+                            },
+                          ]}
+                        >
+                          <Ionicons name="mail-outline" size={17} color={colors.textMuted} style={{ marginRight: 8 }} />
+                          <TextInput
+                            style={[styles.profileInput, { color: colors.text }]}
+                            value={draftEmail}
+                            onChangeText={setDraftEmail}
+                            placeholder="email@example.com"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            placeholderTextColor={colors.textMuted}
+                          />
+                        </View>
+
+                        <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.md }]}>
+                          Organization / Company
+                        </Text>
+                        <View
+                          style={[
+                            styles.profileInputWrapper,
+                            {
+                              borderColor: colors.border,
+                              backgroundColor: isDark ? colors.surfaceHighlight : '#f8fafc',
+                            },
+                          ]}
+                        >
+                          <Ionicons name="business-outline" size={17} color={colors.textMuted} style={{ marginRight: 8 }} />
+                          <TextInput
+                            style={[styles.profileInput, { color: colors.text }]}
+                            value={draftOrg}
+                            onChangeText={setDraftOrg}
+                            placeholder="Organization Name"
+                            placeholderTextColor={colors.textMuted}
+                          />
+                        </View>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.primaryActionBtn,
+                            {
+                              backgroundColor: colors.primary,
+                              marginTop: Spacing.lg,
+                              flexDirection: 'row',
+                              gap: 8,
+                            },
+                          ]}
+                          onPress={handleSaveProfile}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="checkmark-circle-outline" size={20} color="#ffffff" />
+                          <Text style={styles.primaryActionBtnText}>Save Profile Changes</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   </View>
                 )}
 
                 {/* 2. PROVIDER CONNECTIONS & ACCOUNTS */}
                 {activeModal === 'providers' && (
-                  <View style={{ gap: Spacing.lg }}>
+                  <View style={{ gap: Spacing.md }}>
                     {/* Hero Banner Card */}
                     <View
                       style={[
                         styles.providerHeroCard,
                         {
-                          backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : '#e0f2fe',
-                          borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : '#bae6fd',
+                          backgroundColor: isDark ? 'rgba(2, 132, 199, 0.12)' : '#f0f9ff',
+                          borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : '#bae6fd',
                         },
                       ]}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.providerHeroTitle, { color: isDark ? '#38bdf8' : '#0369a1' }]}>
-                          Accounts & Integrations
-                        </Text>
-                        <Text style={[styles.providerHeroSubtitle, { color: colors.textSecondary }]}>
-                          Synchronize DNS providers, registrar credentials and infrastructure email accounts.
-                        </Text>
-                        <View style={styles.heroTagsRow}>
-                          <View style={[styles.heroTagPill, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}>
-                            <Text style={[styles.heroTagCheck, { color: '#16a34a' }]}>✓</Text>
-                            <Text style={[styles.heroTagText, { color: colors.text }]}>{providerAccounts.length} Providers</Text>
-                          </View>
-                          <View style={[styles.heroTagPill, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}>
-                            <Text style={styles.heroTagIcon}>✉️</Text>
-                            <Text style={[styles.heroTagText, { color: colors.text }]}>{emailAccounts.length} Emails</Text>
-                          </View>
+                      {/* Top Row: Category Badge & Sync All Button */}
+                      <View style={styles.providerHeroTopRow}>
+                        <View
+                          style={[
+                            styles.providerHeroBadge,
+                            {
+                              backgroundColor: isDark ? 'rgba(2, 132, 199, 0.22)' : '#e0f2fe',
+                              borderColor: isDark ? 'rgba(56, 189, 248, 0.35)' : '#bae6fd',
+                            },
+                          ]}
+                        >
+                          <View style={styles.heroPulseDot} />
+                          <Text style={[styles.providerHeroBadgeText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                            CLOUD &amp; REGISTRAR HUB
+                          </Text>
                         </View>
+
+                        <TouchableOpacity
+                          style={[styles.syncAllHeroBtn, { backgroundColor: '#0284c7' }]}
+                          disabled={isSyncingAll}
+                          onPress={handleSyncAllProviders}
+                          activeOpacity={0.8}
+                        >
+                          {isSyncingAll ? (
+                            <ActivityIndicator color="#ffffff" size="small" />
+                          ) : (
+                            <>
+                              <Ionicons name="sync" size={13} color="#ffffff" style={{ marginRight: 5 }} />
+                              <Text style={styles.syncAllHeroBtnText}>Sync All</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
                       </View>
-                      <View style={styles.heroGlobeBox}>
-                        <Text style={styles.heroGlobeIcon}>🌐</Text>
+
+                      {/* Title & Description */}
+                      <Text style={[styles.providerHeroTitle, { color: colors.text }]}>
+                        Automated Portfolio Sync
+                      </Text>
+                      <Text style={[styles.providerHeroSubtitle, { color: colors.textSecondary }]}>
+                        Connect DNS registrars and VPS clouds to discover domains, host records, servers and mobile apps in real-time.
+                      </Text>
+
+                      {/* Stat Metrics Row */}
+                      <View style={styles.heroTagsRow}>
+                        <View
+                          style={[
+                            styles.heroTagPill,
+                            {
+                              backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                              borderColor: isDark ? colors.border : '#e2e8f0',
+                            },
+                          ]}
+                        >
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10b981' }} />
+                          <Text style={[styles.heroTagText, { color: colors.text }]}>
+                            {displayedProviderAccounts.length} Connected
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.heroTagPill,
+                            {
+                              backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                              borderColor: isDark ? colors.border : '#e2e8f0',
+                            },
+                          ]}
+                        >
+                          <Ionicons name="mail-outline" size={12} color={colors.textSecondary} />
+                          <Text style={[styles.heroTagText, { color: colors.text }]}>
+                            {emailAccounts.length} Emails
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.heroTagPill,
+                            {
+                              backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                              borderColor: isDark ? colors.border : '#e2e8f0',
+                            },
+                          ]}
+                        >
+                          <Ionicons name="flash-outline" size={12} color="#0284c7" />
+                          <Text style={[styles.heroTagText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                            Live API Sync
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
-                    {/* View Switcher: Provider Accounts vs Email Accounts */}
+                    {/* View Switcher: Segmented Tabs */}
                     <View
-                      style={{
-                        flexDirection: 'row',
-                        backgroundColor: isDark ? colors.surfaceElevated : '#f1f5f9',
-                        borderRadius: 12,
-                        padding: 4,
-                      }}
+                      style={[
+                        styles.segmentedControl,
+                        {
+                          backgroundColor: isDark ? colors.surfaceElevated : '#f1f5f9',
+                          borderColor: colors.borderSubtle,
+                        },
+                      ]}
                     >
                       <TouchableOpacity
-                        style={{
-                          flex: 1,
-                          paddingVertical: 10,
-                          alignItems: 'center',
-                          borderRadius: 8,
-                          backgroundColor: accountsView === 'providers' ? colors.primary : 'transparent',
-                        }}
+                        style={[
+                          styles.segmentedTab,
+                          accountsView === 'providers' && {
+                            backgroundColor: colors.primary,
+                            shadowColor: colors.primary,
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 4,
+                            elevation: 2,
+                          },
+                        ]}
                         onPress={() => setAccountsView('providers')}
+                        activeOpacity={0.8}
                       >
+                        <Ionicons
+                          name="cloud-outline"
+                          size={15}
+                          color={accountsView === 'providers' ? '#ffffff' : colors.textSecondary}
+                        />
                         <Text
-                          style={{
-                            color: accountsView === 'providers' ? '#ffffff' : colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: 13,
-                          }}
+                          style={[
+                            styles.segmentedTabText,
+                            {
+                              color: accountsView === 'providers' ? '#ffffff' : colors.textSecondary,
+                            },
+                          ]}
                         >
-                          Provider Accounts ({providerAccounts.length})
+                          Cloud Providers ({displayedProviderAccounts.length})
                         </Text>
                       </TouchableOpacity>
+
                       <TouchableOpacity
-                        style={{
-                          flex: 1,
-                          paddingVertical: 10,
-                          alignItems: 'center',
-                          borderRadius: 8,
-                          backgroundColor: accountsView === 'emails' ? colors.primary : 'transparent',
-                        }}
+                        style={[
+                          styles.segmentedTab,
+                          accountsView === 'emails' && {
+                            backgroundColor: colors.primary,
+                            shadowColor: colors.primary,
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 4,
+                            elevation: 2,
+                          },
+                        ]}
                         onPress={() => setAccountsView('emails')}
+                        activeOpacity={0.8}
                       >
+                        <Ionicons
+                          name="mail-outline"
+                          size={15}
+                          color={accountsView === 'emails' ? '#ffffff' : colors.textSecondary}
+                        />
                         <Text
-                          style={{
-                            color: accountsView === 'emails' ? '#ffffff' : colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: 13,
-                          }}
+                          style={[
+                            styles.segmentedTabText,
+                            {
+                              color: accountsView === 'emails' ? '#ffffff' : colors.textSecondary,
+                            },
+                          ]}
                         >
                           Email Accounts ({emailAccounts.length})
                         </Text>
                       </TouchableOpacity>
                     </View>
 
-                    {/* Section Header with Add Button */}
+                    {/* Section Heading with Add Button */}
                     <View style={styles.providerSectionHeader}>
-                      <View style={styles.providerSectionTitleLeft}>
-                        <Text style={[styles.providerSectionTitle, { color: colors.text }]}>
-                          {accountsView === 'providers' ? 'Connected Providers' : 'Managed Email Accounts'}
-                        </Text>
-                      </View>
+                      <Text style={[styles.providerSectionTitle, { color: colors.textSecondary }]}>
+                        {accountsView === 'providers' ? 'CONNECTED PROVIDERS' : 'MANAGED EMAIL ACCOUNTS'}
+                      </Text>
                       <TouchableOpacity
-                        style={{
-                          backgroundColor: '#0284c7',
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          borderRadius: 8,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
+                        style={styles.addAccountHeaderBtn}
                         onPress={() => {
                           setNewAccType(accountsView === 'providers' ? 'provider' : 'email');
                           setIsAddAccountModalOpen(true);
                         }}
+                        activeOpacity={0.8}
                       >
-                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>+ Add Account</Text>
+                        <Ionicons name="add" size={15} color="#ffffff" />
+                        <Text style={styles.addAccountHeaderBtnText}>
+                          {accountsView === 'providers' ? 'Add Provider' : 'Add Email'}
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
                     {/* List Section */}
                     {accountsView === 'providers' ? (
                       <View style={styles.providerCardsList}>
-                        {providerAccounts.length === 0 ? (
-                          <View style={{ padding: 24, alignItems: 'center' }}>
-                            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>No provider accounts connected yet.</Text>
+                        {displayedProviderAccounts.length === 0 ? (
+                          <View
+                            style={[
+                              styles.emptyProviderBox,
+                              {
+                                backgroundColor: isDark ? colors.surfaceElevated : '#f8fafc',
+                                borderColor: colors.borderSubtle,
+                              },
+                            ]}
+                          >
+                            <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} style={{ marginBottom: 10 }} />
+                            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15, marginBottom: 4 }}>
+                              No Connected Providers
+                            </Text>
+                            <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center', maxWidth: 280, marginBottom: 14 }}>
+                              Connect Hostinger, Cloudflare, or AWS to auto-sync your domains and VPS infrastructure.
+                            </Text>
+                            <TouchableOpacity
+                              style={[styles.emptyActionBtn, { backgroundColor: '#0284c7' }]}
+                              onPress={() => {
+                                setNewAccType('provider');
+                                setIsAddAccountModalOpen(true);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons name="add-circle-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                              <Text style={styles.emptyActionBtnText}>Connect Your First Provider</Text>
+                            </TouchableOpacity>
                           </View>
                         ) : (
-                          providerAccounts.map((p) => {
+                          displayedProviderAccounts.map((p) => {
                             const key = (p.providerKey || '').toLowerCase();
+                            const accountDomains = getDomainsForAccount(p, allDomains);
                             return (
                               <View
                                 key={p.id}
                                 style={[
-                                  styles.providerCard,
+                                  styles.connectedProviderCard,
                                   {
                                     backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
                                     borderColor: isDark ? colors.border : '#e2e8f0',
                                   },
                                 ]}
                               >
-                                <View style={styles.providerCardLeft}>
+                                {/* Header: Identity & Status (Clickable to open domains!) */}
+                                <TouchableOpacity
+                                  style={styles.providerCardHeader}
+                                  onPress={() => {
+                                    setSelectedAccountForDomains(p);
+                                    setDomainSearchQuery('');
+                                    setDomainFilterStatus('all');
+                                  }}
+                                  activeOpacity={0.7}
+                                >
                                   <View
                                     style={[
                                       styles.providerLogoBox,
@@ -1241,38 +2015,228 @@ export default function MoreScreen() {
                                         contentFit="contain"
                                       />
                                     ) : (
-                                      <Text style={styles.providerLogoGlyph}>🌐</Text>
+                                      <Ionicons name="cloud-outline" size={22} color={colors.primary} />
                                     )}
                                   </View>
-                                  <View style={styles.providerTextCol}>
-                                    <Text style={[styles.providerItemName, { color: colors.text }]}>{p.label}</Text>
-                                    <View style={styles.statusDotRow}>
-                                      <View style={[styles.statusDot, { backgroundColor: '#10b981' }]} />
-                                      <Text style={[styles.statusDotText, { color: '#10b981' }]}>
-                                        {p.providerKey.toUpperCase()}
+
+                                  <View style={styles.providerInfoCol}>
+                                    <View style={styles.providerTitleRow}>
+                                      <Text style={[styles.providerItemName, { color: colors.text }]} numberOfLines={1}>
+                                        {p.label}
+                                      </Text>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <View style={styles.activeStatusPill}>
+                                          <View style={styles.activeStatusDot} />
+                                          <Text style={styles.activeStatusText}>Connected</Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                          style={{
+                                            width: 22,
+                                            height: 22,
+                                            borderRadius: 11,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                          }}
+                                          onPress={async (e) => {
+                                            e.stopPropagation?.();
+                                            await deleteProviderAccount(p.id);
+                                            await loadAccounts();
+                                            showFeedback('Disconnected', `Removed ${p.label}.`, 'info');
+                                          }}
+                                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                          activeOpacity={0.6}
+                                        >
+                                          <Ionicons name="close" size={13} color={colors.textMuted} />
+                                        </TouchableOpacity>
+                                      </View>
+                                    </View>
+
+                                    {/* Meta pills: Provider Key + API Key Preview */}
+                                    <View style={styles.providerMetaRow}>
+                                      <View
+                                        style={[
+                                          styles.providerKeyTag,
+                                          { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : '#e0f2fe' },
+                                        ]}
+                                      >
+                                        <Text style={[styles.providerKeyTagText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                                          {p.providerKey.toUpperCase()}
+                                        </Text>
+                                      </View>
+
+                                      <View
+                                        style={[
+                                          styles.providerKeyPreviewBadge,
+                                          {
+                                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#f1f5f9',
+                                            borderColor: isDark ? colors.border : '#e2e8f0',
+                                          },
+                                        ]}
+                                      >
+                                        <Ionicons name="key-outline" size={11} color={colors.textSecondary} />
+                                        <Text style={[styles.providerIdText, { color: colors.textSecondary }]} numberOfLines={1}>
+                                          {p.externalAccountId
+                                            ? `${p.externalAccountId.length > 14 ? `${p.externalAccountId.slice(0, 6)}...${p.externalAccountId.slice(-4)}` : p.externalAccountId}`
+                                            : 'Direct API Linked'}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                  </View>
+                                </TouchableOpacity>
+
+                                {/* Clickable Domains Banner: Shows domain count & opens all domains on click */}
+                                <TouchableOpacity
+                                  style={[
+                                    styles.accountDomainsBadgeRow,
+                                    {
+                                      backgroundColor: isDark ? 'rgba(2, 132, 199, 0.12)' : '#f0f9ff',
+                                      borderColor: isDark ? 'rgba(56, 189, 248, 0.28)' : '#bae6fd',
+                                    },
+                                  ]}
+                                  onPress={() => {
+                                    setSelectedAccountForDomains(p);
+                                    setDomainSearchQuery('');
+                                    setDomainFilterStatus('all');
+                                  }}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={styles.domainsBadgeRowLeft}>
+                                    <View
+                                      style={[
+                                        styles.domainGlobeIconBadge,
+                                        { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.2)' : '#e0f2fe' },
+                                      ]}
+                                    >
+                                      <Ionicons name="globe-outline" size={16} color={isDark ? '#38bdf8' : '#0284c7'} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={[styles.accountDomainsCountText, { color: colors.text }]}>
+                                          {accountDomains.length} {accountDomains.length === 1 ? 'Domain' : 'Domains'} Managed
+                                        </Text>
+                                        <View
+                                          style={[
+                                            styles.domainActiveBadgePill,
+                                            {
+                                              backgroundColor:
+                                                accountDomains.length > 0
+                                                  ? 'rgba(16, 185, 129, 0.15)'
+                                                  : isDark
+                                                  ? 'rgba(255, 255, 255, 0.08)'
+                                                  : '#f1f5f9',
+                                            },
+                                          ]}
+                                        >
+                                          <Text
+                                            style={[
+                                              styles.domainActiveBadgeText,
+                                              { color: accountDomains.length > 0 ? '#10b981' : colors.textMuted },
+                                            ]}
+                                          >
+                                            {accountDomains.length > 0 ? 'Synchronized' : 'None Synced'}
+                                          </Text>
+                                        </View>
+                                      </View>
+                                      <Text style={[styles.accountDomainsSubText, { color: colors.textSecondary }]} numberOfLines={1}>
+                                        {accountDomains.length > 0
+                                          ? `${accountDomains.slice(0, 3).map((d) => d.name).join(', ')}${accountDomains.length > 3 ? ` +${accountDomains.length - 3} more` : ''}`
+                                          : 'Tap to view details or sync with provider'}
                                       </Text>
                                     </View>
-                                    <Text style={[styles.lastSyncedText, { color: colors.textMuted }]}>
-                                      {p.externalAccountId ? `ID: ${p.externalAccountId}` : 'Active API Sync'}
-                                    </Text>
                                   </View>
-                                </View>
 
-                                <View style={styles.providerCardRight}>
+                                  <View
+                                    style={[
+                                      styles.viewDomainsActionPill,
+                                      { backgroundColor: isDark ? 'rgba(2, 132, 199, 0.25)' : '#e0f2fe' },
+                                    ]}
+                                  >
+                                    <Text style={[styles.viewDomainsActionText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                                      View All
+                                    </Text>
+                                    <Ionicons name="chevron-forward" size={13} color={isDark ? '#38bdf8' : '#0284c7'} />
+                                  </View>
+                                </TouchableOpacity>
+
+                                {/* Divider */}
+                                <View
+                                  style={[
+                                    styles.providerCardDivider,
+                                    { backgroundColor: isDark ? colors.border : '#f1f5f9' },
+                                  ]}
+                                />
+
+                                {/* Action Toolbar (3 comfortable touch-target buttons) */}
+                                <View style={styles.providerActionRow}>
                                   <TouchableOpacity
-                                    style={{
-                                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                      paddingHorizontal: 10,
-                                      paddingVertical: 6,
-                                      borderRadius: 6,
+                                    style={[styles.providerSyncBtn, { backgroundColor: '#0284c7' }]}
+                                    disabled={syncingProviderId === p.id}
+                                    onPress={async () => {
+                                      setSyncingProviderId(p.id);
+                                      try {
+                                        const res = await syncProviderAccount({
+                                          providerKey: p.providerKey,
+                                          accountName: p.label,
+                                          apiKey: p.externalAccountId || undefined,
+                                          providerAccountId: p.id,
+                                        });
+                                        await loadAccounts();
+                                        showFeedback(
+                                          res.success ? 'Provider Synced' : 'Sync Notice',
+                                          res.message,
+                                          res.success ? 'success' : 'error'
+                                        );
+                                      } catch (err: any) {
+                                        showFeedback('Sync Error', err?.message || 'Failed to sync provider.', 'error');
+                                      } finally {
+                                        setSyncingProviderId(null);
+                                      }
                                     }}
+                                    activeOpacity={0.8}
+                                  >
+                                    {syncingProviderId === p.id ? (
+                                      <ActivityIndicator color="#ffffff" size="small" />
+                                    ) : (
+                                      <>
+                                        <Ionicons name="sync" size={14} color="#ffffff" style={{ marginRight: 5 }} />
+                                        <Text style={styles.providerSyncBtnText}>Sync Now</Text>
+                                      </>
+                                    )}
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.providerTokenBtn,
+                                      {
+                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#f8fafc',
+                                        borderColor: isDark ? colors.border : '#e2e8f0',
+                                      },
+                                    ]}
+                                    onPress={() => handleOpenEditToken(p)}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Ionicons
+                                      name="key-outline"
+                                      size={14}
+                                      color={colors.text}
+                                      style={{ marginRight: 5 }}
+                                    />
+                                    <Text style={[styles.providerTokenBtnText, { color: colors.text }]}>Token</Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={styles.providerDisconnectBtn}
                                     onPress={async () => {
                                       await deleteProviderAccount(p.id);
                                       await loadAccounts();
                                       showFeedback('Disconnected', `Removed ${p.label}.`, 'info');
                                     }}
+                                    activeOpacity={0.7}
                                   >
-                                    <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Disconnect</Text>
+                                    <Ionicons name="trash-outline" size={14} color="#ef4444" style={{ marginRight: 5 }} />
+                                    <Text style={styles.providerDisconnectBtnText}>Remove</Text>
                                   </TouchableOpacity>
                                 </View>
                               </View>
@@ -1283,57 +2247,102 @@ export default function MoreScreen() {
                     ) : (
                       <View style={styles.providerCardsList}>
                         {emailAccounts.length === 0 ? (
-                          <View style={{ padding: 24, alignItems: 'center' }}>
-                            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>No email accounts added yet.</Text>
+                          <View
+                            style={[
+                              styles.emptyProviderBox,
+                              {
+                                backgroundColor: isDark ? colors.surfaceElevated : '#f8fafc',
+                                borderColor: colors.borderSubtle,
+                              },
+                            ]}
+                          >
+                            <Ionicons name="mail-unread-outline" size={36} color={colors.textMuted} style={{ marginBottom: 10 }} />
+                            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15, marginBottom: 4 }}>
+                              No Email Accounts Added
+                            </Text>
+                            <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center', maxWidth: 280, marginBottom: 14 }}>
+                              Add an email account for login credentials, notifications, and alert monitoring.
+                            </Text>
+                            <TouchableOpacity
+                              style={[styles.emptyActionBtn, { backgroundColor: '#0284c7' }]}
+                              onPress={() => {
+                                setNewAccType('email');
+                                setIsAddAccountModalOpen(true);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons name="add-circle-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                              <Text style={styles.emptyActionBtnText}>Add Your First Email Account</Text>
+                            </TouchableOpacity>
                           </View>
                         ) : (
                           emailAccounts.map((e) => (
                             <View
                               key={e.id}
                               style={[
-                                styles.providerCard,
+                                styles.connectedProviderCard,
                                 {
                                   backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
                                   borderColor: isDark ? colors.border : '#e2e8f0',
                                 },
                               ]}
                             >
-                              <View style={styles.providerCardLeft}>
+                              <View style={styles.providerCardHeader}>
                                 <View
                                   style={[
                                     styles.providerLogoBox,
                                     {
-                                      backgroundColor: isDark ? 'rgba(56, 189, 248, 0.1)' : '#f0f9ff',
-                                      borderColor: isDark ? colors.border : '#e2e8f0',
+                                      backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : '#e0f2fe',
+                                      borderColor: isDark ? colors.border : '#bae6fd',
                                     },
                                   ]}
                                 >
-                                  <Text style={{ fontSize: 20 }}>✉️</Text>
+                                  <Ionicons name="mail" size={20} color={colors.primary} />
                                 </View>
-                                <View style={styles.providerTextCol}>
-                                  <Text style={[styles.providerItemName, { color: colors.text }]}>{e.email}</Text>
-                                  <Text style={[styles.lastSyncedText, { color: colors.textSecondary }]}>
-                                    {e.label || 'Login / Notifications Account'}
-                                  </Text>
-                                </View>
-                              </View>
 
-                              <View style={styles.providerCardRight}>
-                                <TouchableOpacity
-                                  style={{
-                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 6,
-                                    borderRadius: 6,
-                                  }}
-                                  onPress={async () => {
-                                    await deleteEmailAccount(e.id);
-                                    await loadAccounts();
-                                    showFeedback('Removed', `Removed email account ${e.email}.`, 'info');
-                                  }}
-                                >
-                                  <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Delete</Text>
-                                </TouchableOpacity>
+                                <View style={styles.providerInfoCol}>
+                                  <View style={styles.providerTitleRow}>
+                                    <Text style={[styles.providerItemName, { color: colors.text }]} numberOfLines={1}>
+                                      {e.email}
+                                    </Text>
+                                    <TouchableOpacity
+                                      style={{
+                                        width: 22,
+                                        height: 22,
+                                        borderRadius: 11,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                      }}
+                                      onPress={async (evt) => {
+                                        evt.stopPropagation?.();
+                                        await deleteEmailAccount(e.id);
+                                        await loadAccounts();
+                                        showFeedback('Removed', `Removed email account ${e.email}.`, 'info');
+                                      }}
+                                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                      activeOpacity={0.6}
+                                    >
+                                      <Ionicons name="close" size={13} color={colors.textMuted} />
+                                    </TouchableOpacity>
+                                  </View>
+
+                                  <View style={styles.providerMetaRow}>
+                                    <View
+                                      style={[
+                                        styles.providerKeyTag,
+                                        { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#dcfce7' },
+                                      ]}
+                                    >
+                                      <Text style={[styles.providerKeyTagText, { color: isDark ? '#34d399' : '#15803d' }]}>
+                                        ACTIVE EMAIL
+                                      </Text>
+                                    </View>
+                                    <Text style={[styles.providerIdText, { color: colors.textSecondary }]}>
+                                      {e.label || 'Login / Notifications Account'}
+                                    </Text>
+                                  </View>
+                                </View>
                               </View>
                             </View>
                           ))
@@ -1341,36 +2350,42 @@ export default function MoreScreen() {
                       </View>
                     )}
 
-                    {/* Available Integrations */}
-                    <View style={styles.providerSection}>
-                      <View style={styles.providerSectionHeader}>
-                        <View style={styles.providerSectionTitleLeft}>
-                          <Text style={[styles.providerSectionTitle, { color: colors.text }]}>Supported Cloud Providers</Text>
-                        </View>
+                    {/* Available Supported Integrations Directory */}
+                    <View style={{ marginTop: 8, gap: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={[styles.providerSectionTitle, { color: colors.textSecondary }]}>
+                          SUPPORTED CLOUD PLATFORMS (8)
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '600' }}>
+                          Instant Discovery
+                        </Text>
                       </View>
 
                       <View style={styles.providerCardsList}>
                         {[
-                          { key: 'google-play', name: 'Google Play Console', desc: 'Sync mobile apps from developer account' },
-                          { key: 'hostinger', name: 'Hostinger Cloud & VPS', desc: 'Sync VPS servers and domains' },
-                          { key: 'cloudflare', name: 'Cloudflare DNS', desc: 'Sync DNS zones, SSL and edge rules' },
-                          { key: 'godaddy', name: 'GoDaddy Domains & DNS', desc: 'Sync domains and DNS records' },
-                          { key: 'aws', name: 'Amazon Route 53 & EC2', desc: 'Sync AWS instances and DNS' },
-                          { key: 'namecheap', name: 'Namecheap API', desc: 'Sync registered domain portfolio' },
-                          { key: 'digitalocean', name: 'DigitalOcean Droplets', desc: 'Sync droplets, IP addresses & DNS' },
-                          { key: 'hetzner', name: 'Hetzner Cloud', desc: 'Sync bare metal & cloud VPS nodes' },
-                        ].map((prov) => (
-                          <View
-                            key={prov.key}
-                            style={[
-                              styles.providerCard,
-                              {
-                                backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
-                                borderColor: isDark ? colors.border : '#e2e8f0',
-                              },
-                            ]}
-                          >
-                            <View style={styles.providerCardLeft}>
+                          { key: 'google-play', name: 'Google Play & Console', tag: 'Store & Apps', desc: 'Universal developer search & live apps sync' },
+                          { key: 'hostinger', name: 'Hostinger Cloud & VPS', tag: 'VPS & Domains', desc: 'Sync VPS servers and domains via API' },
+                          { key: 'cloudflare', name: 'Cloudflare DNS', tag: 'DNS & SSL', desc: 'Sync DNS zones, SSL certificates & edge rules' },
+                          { key: 'godaddy', name: 'GoDaddy Domains & DNS', tag: 'Registrar', desc: 'Sync domains and nameserver records' },
+                          { key: 'aws', name: 'Amazon Route 53 & EC2', tag: 'Cloud Infra', desc: 'Sync AWS cloud instances & Route 53 zones' },
+                          { key: 'namecheap', name: 'Namecheap API', tag: 'Domains', desc: 'Sync registered domain portfolio' },
+                          { key: 'digitalocean', name: 'DigitalOcean Droplets', tag: 'VPS & DNS', desc: 'Sync droplets, IP addresses & DNS' },
+                          { key: 'hetzner', name: 'Hetzner Cloud', tag: 'VPS Nodes', desc: 'Sync bare metal & cloud VPS nodes' },
+                        ].map((prov) => {
+                          const isAlreadyConnected = providerAccounts.some(
+                            (a) => a.providerKey.toLowerCase() === prov.key.toLowerCase()
+                          );
+                          return (
+                            <View
+                              key={prov.key}
+                              style={[
+                                styles.supportedProviderCard,
+                                {
+                                  backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                                  borderColor: isDark ? colors.border : '#e2e8f0',
+                                },
+                              ]}
+                            >
                               <View
                                 style={[
                                   styles.providerLogoBox,
@@ -1387,31 +2402,71 @@ export default function MoreScreen() {
                                     contentFit="contain"
                                   />
                                 ) : (
-                                  <Text style={styles.providerLogoGlyph}>☁️</Text>
+                                  <Ionicons name="cloud-outline" size={20} color={colors.primary} />
                                 )}
                               </View>
-                              <View style={styles.providerTextCol}>
-                                <Text style={[styles.providerItemName, { color: colors.text }]}>{prov.name}</Text>
-                                <Text style={[styles.lastSyncedText, { color: colors.textMuted }]}>{prov.desc}</Text>
+
+                              <View style={styles.supportedProviderTextCol}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Text style={[styles.supportedProviderName, { color: colors.text }]} numberOfLines={1}>
+                                    {prov.name}
+                                  </Text>
+                                  <View
+                                    style={[
+                                      styles.supportedTagPill,
+                                      {
+                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.07)' : '#f1f5f9',
+                                        borderColor: isDark ? colors.border : '#e2e8f0',
+                                      },
+                                    ]}
+                                  >
+                                    <Text style={[styles.supportedTagText, { color: colors.textSecondary }]}>{prov.tag}</Text>
+                                  </View>
+                                </View>
+                                <Text style={[styles.supportedProviderDesc, { color: colors.textSecondary }]} numberOfLines={1}>
+                                  {prov.desc}
+                                </Text>
+                              </View>
+
+                              <View style={styles.supportedProviderRight}>
+                                {isAlreadyConnected && prov.key !== 'google-play' ? (
+                                  <View style={styles.connectedBadgePill}>
+                                    <Ionicons name="checkmark-circle" size={13} color="#10b981" />
+                                    <Text style={styles.connectedBadgeText}>Connected</Text>
+                                  </View>
+                                ) : (
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.connectSolidBtn,
+                                      { backgroundColor: prov.key === 'google-play' ? '#01875f' : '#0284c7' },
+                                    ]}
+                                    onPress={() => {
+                                      if (prov.key === 'google-play') {
+                                        router.push('/google-play');
+                                      } else {
+                                        setNewAccType('provider');
+                                        setNewAccProviderKey(prov.key);
+                                        setNewAccLabel(`${prov.name} Account`);
+                                        setIsAddAccountModalOpen(true);
+                                      }
+                                    }}
+                                    activeOpacity={0.8}
+                                  >
+                                    <Ionicons
+                                      name={prov.key === 'google-play' ? 'arrow-forward' : 'add'}
+                                      size={13}
+                                      color="#ffffff"
+                                      style={{ marginRight: 3 }}
+                                    />
+                                    <Text style={styles.connectSolidBtnText}>
+                                      {prov.key === 'google-play' ? 'Explore' : 'Connect'}
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
                               </View>
                             </View>
-
-                            <View style={styles.providerCardRight}>
-                              <TouchableOpacity
-                                style={[styles.connectSolidBtn, { backgroundColor: '#0284c7' }]}
-                                onPress={() => {
-                                  setNewAccType('provider');
-                                  setNewAccProviderKey(prov.key);
-                                  setNewAccLabel(`${prov.name} Account`);
-                                  setIsAddAccountModalOpen(true);
-                                }}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={styles.connectSolidBtnText}>+ Connect</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        ))}
+                          );
+                        })}
                       </View>
                     </View>
                   </View>
@@ -1837,45 +2892,164 @@ export default function MoreScreen() {
 
                     <View style={styles.switchRow}>
                       <View style={styles.switchTextCol}>
-                        <Text style={[styles.switchTitle, { color: colors.text }]}>Push Notifications</Text>
+                        <Text style={[styles.switchTitle, { color: colors.text, fontWeight: '700' }]}>Push Notifications</Text>
                         <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
-                          Instant alerts for domain down-time and DNS drift
+                          Receive automated push alerts on your registered mobile devices
                         </Text>
                       </View>
                       <Switch
-                        value={pushAlerts}
-                        onValueChange={setPushAlerts}
-                        trackColor={{ false: '#cbd5e1', true: '#38bdf8' }}
+                        value={notifPrefs.pushEnabled}
+                        onValueChange={(val) => handleTogglePref('pushEnabled', val)}
+                        trackColor={{ false: '#cbd5e1', true: colors.primary }}
                       />
                     </View>
 
-                    <View style={styles.switchRow}>
-                      <View style={styles.switchTextCol}>
-                        <Text style={[styles.switchTitle, { color: colors.text }]}>Domain Expiry Reminders</Text>
-                        <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
-                          Receive notices at 60, 30, and 7 days before expiration
+                    {notifPrefs.pushEnabled && (
+                      <View style={{ marginTop: Spacing.xs, paddingLeft: 4 }}>
+                        <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.sm, marginBottom: 8, fontSize: 13 }]}>
+                          REMINDER INTERVALS (SELECT THRESHOLDS)
                         </Text>
-                      </View>
-                      <Switch
-                        value={expiryReminders}
-                        onValueChange={setExpiryReminders}
-                        trackColor={{ false: '#cbd5e1', true: '#38bdf8' }}
-                      />
-                    </View>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.md }}>
+                          {[
+                            { value: 15, label: '15 Days' },
+                            { value: 7, label: '7 Days' },
+                            { value: 3, label: '3 Days' },
+                            { value: 1, label: '1 Day' },
+                            { value: 0, label: 'On Expiry' },
+                          ].map((pill) => {
+                            const isSelected = notifPrefs.reminderThresholds?.includes(pill.value);
+                            return (
+                              <TouchableOpacity
+                                key={pill.value}
+                                onPress={() => toggleThreshold(pill.value)}
+                                activeOpacity={0.7}
+                                style={{
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 7,
+                                  borderRadius: 20,
+                                  backgroundColor: isSelected ? colors.primary : colors.surfaceElevated,
+                                  borderWidth: 1,
+                                  borderColor: isSelected ? colors.primary : colors.border,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? '700' : '500',
+                                    color: isSelected ? '#ffffff' : colors.text,
+                                  }}
+                                >
+                                  {isSelected ? `✓ ${pill.label}` : pill.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
 
-                    <View style={styles.switchRow}>
-                      <View style={styles.switchTextCol}>
-                        <Text style={[styles.switchTitle, { color: colors.text }]}>Weekly Portfolio Digest</Text>
-                        <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
-                          Executive summary of SSL certificates and server uptime
+                        <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xs, marginBottom: 4, fontSize: 13 }]}>
+                          MONITORED ASSET TYPES
                         </Text>
+                        <View style={styles.switchRow}>
+                          <View style={styles.switchTextCol}>
+                            <Text style={[styles.switchTitle, { color: colors.text }]}>🌐 Domains</Text>
+                            <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
+                              Monitors registered domain expiration dates
+                            </Text>
+                          </View>
+                          <Switch
+                            value={notifPrefs.notifyDomains}
+                            onValueChange={(val) => handleTogglePref('notifyDomains', val)}
+                            trackColor={{ false: '#cbd5e1', true: colors.primary }}
+                          />
+                        </View>
+
+                        <View style={styles.switchRow}>
+                          <View style={styles.switchTextCol}>
+                            <Text style={[styles.switchTitle, { color: colors.text }]}>🔒 SSL / TLS Certificates</Text>
+                            <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
+                              Monitors certificate validity and impending expiration
+                            </Text>
+                          </View>
+                          <Switch
+                            value={notifPrefs.notifySsl}
+                            onValueChange={(val) => handleTogglePref('notifySsl', val)}
+                            trackColor={{ false: '#cbd5e1', true: colors.primary }}
+                          />
+                        </View>
+
+                        <View style={styles.switchRow}>
+                          <View style={styles.switchTextCol}>
+                            <Text style={[styles.switchTitle, { color: colors.text }]}>🖥️ Cloud Servers</Text>
+                            <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
+                              Monitors virtual machine and server renewals
+                            </Text>
+                          </View>
+                          <Switch
+                            value={notifPrefs.notifyServers}
+                            onValueChange={(val) => handleTogglePref('notifyServers', val)}
+                            trackColor={{ false: '#cbd5e1', true: colors.primary }}
+                          />
+                        </View>
+
+                        <View style={styles.switchRow}>
+                          <View style={styles.switchTextCol}>
+                            <Text style={[styles.switchTitle, { color: colors.text }]}>📦 Hosting Subscriptions</Text>
+                            <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
+                              Monitors hosting plans and registrar services
+                            </Text>
+                          </View>
+                          <Switch
+                            value={notifPrefs.notifyHosting}
+                            onValueChange={(val) => handleTogglePref('notifyHosting', val)}
+                            trackColor={{ false: '#cbd5e1', true: colors.primary }}
+                          />
+                        </View>
+
+                        {/* Test Notification Simulator */}
+                        <View
+                          style={{
+                            marginTop: Spacing.md,
+                            padding: 12,
+                            borderRadius: Radius.md,
+                            backgroundColor: isDark ? 'rgba(37, 99, 235, 0.12)' : '#eff6ff',
+                            borderWidth: 1,
+                            borderColor: isDark ? 'rgba(37, 99, 235, 0.3)' : '#bfdbfe',
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>
+                            ⚡ Test Push Notification Simulation
+                          </Text>
+                          <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 10 }}>
+                            Daily check automatically runs at 9:00 AM IST. Test simulated alerts immediately:
+                          </Text>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {[15, 7, 3, 1, 0].map((d) => (
+                              <TouchableOpacity
+                                key={d}
+                                onPress={() => handleTestAlert(d)}
+                                disabled={isSimulatingNotif}
+                                style={{
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 5,
+                                  borderRadius: Radius.sm,
+                                  backgroundColor: colors.primary,
+                                  opacity: isSimulatingNotif ? 0.6 : 1,
+                                }}
+                              >
+                                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '600' }}>
+                                  {d === 0 ? 'Today (0d)' : `${d}d Test`}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                          {simulationStatus && (
+                            <Text style={{ fontSize: 12, color: colors.primary, marginTop: 8, fontWeight: '600' }}>
+                              {simulationStatus}
+                            </Text>
+                          )}
+                        </View>
                       </View>
-                      <Switch
-                        value={weeklyDigest}
-                        onValueChange={setWeeklyDigest}
-                        trackColor={{ false: '#cbd5e1', true: '#38bdf8' }}
-                      />
-                    </View>
+                    )}
 
                     <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.lg }]}>
                       Display Currency
@@ -2184,9 +3358,13 @@ export default function MoreScreen() {
 
                 {/* 8. ABOUT */}
                 {activeModal === 'about' && (
-                  <View style={styles.aboutContainer}>
-                    <View style={styles.aboutLogoBox}>
-                      <Text style={{ fontSize: 40 }}>🌐</Text>
+                  <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                    <View style={{ shadowColor: '#38bdf8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8, marginBottom: 16 }}>
+                      <Image
+                        source={require('../../../assets/images/icon.png')}
+                        style={{ width: 80, height: 80, borderRadius: 20 }}
+                        contentFit="contain"
+                      />
                     </View>
                     <Text style={[styles.aboutTitle, { color: colors.text }]}>DomainPulse</Text>
                     <Text style={[styles.aboutVersion, { color: colors.textMuted }]}>
@@ -2214,7 +3392,10 @@ export default function MoreScreen() {
         statusBarTranslucent
         onRequestClose={() => setIsAddAccountModalOpen(false)}
       >
-        <View style={styles.providerModalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.providerModalOverlay}
+        >
           <TouchableOpacity
             style={styles.modalDismissArea}
             activeOpacity={1}
@@ -2223,7 +3404,7 @@ export default function MoreScreen() {
           <View
             style={[
               styles.modalSheet,
-              { backgroundColor: isDark ? '#0f172a' : '#ffffff', maxHeight: '85%', paddingBottom: Math.max(insets.bottom, 20) },
+              { backgroundColor: isDark ? '#0f172a' : '#ffffff', height: '88%', maxHeight: '95%', paddingBottom: Math.max(insets.bottom, 20) },
             ]}
           >
             <View style={styles.dragHandleWrapper}>
@@ -2306,9 +3487,11 @@ export default function MoreScreen() {
                           <TouchableOpacity
                             key={item.key}
                             style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
                               paddingHorizontal: 12,
                               paddingVertical: 8,
-                              borderRadius: 8,
+                              borderRadius: 10,
                               backgroundColor: isSel ? colors.primary : isDark ? colors.surfaceElevated : '#f1f5f9',
                               borderWidth: 1,
                               borderColor: isSel ? colors.primary : colors.border,
@@ -2320,6 +3503,13 @@ export default function MoreScreen() {
                               }
                             }}
                           >
+                            {PROVIDER_LOGOS[item.key] && (
+                              <Image
+                                source={PROVIDER_LOGOS[item.key]}
+                                style={{ width: 18, height: 18, marginRight: 6 }}
+                                contentFit="contain"
+                              />
+                            )}
                             <Text style={{ color: isSel ? '#ffffff' : colors.text, fontWeight: '700', fontSize: 12 }}>
                               {item.name}
                             </Text>
@@ -2340,16 +3530,220 @@ export default function MoreScreen() {
                     onChangeText={setNewAccLabel}
                   />
 
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>
-                    {newAccProviderKey === 'google-play' ? 'Developer ID / Organization Key (Optional)' : 'External Account ID / API Key (Optional)'}
-                  </Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
-                    placeholder={newAccProviderKey === 'google-play' ? 'e.g. WorknAi Technologies India Pvt Ltd' : 'e.g. hst-99182 or cf-zone-xyz'}
-                    placeholderTextColor={colors.textMuted}
-                    value={newAccExternalId}
-                    onChangeText={setNewAccExternalId}
-                  />
+                  {newAccProviderKey === 'aws' ? (
+                    <>
+                      <View style={{ backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#eff6ff', padding: 12, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: isDark ? '#0369a1' : '#bfdbfe' }}>
+                        <Text style={{ color: isDark ? '#93c5fd' : '#1e40af', fontSize: 13, fontWeight: '700', marginBottom: 2 }}>
+                          AWS IAM Credentials
+                        </Text>
+                        <Text style={{ color: isDark ? '#cbd5e1' : '#475569', fontSize: 12, lineHeight: 17 }}>
+                          Enter your AWS Access Keys to discover Route53 hosted domains and EC2 virtual servers across regions.
+                        </Text>
+                      </View>
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Access Key ID *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="AKIA..."
+                        placeholderTextColor={colors.textMuted}
+                        value={newAwsAccessKeyId}
+                        onChangeText={setNewAwsAccessKeyId}
+                        autoCapitalize="characters"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Secret Access Key *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="Paste your AWS secret access key"
+                        placeholderTextColor={colors.textMuted}
+                        value={newAwsSecretAccessKey}
+                        onChangeText={setNewAwsSecretAccessKey}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Session Token (optional)</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="Optional STS session token"
+                        placeholderTextColor={colors.textMuted}
+                        value={newAwsSessionToken}
+                        onChangeText={setNewAwsSessionToken}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Regions to inventory (comma-separated)</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="e.g. us-east-1, ap-south-1"
+                        placeholderTextColor={colors.textMuted}
+                        value={newAwsRegions}
+                        onChangeText={setNewAwsRegions}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </>
+                  ) : newAccProviderKey === 'namecheap' ? (
+                    <>
+                      <View style={{ backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#eff6ff', padding: 12, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: isDark ? '#0369a1' : '#bfdbfe' }}>
+                        <Text style={{ color: isDark ? '#93c5fd' : '#1e40af', fontSize: 13, fontWeight: '700', marginBottom: 2 }}>
+                          Namecheap API Credentials
+                        </Text>
+                        <Text style={{ color: isDark ? '#cbd5e1' : '#475569', fontSize: 12, lineHeight: 17 }}>
+                          Provide your API Key and whitelisted Client IP to inventory registered domains.
+                        </Text>
+                      </View>
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>API Key *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="Namecheap API key"
+                        placeholderTextColor={colors.textMuted}
+                        value={newNamecheapApiKey}
+                        onChangeText={setNewNamecheapApiKey}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>API Username *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="Namecheap API username"
+                        placeholderTextColor={colors.textMuted}
+                        value={newNamecheapApiUser}
+                        onChangeText={setNewNamecheapApiUser}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Client IP (Whitelisted IP)</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="Your whitelisted client IP (e.g. 103.21.58.112)"
+                        placeholderTextColor={colors.textMuted}
+                        value={newNamecheapClientIp}
+                        onChangeText={setNewNamecheapClientIp}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Account Username (Optional)</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="Namecheap account username (if different)"
+                        placeholderTextColor={colors.textMuted}
+                        value={newNamecheapUserName}
+                        onChangeText={setNewNamecheapUserName}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </>
+                  ) : newAccProviderKey === 'gcp' ? (
+                    <>
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Project ID *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="e.g. my-project-id"
+                        placeholderTextColor={colors.textMuted}
+                        value={newGcpProjectId}
+                        onChangeText={setNewGcpProjectId}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Service Account Email *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="name@project.iam.gserviceaccount.com"
+                        placeholderTextColor={colors.textMuted}
+                        value={newGcpClientEmail}
+                        onChangeText={setNewGcpClientEmail}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Service Account Private Key *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12, height: 80 }]}
+                        placeholder="-----BEGIN PRIVATE KEY-----"
+                        placeholderTextColor={colors.textMuted}
+                        value={newGcpPrivateKey}
+                        onChangeText={setNewGcpPrivateKey}
+                        secureTextEntry
+                        multiline
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </>
+                  ) : newAccProviderKey === 'azure' ? (
+                    <>
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Tenant ID *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="GUID"
+                        placeholderTextColor={colors.textMuted}
+                        value={newAzureTenantId}
+                        onChangeText={setNewAzureTenantId}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Client (Application) ID *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="GUID"
+                        placeholderTextColor={colors.textMuted}
+                        value={newAzureClientId}
+                        onChangeText={setNewAzureClientId}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Client Secret *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="Paste your client secret"
+                        placeholderTextColor={colors.textMuted}
+                        value={newAzureClientSecret}
+                        onChangeText={setNewAzureClientSecret}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Subscription ID *</Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder="GUID"
+                        placeholderTextColor={colors.textMuted}
+                        value={newAzureSubscriptionId}
+                        onChangeText={setNewAzureSubscriptionId}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>
+                        {newAccProviderKey === 'google-play' ? 'Developer ID / Organization Key (Optional)' : 'API Token / Key (Required for live domain & server discovery)'}
+                      </Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                        placeholder={newAccProviderKey === 'google-play' ? 'e.g. WorknAi Technologies India Pvt Ltd' : 'Paste API token (e.g. Hostinger, DO, Hetzner, Vultr)'}
+                        placeholderTextColor={colors.textMuted}
+                        value={newAccExternalId}
+                        onChangeText={setNewAccExternalId}
+                        secureTextEntry={newAccProviderKey !== 'google-play'}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </>
+                  )}
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Notes (Optional)</Text>
                   <TextInput
@@ -2393,27 +3787,356 @@ export default function MoreScreen() {
                 </>
               )}
 
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#0284c7',
-                  paddingVertical: 12,
-                  borderRadius: 10,
-                  alignItems: 'center',
-                }}
-                onPress={handleCreateAccount}
-                disabled={isCreatingAccount}
-              >
-                {isCreatingAccount ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
-                    {newAccType === 'provider' ? 'Connect Provider' : 'Save Email Account'}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDark ? colors.surfaceElevated : '#f1f5f9',
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                  onPress={() => setIsAddAccountModalOpen(false)}
+                  disabled={isCreatingAccount}
+                >
+                  <Text style={{ color: colors.textSecondary, fontWeight: '700', fontSize: 14 }}>
+                    Cancel
                   </Text>
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flex: 2,
+                    backgroundColor: '#0284c7',
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                  }}
+                  onPress={handleCreateAccount}
+                  disabled={isCreatingAccount}
+                >
+                  {isCreatingAccount ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
+                      {newAccType === 'provider' ? 'Save and connect' : 'Save Email Account'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* EDIT / UPDATE PROVIDER TOKEN MODAL                                         */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={!!editingTokenAccount}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setEditingTokenAccount(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.providerModalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.modalDismissArea}
+            activeOpacity={1}
+            onPress={() => setEditingTokenAccount(null)}
+          />
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                height: '65%',
+                maxHeight: '90%',
+                paddingBottom: Math.max(insets.bottom, 20),
+              },
+            ]}
+          >
+            <View style={styles.dragHandleWrapper}>
+              <View style={[styles.dragHandle, { backgroundColor: isDark ? '#334155' : '#cbd5e1' }]} />
+            </View>
+            <View style={[styles.sheetHeader, { borderBottomColor: colors.borderSubtle }]}>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>
+                {editingTokenAccount?.label || 'Provider'} — {editingTokenAccount?.providerKey === 'aws' ? 'AWS Credentials' : 'API Token'}
+              </Text>
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setEditingTokenAccount(null)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Text style={[styles.closeBtnText, { color: colors.textMuted }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={[styles.sheetBody, { paddingBottom: 24 }]} keyboardShouldPersistTaps="handled">
+              {editingTokenAccount?.providerKey === 'aws' ? (
+                <>
+                  <View style={{ backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#eff6ff', padding: 12, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: isDark ? '#0369a1' : '#bfdbfe' }}>
+                    <Text style={{ color: isDark ? '#93c5fd' : '#1e40af', fontSize: 13, fontWeight: '700', marginBottom: 2 }}>
+                      AWS IAM Credentials
+                    </Text>
+                    <Text style={{ color: isDark ? '#cbd5e1' : '#475569', fontSize: 12, lineHeight: 17 }}>
+                      Update your AWS Access Keys to discover Route53 hosted domains and EC2 virtual servers across regions.
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Access Key ID *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="AKIA..."
+                    placeholderTextColor={colors.textMuted}
+                    value={editAwsAccessKeyId}
+                    onChangeText={setEditAwsAccessKeyId}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Secret Access Key *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="Paste your AWS secret access key"
+                    placeholderTextColor={colors.textMuted}
+                    value={editAwsSecretAccessKey}
+                    onChangeText={setEditAwsSecretAccessKey}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Session Token (optional)</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="Optional STS session token"
+                    placeholderTextColor={colors.textMuted}
+                    value={editAwsSessionToken}
+                    onChangeText={setEditAwsSessionToken}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Regions to inventory (comma-separated)</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 16 }]}
+                    placeholder="e.g. us-east-1, ap-south-1"
+                    placeholderTextColor={colors.textMuted}
+                    value={editAwsRegions}
+                    onChangeText={setEditAwsRegions}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              ) : editingTokenAccount?.providerKey === 'namecheap' ? (
+                <>
+                  <View style={{ backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#eff6ff', padding: 12, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: isDark ? '#0369a1' : '#bfdbfe' }}>
+                    <Text style={{ color: isDark ? '#93c5fd' : '#1e40af', fontSize: 13, fontWeight: '700', marginBottom: 2 }}>
+                      Namecheap API Credentials
+                    </Text>
+                    <Text style={{ color: isDark ? '#cbd5e1' : '#475569', fontSize: 12, lineHeight: 17 }}>
+                      Provide your API Key and whitelisted Client IP to inventory registered domains.
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>API Key *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="Namecheap API key"
+                    placeholderTextColor={colors.textMuted}
+                    value={editNamecheapApiKey}
+                    onChangeText={setEditNamecheapApiKey}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>API Username *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="Namecheap API username"
+                    placeholderTextColor={colors.textMuted}
+                    value={editNamecheapApiUser}
+                    onChangeText={setEditNamecheapApiUser}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Client IP (Whitelisted IP)</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="Your whitelisted client IP (e.g. 103.21.58.112)"
+                    placeholderTextColor={colors.textMuted}
+                    value={editNamecheapClientIp}
+                    onChangeText={setEditNamecheapClientIp}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Account Username (Optional)</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 16 }]}
+                    placeholder="Namecheap account username (if different)"
+                    placeholderTextColor={colors.textMuted}
+                    value={editNamecheapUserName}
+                    onChangeText={setEditNamecheapUserName}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              ) : editingTokenAccount?.providerKey === 'gcp' ? (
+                <>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Project ID *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="e.g. my-project-id"
+                    placeholderTextColor={colors.textMuted}
+                    value={editGcpProjectId}
+                    onChangeText={setEditGcpProjectId}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Service Account Email *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="name@project.iam.gserviceaccount.com"
+                    placeholderTextColor={colors.textMuted}
+                    value={editGcpClientEmail}
+                    onChangeText={setEditGcpClientEmail}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Service Account Private Key *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 16, height: 80 }]}
+                    placeholder="-----BEGIN PRIVATE KEY-----"
+                    placeholderTextColor={colors.textMuted}
+                    value={editGcpPrivateKey}
+                    onChangeText={setEditGcpPrivateKey}
+                    secureTextEntry
+                    multiline
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              ) : editingTokenAccount?.providerKey === 'azure' ? (
+                <>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Tenant ID *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="GUID"
+                    placeholderTextColor={colors.textMuted}
+                    value={editAzureTenantId}
+                    onChangeText={setEditAzureTenantId}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Client (Application) ID *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="GUID"
+                    placeholderTextColor={colors.textMuted}
+                    value={editAzureClientId}
+                    onChangeText={setEditAzureClientId}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Client Secret *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
+                    placeholder="Paste your client secret"
+                    placeholderTextColor={colors.textMuted}
+                    value={editAzureClientSecret}
+                    onChangeText={setEditAzureClientSecret}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Subscription ID *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 16 }]}
+                    placeholder="GUID"
+                    placeholderTextColor={colors.textMuted}
+                    value={editAzureSubscriptionId}
+                    onChangeText={setEditAzureSubscriptionId}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 16 }}>
+                    Paste or update your {editingTokenAccount?.providerKey.toUpperCase()} API token/key to enable live domain and VPS discovery.
+                  </Text>
+
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>API Token / Key</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 20 }]}
+                    placeholder="Paste API token / key"
+                    placeholderTextColor={colors.textMuted}
+                    value={editingTokenValue}
+                    onChangeText={setEditingTokenValue}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDark ? colors.surfaceElevated : '#f1f5f9',
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                  onPress={() => setEditingTokenAccount(null)}
+                  disabled={isSavingToken}
+                >
+                  <Text style={{ color: colors.textSecondary, fontWeight: '700', fontSize: 14 }}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flex: 2,
+                    backgroundColor: '#0284c7',
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                  }}
+                  onPress={handleSaveAndSyncToken}
+                  disabled={isSavingToken}
+                >
+                  {isSavingToken ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
+                      Save and connect
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================================= */}
@@ -2492,6 +4215,345 @@ export default function MoreScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* VIEW ALL DOMAINS FOR SELECTED PROVIDER ACCOUNT MODAL                       */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={!!selectedAccountForDomains}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setSelectedAccountForDomains(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.providerModalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.modalDismissArea}
+            activeOpacity={1}
+            onPress={() => setSelectedAccountForDomains(null)}
+          />
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                height: '92%',
+                maxHeight: '96%',
+                paddingBottom: Math.max(insets.bottom, 20),
+              },
+            ]}
+          >
+            <View style={styles.dragHandleWrapper}>
+              <View style={[styles.dragHandle, { backgroundColor: isDark ? '#334155' : '#cbd5e1' }]} />
+            </View>
+
+            {/* Modal Header */}
+            <View style={[styles.sheetHeader, { borderBottomColor: colors.borderSubtle }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
+                {selectedAccountForDomains && PROVIDER_LOGOS[(selectedAccountForDomains.providerKey || '').toLowerCase()] ? (
+                  <View
+                    style={[
+                      styles.providerLogoBox,
+                      {
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f8fafc',
+                        borderColor: colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <Image
+                      source={PROVIDER_LOGOS[(selectedAccountForDomains.providerKey || '').toLowerCase()]}
+                      style={{ width: 24, height: 24 }}
+                      contentFit="contain"
+                    />
+                  </View>
+                ) : (
+                  <Ionicons name="globe-outline" size={24} color="#0284c7" />
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.sheetTitle, { color: colors.text, fontSize: 16 }]} numberOfLines={1}>
+                    {selectedAccountForDomains?.label || 'Provider Domains'}
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                    Connected Domain Portfolio
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setSelectedAccountForDomains(null)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Text style={[styles.closeBtnText, { color: colors.textMuted }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Body with Domains List */}
+            {selectedAccountForDomains && (() => {
+              const accountDomains = getDomainsForAccount(selectedAccountForDomains, allDomains);
+              const filteredDomains = accountDomains.filter((d) => {
+                if (domainSearchQuery.trim()) {
+                  const q = domainSearchQuery.toLowerCase().trim();
+                  if (!d.name.toLowerCase().includes(q)) return false;
+                }
+                if (domainFilterStatus !== 'all') {
+                  if (d.status !== domainFilterStatus) return false;
+                }
+                return true;
+              });
+
+              return (
+                <View style={{ flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md }}>
+                  {/* Account Overview Stats Card */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isDark ? 'rgba(2, 132, 199, 0.12)' : '#f0f9ff',
+                      borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : '#bae6fd',
+                      borderWidth: 1,
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <View>
+                      <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>
+                        {accountDomains.length} {accountDomains.length === 1 ? 'Domain' : 'Domains'} Linked
+                      </Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 1 }}>
+                        Provider: {selectedAccountForDomains.providerKey.toUpperCase()} • Direct API
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#0284c7',
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                      disabled={syncingProviderId === selectedAccountForDomains.id}
+                      onPress={async () => {
+                        setSyncingProviderId(selectedAccountForDomains.id);
+                        try {
+                          const res = await syncProviderAccount({
+                            providerKey: selectedAccountForDomains.providerKey,
+                            accountName: selectedAccountForDomains.label,
+                            apiKey: selectedAccountForDomains.externalAccountId || undefined,
+                            providerAccountId: selectedAccountForDomains.id,
+                          });
+                          await loadAccounts();
+                          showFeedback(
+                            res.success ? 'Provider Synced' : 'Sync Notice',
+                            res.message,
+                            res.success ? 'success' : 'error'
+                          );
+                        } catch (err: any) {
+                          showFeedback('Sync Error', err?.message || 'Failed to sync provider.', 'error');
+                        } finally {
+                          setSyncingProviderId(null);
+                        }
+                      }}
+                    >
+                      {syncingProviderId === selectedAccountForDomains.id ? (
+                        <ActivityIndicator color="#ffffff" size="small" />
+                      ) : (
+                        <>
+                          <Ionicons name="sync" size={13} color="#ffffff" />
+                          <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 12 }}>Sync Now</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Search Bar */}
+                  {accountDomains.length > 2 && (
+                    <View
+                      style={[
+                        styles.domainSearchBox,
+                        {
+                          backgroundColor: isDark ? colors.surfaceElevated : '#f8fafc',
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <Ionicons name="search" size={16} color={colors.textSecondary} />
+                      <TextInput
+                        style={[styles.domainSearchInput, { color: colors.text }]}
+                        placeholder={`Search ${accountDomains.length} domains...`}
+                        placeholderTextColor={colors.textMuted}
+                        value={domainSearchQuery}
+                        onChangeText={setDomainSearchQuery}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      {domainSearchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setDomainSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Domains ScrollView */}
+                  <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ paddingBottom: 24 }}
+                    showsVerticalScrollIndicator={true}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {filteredDomains.length === 0 ? (
+                      <View
+                        style={{
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          paddingVertical: 36,
+                          paddingHorizontal: 20,
+                        }}
+                      >
+                        <Ionicons name="globe-outline" size={44} color={colors.textMuted} style={{ marginBottom: 12 }} />
+                        <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, marginBottom: 4 }}>
+                          {accountDomains.length === 0 ? 'No Domains Discovered Yet' : 'No Domains Match Search'}
+                        </Text>
+                        <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center', maxWidth: 280, marginBottom: 16 }}>
+                          {accountDomains.length === 0
+                            ? `Tap 'Sync Now' above to pull live domain records from ${selectedAccountForDomains.label}.`
+                            : 'Try searching with a different domain name or clear the search query.'}
+                        </Text>
+                      </View>
+                    ) : (
+                      filteredDomains.map((dom) => {
+                        const statusColor = dom.status === 'critical' ? '#ef4444' : dom.status === 'warning' ? '#f59e0b' : '#10b981';
+                        return (
+                          <View
+                            key={dom.id || dom.name}
+                            style={[
+                              styles.accountDomainCard,
+                              {
+                                backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                                borderColor: isDark ? colors.border : '#e2e8f0',
+                              },
+                            ]}
+                          >
+                            {/* Domain Header: Name + Health Badge */}
+                            <View style={styles.accountDomainCardHeader}>
+                              <View style={styles.accountDomainNameRow}>
+                                <Ionicons name="globe" size={16} color="#0284c7" />
+                                <Text style={[styles.accountDomainNameText, { color: colors.text }]} numberOfLines={1}>
+                                  {dom.name}
+                                </Text>
+                              </View>
+
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={[styles.domainHealthStatusBadge, { backgroundColor: `${statusColor}22` }]}>
+                                  <Text style={[styles.domainHealthStatusText, { color: statusColor }]}>
+                                    {dom.status}
+                                  </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: 11,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                  }}
+                                  onPress={async (e) => {
+                                    e.stopPropagation?.();
+                                    setAllDomains((prev) => prev.filter((d) => d.id !== dom.id));
+                                    try {
+                                      await deleteDomain(dom.id);
+                                    } catch {}
+                                  }}
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                  activeOpacity={0.6}
+                                >
+                                  <Ionicons name="close" size={13} color={colors.textMuted} />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+
+                            {/* Meta items: Expiry, Days remaining, SSL, Auto-renew */}
+                            <View style={styles.accountDomainMetaRow}>
+                              <View style={styles.accountDomainMetaItem}>
+                                <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+                                <Text style={[styles.accountDomainMetaText, { color: colors.textSecondary }]}>
+                                  {dom.daysRemaining} days left
+                                </Text>
+                              </View>
+
+                              <View style={styles.accountDomainMetaItem}>
+                                <Ionicons name="calendar-outline" size={12} color={colors.textSecondary} />
+                                <Text style={[styles.accountDomainMetaText, { color: colors.textSecondary }]}>
+                                  {dom.expiresAt ? dom.expiresAt.split('T')[0] : 'Active'}
+                                </Text>
+                              </View>
+
+                              <View style={styles.accountDomainMetaItem}>
+                                <Ionicons name="shield-checkmark-outline" size={12} color="#10b981" />
+                                <Text style={[styles.accountDomainMetaText, { color: '#10b981' }]}>
+                                  {dom.sslStatus || 'SSL Active'}
+                                </Text>
+                              </View>
+
+                              {dom.autoRenew && (
+                                <View style={styles.accountDomainMetaItem}>
+                                  <Ionicons name="refresh-outline" size={12} color="#0284c7" />
+                                  <Text style={[styles.accountDomainMetaText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                                    Auto-Renew
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+
+                            {/* Actions Row */}
+                            <View style={[styles.accountDomainCardActions, { borderTopColor: isDark ? colors.border : '#f1f5f9' }]}>
+                              <TouchableOpacity
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8 }}
+                                onPress={() => {
+                                  Share.share({ message: `Domain: ${dom.name}\nRegistrar: ${dom.registrar}\nExpires: ${dom.expiresAt}` }).catch(() => {});
+                                }}
+                              >
+                                <Ionicons name="share-outline" size={13} color={colors.textSecondary} />
+                                <Text style={{ color: colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Share</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.viewInDomainsTabBtn, { backgroundColor: '#0284c7' }]}
+                                onPress={() => {
+                                  setSelectedAccountForDomains(null);
+                                  setActiveModal(null);
+                                  router.push('/(tabs)/domains');
+                                }}
+                              >
+                                <Text style={styles.viewInDomainsTabBtnText}>View in Domains Tab</Text>
+                                <Ionicons name="arrow-forward" size={12} color="#ffffff" />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })
+                    )}
+                  </ScrollView>
+                </View>
+              );
+            })()}
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Delete Account Confirmation Modal */}
@@ -3231,7 +5293,7 @@ const styles = StyleSheet.create({
   modalSheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '90%',
+    maxHeight: '96%',
     width: '100%',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -6 },
@@ -3260,6 +5322,107 @@ const styles = StyleSheet.create({
   },
   sheetBody: {
     padding: Spacing.lg,
+  },
+  profileModalHeroCard: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  profileModalAvatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  profileModalAvatarBox: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0284c7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  profileModalAvatarText: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  profileModalHeroName: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  profileModalHeroEmail: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  profileModalBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  profileModalBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  profileModalBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  profileModalFormCard: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 14,
+  },
+  profileModalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  profileModalSectionSubtitle: {
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 6,
+  },
+  profileInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  profileInput: {
+    flex: 1,
+    fontSize: 14.5,
+    paddingVertical: 0,
+    height: 48,
+  },
+  profileStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 2,
+  },
+  profileStatCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  profileStatNum: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  profileStatLabel: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '600',
   },
   formGroup: {
     gap: Spacing.xs,
@@ -3332,23 +5495,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
     gap: 12,
   },
   providerHeaderIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  providerHeaderIconGlyph: {
-    fontSize: 22,
-    color: '#ffffff',
+    shadowColor: '#0284c7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   providerHeaderTitle: {
     fontSize: 18,
     fontWeight: '800',
+    letterSpacing: -0.3,
   },
   providerHeaderSubtitle: {
     fontSize: 12,
@@ -3361,135 +5528,185 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
-  providerCloseText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
+
+  // Hero Card
   providerHeroCard: {
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 10,
+  },
+  providerHeroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.lg,
-    borderRadius: 20,
+    justifyContent: 'space-between',
+  },
+  providerHeroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
     borderWidth: 1,
-    overflow: 'hidden',
+    gap: 6,
+  },
+  heroPulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#0284c7',
+  },
+  providerHeroBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  syncAllHeroBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0284c7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  syncAllHeroBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   providerHeroTitle: {
     fontSize: 16,
     fontWeight: '800',
+    letterSpacing: -0.3,
   },
   providerHeroSubtitle: {
     fontSize: 12,
-    marginTop: 3,
-    marginBottom: 10,
-    lineHeight: 16,
+    lineHeight: 17,
   },
   heroTagsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     flexWrap: 'wrap',
-    gap: 6,
+    marginTop: 2,
   },
   heroTagPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  heroTagCheck: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  heroTagIcon: {
-    fontSize: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 5,
   },
   heroTagText: {
     fontSize: 11,
     fontWeight: '700',
   },
-  heroGlobeBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+
+  // Segmented Control
+  segmentedControl: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
+  },
+  segmentedTab: {
+    flex: 1,
+    paddingVertical: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    borderRadius: 10,
+    flexDirection: 'row',
+    gap: 6,
   },
-  heroGlobeIcon: {
-    fontSize: 32,
+  segmentedTabText: {
+    fontWeight: '700',
+    fontSize: 12,
   },
-  providerSection: {
-    gap: 10,
-  },
+
+  // Section Header
   providerSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 2,
-  },
-  providerSectionTitleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    marginTop: 4,
+    marginBottom: 2,
   },
   providerSectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  connectedBadge: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  connectedBadgeText: {
-    color: '#16a34a',
     fontSize: 12,
     fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
-  availableBadge: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+  addAccountHeaderBtn: {
+    backgroundColor: '#0284c7',
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#0284c7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  availableBadgeText: {
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  manageAllLink: {
-    fontSize: 13,
+  addAccountHeaderBtnText: {
+    color: '#ffffff',
     fontWeight: '700',
+    fontSize: 12,
   },
+
+  // Lists & Empty State
   providerCardsList: {
     gap: 10,
   },
-  providerCard: {
-    flexDirection: 'row',
+  emptyProviderBox: {
+    padding: 24,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
+    justifyContent: 'center',
     borderRadius: 18,
     borderWidth: 1,
+  },
+  emptyActionBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyActionBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // Connected Provider Card (3-Tier Structure)
+  connectedProviderCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
   },
-  providerCardLeft: {
+  providerCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
   },
   providerLogoBox: {
     width: 46,
@@ -3499,7 +5716,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     overflow: 'hidden',
-    padding: 6,
+    padding: 5,
   },
   providerLogoImg: {
     width: 28,
@@ -3507,66 +5724,205 @@ const styles = StyleSheet.create({
   },
   providerLogoGlyph: {
     fontSize: 22,
+    textAlign: 'center',
   },
-  providerTextCol: {
+  providerInfoCol: {
     flex: 1,
+  },
+  providerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   providerItemName: {
     fontSize: 15,
     fontWeight: '800',
+    letterSpacing: -0.2,
+    flex: 1,
   },
-  statusDotRow: {
+  activeStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 2,
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+  activeStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
   },
-  statusDotText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  lastSyncedText: {
+  activeStatusText: {
+    color: '#10b981',
     fontSize: 11,
-    marginTop: 2,
+    fontWeight: '700',
   },
-  providerCardRight: {
+  providerMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginLeft: 8,
+    marginTop: 4,
+    flexWrap: 'wrap',
   },
-  configureBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
+  providerKeyTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  providerKeyTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  providerKeyPreviewBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 4,
   },
-  configureBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
+  providerIdText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
-  connectSolidBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
+  providerCardDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  providerActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  providerSyncBtn: {
+    flex: 1.2,
+    height: 38,
+    borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#0284c7',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 3,
     elevation: 2,
+  },
+  providerSyncBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  providerTokenBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  providerTokenBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  providerDisconnectBtn: {
+    flex: 1,
+    height: 38,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    borderWidth: 1,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  providerDisconnectBtnText: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  emailDeleteSmallBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Supported Provider Card
+  supportedProviderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  supportedProviderTextCol: {
+    flex: 1,
+  },
+  supportedProviderName: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  supportedTagPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  supportedTagText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  supportedProviderDesc: {
+    fontSize: 11.5,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  supportedProviderRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  connectedBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    gap: 4,
+  },
+  connectedBadgeText: {
+    color: '#10b981',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  connectSolidBtn: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   connectSolidBtnText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   moreDotsBtn: {
     padding: 6,
@@ -4261,6 +6617,150 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 11,
     lineHeight: 16,
+  },
+
+  // Provider Domains Summary Row inside card
+  accountDomainsBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 10,
+    gap: 8,
+  },
+  domainsBadgeRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  domainGlobeIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountDomainsCountText: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  domainActiveBadgePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  domainActiveBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  accountDomainsSubText: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  viewDomainsActionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  viewDomainsActionText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Modal: Provider Domains Viewer
+  domainSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    gap: 8,
+  },
+  domainSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    paddingVertical: 2,
+  },
+  accountDomainCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 8,
+    gap: 6,
+  },
+  accountDomainCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  accountDomainNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  accountDomainNameText: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  domainHealthStatusBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  domainHealthStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  accountDomainMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 2,
+  },
+  accountDomainMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  accountDomainMetaText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  accountDomainCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+  },
+  viewInDomainsTabBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  viewInDomainsTabBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 

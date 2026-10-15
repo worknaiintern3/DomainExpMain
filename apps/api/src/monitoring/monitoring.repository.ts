@@ -559,3 +559,5 @@ export class PostgresMonitoringRepository implements MonitoringStore {
     return this.host.withWorkspaceContext(workspaceId, operation);
   }
 }
+
+export { MongoMonitoringRepository } from './mongo-monitoring.repository';

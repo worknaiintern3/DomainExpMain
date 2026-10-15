@@ -9,7 +9,7 @@ import {
   AlertsController,
   MonitoringController,
 } from './monitoring.controller';
-import { PostgresMonitoringRepository } from './monitoring.repository';
+import { MongoMonitoringRepository } from './monitoring.repository';
 import { MonitoringService } from './monitoring.service';
 
 @Module({
@@ -17,15 +17,15 @@ import { MonitoringService } from './monitoring.service';
   controllers: [MonitoringController, AlertsController, AlertRulesController],
   providers: [
     {
-      provide: PostgresMonitoringRepository,
+      provide: MongoMonitoringRepository,
       inject: [DatabaseService],
       useFactory: (database: DatabaseService) =>
-        new PostgresMonitoringRepository(database),
+        new MongoMonitoringRepository(database),
     },
     {
       provide: MonitoringService,
-      inject: [PostgresMonitoringRepository],
-      useFactory: (repository: PostgresMonitoringRepository) =>
+      inject: [MongoMonitoringRepository],
+      useFactory: (repository: MongoMonitoringRepository) =>
         new MonitoringService(repository),
     },
   ],

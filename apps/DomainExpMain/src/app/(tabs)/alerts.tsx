@@ -13,7 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
 import { fetchAlertsList, acknowledgeAlert, deleteAlert, clearAllAlerts } from '../../services/monitoring';
-import { fetchDomainsList } from '../../services/domains';
+import { fetchDomainsList, deleteDomain } from '../../services/domains';
+import {
+  getNotificationHistory,
+  markNotificationAsRead,
+  type NotificationHistoryItem,
+} from '../../services/notifications';
 import type { AlertItem, DomainItem } from '../../types';
 
 type FilterType = 'All' | 'Expiring' | 'Critical' | 'Warning' | 'Resolved';
@@ -25,17 +30,20 @@ export default function AlertsScreen() {
 
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [domains, setDomains] = useState<DomainItem[]>([]);
+  const [pushHistory, setPushHistory] = useState<NotificationHistoryItem[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('All');
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const [altList, domList] = await Promise.all([
+      const [altList, domList, histList] = await Promise.all([
         fetchAlertsList(),
         fetchDomainsList(),
+        getNotificationHistory(20).catch(() => []),
       ]);
       setAlerts(altList);
       setDomains(domList);
+      setPushHistory(histList || []);
     } catch {
       // Offline fallback
     }
@@ -61,6 +69,13 @@ export default function AlertsScreen() {
   const handleDeleteAlert = async (id: string) => {
     await deleteAlert(id);
     setAlerts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const handleDeleteDomain = async (id: string) => {
+    setDomains((prev) => prev.filter((d) => d.id !== id));
+    try {
+      await deleteDomain(id);
+    } catch {}
   };
 
   const handleClearAllAlerts = async () => {
@@ -252,7 +267,25 @@ export default function AlertsScreen() {
                         {days <= 0 ? 'Expired' : `${days}d`}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    <TouchableOpacity
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                        marginLeft: 4,
+                      }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteDomain(domain.id);
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.6}
+                    >
+                      <Ionicons name="close" size={13} color={colors.textMuted} />
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               );
@@ -315,10 +348,31 @@ export default function AlertsScreen() {
                     </View>
                   </View>
 
-                  <View style={[styles.severityBadge, { backgroundColor: badgeBg }]}>
-                    <Text style={[styles.severityBadgeText, { color: accentColor }]}>
-                      {isCritical ? 'Critical' : 'Warning'}
-                    </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={[styles.severityBadge, { backgroundColor: badgeBg }]}>
+                      <Text style={[styles.severityBadgeText, { color: accentColor }]}>
+                        {isCritical ? 'Critical' : 'Warning'}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                      }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteAlert(alert.id);
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.6}
+                    >
+                      <Ionicons name="close" size={13} color={colors.textMuted} />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -366,6 +420,135 @@ export default function AlertsScreen() {
               </TouchableOpacity>
             );
           })
+        )}
+
+        {/* Push Notification History Section */}
+        {pushHistory.length > 0 && selectedFilter === 'All' && (
+          <View style={{ marginTop: 24, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="paper-plane-outline" size={18} color={colors.primary} />
+                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>
+                  Expiry Push Reminders
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                {pushHistory.length} sent
+              </Text>
+            </View>
+
+            {pushHistory.map((item) => {
+              const handleHistoryPress = () => {
+                if (!item.isRead) {
+                  markNotificationAsRead(item.id);
+                  setPushHistory((prev) =>
+                    prev.map((h) => (h.id === item.id ? { ...h, isRead: true } : h)),
+                  );
+                }
+                if (item.assetType === 'domain' && item.assetId) {
+                  router.push({ pathname: '/domain/[id]', params: { id: item.assetId } });
+                } else if (item.assetType === 'server' && item.assetId) {
+                  router.push({ pathname: '/server/[id]', params: { id: item.assetId } });
+                } else if (item.assetType === 'ssl' && item.assetId) {
+                  const cleanId = item.assetId.replace(/^ssl_/, '');
+                  router.push({ pathname: '/domain/[id]', params: { id: cleanId } });
+                }
+              };
+
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.alertCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: item.isRead ? colors.borderSubtle : colors.primary,
+                      borderLeftWidth: item.isRead ? 1 : 4,
+                      marginBottom: 10,
+                    },
+                  ]}
+                  onPress={handleHistoryPress}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.cardTopRow}>
+                    <View style={styles.topRowLeft}>
+                      <View
+                        style={[
+                          styles.alertIconCircle,
+                          {
+                            backgroundColor:
+                              item.reminderThreshold <= 1
+                                ? 'rgba(239, 68, 68, 0.12)'
+                                : 'rgba(59, 130, 246, 0.12)',
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            item.assetType === 'domain'
+                              ? 'globe-outline'
+                              : item.assetType === 'ssl'
+                              ? 'lock-closed-outline'
+                              : item.assetType === 'server'
+                              ? 'server-outline'
+                              : 'cube-outline'
+                          }
+                          size={18}
+                          color={item.reminderThreshold <= 1 ? '#ef4444' : '#2563eb'}
+                        />
+                      </View>
+                      <View style={styles.alertHeaderTextBox}>
+                        <Text style={[styles.alertTitleText, { color: colors.text }]} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.domainSubtext, { color: colors.textMuted }]} numberOfLines={1}>
+                          {item.assetName} • {item.reminderThreshold === 0 ? 'Expires today' : `${item.reminderThreshold}d before expiry`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.severityBadge,
+                        {
+                          backgroundColor:
+                            item.status === 'delivered' || item.status === 'sent'
+                              ? 'rgba(16, 185, 129, 0.12)'
+                              : 'rgba(239, 68, 68, 0.12)',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.severityBadgeText,
+                          {
+                            color:
+                              item.status === 'delivered' || item.status === 'sent'
+                                ? '#10b981'
+                                : '#ef4444',
+                            fontSize: 10,
+                          },
+                        ]}
+                      >
+                        {item.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={[styles.detailBody, { color: colors.textSecondary, marginTop: 6 }]}>
+                    {item.body}
+                  </Text>
+
+                  <View style={[styles.cardFooter, { marginTop: 8 }]}>
+                    <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                      {new Date(item.createdAt).toLocaleDateString()} {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
     </View>

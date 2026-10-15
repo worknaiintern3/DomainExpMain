@@ -43,10 +43,24 @@ export async function createApplication(): Promise<NestFastifyApplication> {
   );
   const config = app.get(AppConfigService);
 
+  const fastifyInstance = app.getHttpAdapter().getInstance();
+  fastifyInstance.addHook('onRequest', (req: any, _reply: any, done: () => void) => {
+    if (req?.raw && typeof req.raw.url === 'string') {
+      if (req.raw.url.startsWith('/api/google-play/')) {
+        req.raw.url = req.raw.url.replace('/api/google-play/', '/api/v1/google-play/');
+      } else if (req.raw.url.startsWith('/api/play-store/')) {
+        req.raw.url = req.raw.url.replace('/api/play-store/', '/api/v1/play-store/');
+      }
+    }
+    done();
+  });
+
   app.setGlobalPrefix('api/v1', {
     exclude: [
       { path: 'health', method: RequestMethod.GET },
       { path: 'ready', method: RequestMethod.GET },
+      { path: 'privacy', method: RequestMethod.GET },
+      { path: 'privacy-policy', method: RequestMethod.GET },
     ],
   });
   app.enableCors({

@@ -1,5 +1,5 @@
-import { apiGet, apiPost, apiPatch, setApiAccessToken, bootstrapMobileSession } from './api';
-import { getItem, setItem, deleteItem, STORAGE_KEYS, setActiveUserId, clearUserData } from './storage';
+import { apiGet, apiPost, apiPatch, setApiAccessToken, bootstrapMobileSession, getEffectiveApiUrl } from './api';
+import { getItem, setItem, deleteItem, STORAGE_KEYS, setActiveUserId, getCurrentActiveUserId, clearUserData } from './storage';
 import type { LoginResult, User, AuthSession } from '../types';
 
 export interface LoginPayload {
@@ -175,6 +175,9 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResult> {
           updatedAt: new Date().toISOString(),
         };
 
+    setActiveUserId(liveUser.id);
+    setApiAccessToken(liveToken);
+
     const session: AuthSession = {
       id: `sess_${liveUser.id}`,
       userId: liveUser.id,
@@ -192,6 +195,10 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResult> {
   }
 
   if (matched) {
+    setActiveUserId(matched.id);
+    const localTok = `token_${matched.id}`;
+    setApiAccessToken(localTok);
+
     const isWorknAi = isWorknAiAccount(matched);
     const user: User = {
       id: matched.id,
@@ -212,7 +219,7 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResult> {
     };
 
     return {
-      accessToken: `token_${matched.id}`,
+      accessToken: localTok,
       accessTokenExpiresAt: expiresAt,
       refreshToken: `ref_${matched.id}`,
       session,
@@ -234,14 +241,98 @@ export async function registerUser(payload: RegisterPayload): Promise<LoginResul
     throw new Error('Password must be at least 8 characters long.');
   }
 
-  // Instant duplicate account check (0ms)
+  // Instant duplicate account check from local cache
   const accounts = await getStoredAccounts();
   const existing = accounts.find((a) => a.email.toLowerCase() === normalizedEmail);
   if (existing) {
     throw new Error('This email is already registered. Please sign in instead.');
   }
 
-  // Create persistent verified account
+  // 1. Attempt live backend registration & login first (writes directly to MongoDB)
+  try {
+    const targetUrl = getEffectiveApiUrl();
+    console.log('[Auth] Attempting live registration at:', targetUrl);
+
+    await apiPost<{ user: any }>(
+      '/auth/register',
+      {
+        email: normalizedEmail,
+        password: payload.password,
+        displayName: payload.displayName?.trim() || normalizedEmail.split('@')[0],
+      },
+      { auth: false, retryOnUnauthorized: false }
+    );
+
+    // After successful backend registration, log in directly via backend to get authenticated session
+    const loginResult = await apiPost<LoginResult>(
+      '/auth/login',
+      {
+        email: normalizedEmail,
+        password: payload.password,
+      },
+      { auth: false, retryOnUnauthorized: false }
+    );
+
+    if (loginResult && loginResult.accessToken) {
+      console.log('[Auth] User registered and authenticated on MongoDB backend:', loginResult.user.email);
+      setActiveUserId(loginResult.user.id);
+      setApiAccessToken(loginResult.accessToken);
+      await setItem(STORAGE_KEYS.ACCESS_TOKEN, loginResult.accessToken);
+      if (loginResult.refreshToken) {
+        await setItem(STORAGE_KEYS.REFRESH_TOKEN, loginResult.refreshToken);
+      }
+      await setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(loginResult.user));
+
+      // Cache account in local store for rapid offline launch
+      const now = new Date().toISOString();
+      const existingIdx = accounts.findIndex((a) => a.email.toLowerCase() === normalizedEmail);
+      if (existingIdx !== -1) {
+        accounts[existingIdx].passwordHash = payload.password;
+        accounts[existingIdx].updatedAt = now;
+      } else {
+        accounts.push({
+          id: loginResult.user.id,
+          email: loginResult.user.email,
+          passwordHash: payload.password,
+          displayName: loginResult.user.displayName || normalizedEmail.split('@')[0],
+          organization: loginResult.user.organization || 'Pulse Cloud Infrastructure',
+          createdAt: loginResult.user.createdAt || now,
+          updatedAt: now,
+        });
+      }
+      await saveStoredAccounts(accounts);
+
+      const isWorknAi = isWorknAiAccount({
+        email: normalizedEmail,
+        displayName: payload.displayName,
+      });
+      if (isWorknAi) {
+        const { WORKNAI_CONSOLE_APPS } = require('./applications');
+        const { WORKNAI_APPLICATION_WEBSITES } = require('./websites');
+        const { setUserItem } = require('./storage');
+        await setUserItem(STORAGE_KEYS.APPLICATIONS_LIST, JSON.stringify(WORKNAI_CONSOLE_APPS), loginResult.user.id);
+        await setUserItem(STORAGE_KEYS.WEBSITES_LIST, JSON.stringify(WORKNAI_APPLICATION_WEBSITES), loginResult.user.id);
+        await setUserItem(STORAGE_KEYS.CONSOLE_ACCOUNT, JSON.stringify({
+          developerName: 'WorknAi Technologies India Pvt Ltd',
+          connectedAt: now,
+          autoSync: true,
+        }), loginResult.user.id);
+      }
+
+      return loginResult;
+    }
+  } catch (backendErr: any) {
+    console.warn('[Auth] Backend registration attempt note:', backendErr?.status, backendErr?.message || backendErr);
+    if (backendErr?.status === 409 || backendErr?.message?.includes('unavailable') || backendErr?.message?.includes('already')) {
+      throw new Error('This email is already registered. Please sign in instead.');
+    }
+    if (backendErr?.status === 400 || backendErr?.status === 422) {
+      throw new Error(backendErr?.message || 'Invalid registration details. Please check your email and ensure password is at least 8 characters.');
+    }
+    // If backend is offline or unreachable, fall back to offline local storage
+  }
+
+  // 2. Fallback to local offline storage if backend is currently unreachable
   const now = new Date().toISOString();
   const isWorknAi = isWorknAiAccount({
     email: normalizedEmail,
@@ -285,7 +376,6 @@ export async function registerUser(payload: RegisterPayload): Promise<LoginResul
   setActiveUserId(newUserAccount.id);
   await clearUserData(newUserAccount.id);
 
-  // If WorknAI account, seed all real 17 applications and 17 websites
   if (isWorknAi) {
     const { WORKNAI_CONSOLE_APPS } = require('./applications');
     const { WORKNAI_APPLICATION_WEBSITES } = require('./websites');
@@ -303,10 +393,6 @@ export async function registerUser(payload: RegisterPayload): Promise<LoginResul
   await setItem(STORAGE_KEYS.ACCESS_TOKEN, localToken);
   await setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
   await setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
-
-  // Non-blocking backend registration
-  apiPost<{ user: User }>('/auth/register', { email: normalizedEmail, password: payload.password, displayName: payload.displayName }, { auth: false })
-    .catch(() => {});
 
   return {
     accessToken: localToken,
@@ -453,8 +539,10 @@ export async function fetchCurrentUser(): Promise<{ user: User }> {
 }
 
 export async function logoutUser(): Promise<void> {
+  const currentUid = getCurrentActiveUserId();
+  const { resetApiState } = require('./api');
+  resetApiState();
   setActiveUserId(null);
-  setApiAccessToken(null);
 
   apiPost<void>('/auth/logout', undefined, { retryOnUnauthorized: false }).catch(() => {});
 
@@ -463,6 +551,7 @@ export async function logoutUser(): Promise<void> {
     deleteItem(STORAGE_KEYS.REFRESH_TOKEN),
     deleteItem(STORAGE_KEYS.USER_DATA),
     deleteItem(STORAGE_KEYS.WORKSPACE_ID),
+    clearUserData(currentUid || undefined),
   ]);
 }
 
@@ -487,8 +576,9 @@ export async function deleteUserAccount(): Promise<void> {
     await clearUserData(userIdToDelete);
   }
 
+  const { resetApiState } = require('./api');
+  resetApiState();
   setActiveUserId(null);
-  setApiAccessToken(null);
 
   apiPost<void>('/auth/delete-account', undefined, { retryOnUnauthorized: false }).catch(() => {});
 

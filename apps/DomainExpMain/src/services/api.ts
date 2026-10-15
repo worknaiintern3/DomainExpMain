@@ -37,6 +37,11 @@ export function setApiWorkspaceId(id: string | undefined): void {
   cachedWorkspaceId = id;
 }
 
+export function resetApiState(): void {
+  cachedAccessToken = null;
+  cachedWorkspaceId = undefined;
+}
+
 export async function setCustomApiUrl(url: string | null): Promise<void> {
   customApiUrl = url;
   if (url) {
@@ -140,8 +145,11 @@ export async function bootstrapMobileSession(email?: string): Promise<boolean> {
 
 export async function initApiClient(): Promise<void> {
   const savedUrl = await getItem(STORAGE_KEYS.API_URL);
-  if (savedUrl) {
+  if (savedUrl && !savedUrl.includes('app.domainexp.info')) {
     customApiUrl = savedUrl;
+  } else if (savedUrl && savedUrl.includes('app.domainexp.info')) {
+    await deleteItem(STORAGE_KEYS.API_URL);
+    customApiUrl = null;
   }
 
   const token = await getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -155,11 +163,6 @@ export async function initApiClient(): Promise<void> {
   const wsId = await getItem(STORAGE_KEYS.WORKSPACE_ID);
   if (wsId) {
     cachedWorkspaceId = wsId;
-  }
-
-  // Auto-bootstrap authentic workspace session if needed or if token was expired
-  if (!cachedAccessToken) {
-    await bootstrapMobileSession();
   }
 }
 
@@ -199,15 +202,16 @@ async function runSingleFlightRefresh(): Promise<string | null> {
         }
       }
 
-      // Refresh token failed or expired -> re-bootstrap fresh 30-day session
+      // Refresh token failed or expired -> clear tokens
       await deleteItem(STORAGE_KEYS.ACCESS_TOKEN);
       await deleteItem(STORAGE_KEYS.REFRESH_TOKEN);
       cachedAccessToken = null;
-      const bootstrapped = await bootstrapMobileSession();
-      return bootstrapped ? cachedAccessToken : null;
+      return null;
     } catch {
-      const bootstrapped = await bootstrapMobileSession();
-      return bootstrapped ? cachedAccessToken : null;
+      await deleteItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await deleteItem(STORAGE_KEYS.REFRESH_TOKEN);
+      cachedAccessToken = null;
+      return null;
     } finally {
       inflightRefresh = null;
     }
@@ -232,7 +236,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
       if (stored && !isJwtExpired(stored)) {
         cachedAccessToken = stored;
       } else {
-        await bootstrapMobileSession();
+        cachedAccessToken = null;
       }
     }
     if (cachedAccessToken) {

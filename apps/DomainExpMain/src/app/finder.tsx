@@ -54,7 +54,17 @@ export default function DomainFinderScreen() {
     setIsSearching(true);
     setHasSearched(true);
     try {
-      const searchResults = await searchMultipleTlds(term, selectedTlds);
+      const searchResults = await searchMultipleTlds(term, selectedTlds, (partial) => {
+        setResults((prev) => {
+          const index = prev.findIndex((r) => r.domain === partial.domain);
+          if (index >= 0) {
+            const next = [...prev];
+            next[index] = partial;
+            return next;
+          }
+          return [...prev, partial];
+        });
+      });
       setResults(searchResults);
     } finally {
       setIsSearching(false);
@@ -214,6 +224,26 @@ export default function DomainFinderScreen() {
                     activeOpacity={0.8}
                   >
                     <Text style={styles.cartIcon}>{item.available ? '🛒' : 'ℹ️'}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                      marginLeft: 6,
+                    }}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setResults((prev) => prev.filter((r) => r.domain !== item.domain));
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    activeOpacity={0.6}
+                  >
+                    <Ionicons name="close" size={13} color={colors.textMuted} />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>

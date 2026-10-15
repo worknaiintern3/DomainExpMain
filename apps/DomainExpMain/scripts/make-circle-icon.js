@@ -2,17 +2,17 @@ const fs = require('fs');
 const path = require('path');
 const { PNG } = require('pngjs');
 
-const sourcePath = path.join(__dirname, '../assets/images/ChatGPT Image 1 Oct 2026, 15_11_16.png');
+const sourcePath = path.join(__dirname, '../assets/images/master-icon.png');
 const data = fs.readFileSync(sourcePath);
 const srcPng = PNG.sync.read(data);
 
 const width = srcPng.width;
 const height = srcPng.height;
 
-// Circle parameters
-const cx = 625.5;
-const cy = 625.0;
-const radius = 533.0; // exact circle radius of the glass logo
+// Circle parameters (centered on 1024x1024 canvas)
+const cx = width / 2;
+const cy = height / 2;
+const radius = Math.min(width, height) / 2 - 2;
 
 // Create circular masked PNG
 const outPng = new PNG({ width, height });

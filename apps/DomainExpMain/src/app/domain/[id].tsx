@@ -13,17 +13,98 @@ import {
   Linking,
   Share,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
 import { fetchDomainsList, deleteDomain, updateDomainRecord } from '../../services/domains';
+import { fetchProviderAccountsList } from '../../services/accounts';
+import { fetchServersList, updateServer } from '../../services/servers';
 import { fetchLiveDomainDetails, getDomainLogoUrl, type LiveDomainInfo } from '../../services/liveDomainLookup';
 import { openWebsiteInBrowser } from '../../services/websites';
 import { fetchApplicationsList } from '../../services/applications';
 import { DomainLogoImage } from '../../components/ui/DomainLogoImage';
-import type { DomainItem, ApplicationItem } from '../../types';
+import type { DomainItem, ApplicationItem, ProviderAccount, ServerItem } from '../../types';
+
+const PROVIDER_LOGOS: Record<string, any> = {
+  hostinger: require('../../../assets/images/providers/hostinger.png'),
+  hetzner: require('../../../assets/images/providers/hetzner.png'),
+  aws: require('../../../assets/images/providers/aws.png'),
+  digitalocean: require('../../../assets/images/providers/digitalocean.png'),
+  cloudflare: require('../../../assets/images/providers/cloudflare.png'),
+  godaddy: require('../../../assets/images/providers/godaddy.png'),
+  namecheap: require('../../../assets/images/providers/namecheap.png'),
+  gcp: require('../../../assets/images/providers/gcp.png'),
+  azure: require('../../../assets/images/providers/azure.png'),
+  vultr: require('../../../assets/images/providers/vultr.png'),
+  linode: require('../../../assets/images/providers/linode.png'),
+};
+
+function getProviderDisplayTitle(providerKey?: string | null): string {
+  if (!providerKey) return 'Custom Provider';
+  const k = providerKey.toLowerCase();
+  if (k === 'aws' || k.includes('route53')) return 'Amazon Web Services (AWS)';
+  if (k === 'hostinger') return 'Hostinger';
+  if (k === 'cloudflare') return 'Cloudflare';
+  if (k === 'godaddy') return 'GoDaddy';
+  if (k === 'namecheap') return 'Namecheap';
+  if (k === 'digitalocean') return 'DigitalOcean';
+  if (k === 'hetzner') return 'Hetzner';
+  if (k === 'gcp' || k.includes('google')) return 'Google Cloud';
+  if (k === 'azure' || k.includes('microsoft')) return 'Microsoft Azure';
+  if (k === 'vultr') return 'Vultr';
+  if (k === 'linode') return 'Linode / Akamai';
+  return providerKey.charAt(0).toUpperCase() + providerKey.slice(1);
+}
+
+function detectProviderKey(
+  registrar?: string | null,
+  dnsProvider?: string | null,
+  nameservers?: string[] | null,
+  tags?: string[] | null
+): string | null {
+  const combined = [
+    registrar || '',
+    dnsProvider || '',
+    (nameservers || []).join(' '),
+    (tags || []).join(' '),
+  ].join(' ').toLowerCase();
+
+  if (combined.includes('hostinger') || combined.includes('hstgr')) return 'hostinger';
+  if (combined.includes('amazon') || combined.includes('route 53') || combined.includes('route53') || combined.includes('awsdns')) return 'aws';
+  if (combined.includes('cloudflare')) return 'cloudflare';
+  if (combined.includes('godaddy') || combined.includes('domaincontrol')) return 'godaddy';
+  if (combined.includes('namecheap')) return 'namecheap';
+  if (combined.includes('digitalocean')) return 'digitalocean';
+  if (combined.includes('hetzner')) return 'hetzner';
+  if (combined.includes('google') || combined.includes('googledomains')) return 'gcp';
+  if (combined.includes('azure') || combined.includes('microsoft')) return 'azure';
+  if (combined.includes('vultr')) return 'vultr';
+  if (combined.includes('linode')) return 'linode';
+  return null;
+}
+
+function getServerProviderKey(
+  provider?: string | null,
+  name?: string | null,
+  os?: string | null
+): string {
+  const p = (provider || '').toLowerCase();
+  const n = (name || '').toLowerCase();
+  const o = (os || '').toLowerCase();
+  if (p.includes('aws') || p.includes('amazon') || n.includes('aws') || n.includes('ec2') || o.includes('aws')) return 'aws';
+  if (p.includes('hostinger') || n.includes('hostinger') || n.includes('hstgr')) return 'hostinger';
+  if (p.includes('hetzner') || n.includes('hetzner')) return 'hetzner';
+  if (p.includes('digital') || p.includes('ocean') || n.includes('digitalocean')) return 'digitalocean';
+  if (p.includes('cloudflare')) return 'cloudflare';
+  if (p.includes('gcp') || p.includes('google') || n.includes('gcp')) return 'gcp';
+  if (p.includes('azure') || p.includes('microsoft')) return 'azure';
+  if (p.includes('vultr') || n.includes('vultr')) return 'vultr';
+  if (p.includes('linode') || n.includes('linode')) return 'linode';
+  return 'hostinger';
+}
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'Not Published';
@@ -307,6 +388,20 @@ export default function DomainDetailsScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // Infrastructure: Provider Account and VPS Server
+  const [providerAccounts, setProviderAccounts] = useState<ProviderAccount[]>([]);
+  const [servers, setServers] = useState<ServerItem[]>([]);
+  const [matchedProvider, setMatchedProvider] = useState<ProviderAccount | null>(null);
+  const [matchedServer, setMatchedServer] = useState<ServerItem | null>(null);
+  const [serverMatchReason, setServerMatchReason] = useState<string>('');
+  const [copiedServerIp, setCopiedServerIp] = useState(false);
+
+  // Modals for linking / changing provider and server
+  const [isLinkProviderModalOpen, setIsLinkProviderModalOpen] = useState(false);
+  const [isLinkServerModalOpen, setIsLinkServerModalOpen] = useState(false);
+  const [accountSearchText, setAccountSearchText] = useState('');
+  const [serverSearchText, setServerSearchText] = useState('');
+
   // Edit Domain Draft State
   const [editCreated, setEditCreated] = useState('');
   const [editExpires, setEditExpires] = useState('');
@@ -324,7 +419,9 @@ export default function DomainDetailsScreen() {
   const [editSslValidFrom, setEditSslValidFrom] = useState('Not set');
   const [editSslValidTo, setEditSslValidTo] = useState('Not set');
   const [editTags, setEditTags] = useState<string[]>(['Personal']);
-  const [editNotes, setEditNotes] = useState('');  const populateEditState = (currentDomain: DomainItem, info: LiveDomainInfo | null) => {
+  const [editNotes, setEditNotes] = useState('');
+
+  const populateEditState = (currentDomain: DomainItem, info: LiveDomainInfo | null) => {
     setEditCreated(formatDate(info?.registrationDate || currentDomain.registrationDate));
     setEditExpires(formatDate(info?.expirationDate || (currentDomain.expiresAt ? currentDomain.expiresAt.split('T')[0] : '')));
     setEditUpdated(formatDate(info?.lastUpdatedDate || ''));
@@ -354,52 +451,191 @@ export default function DomainDetailsScreen() {
     setEditNotes(currentDomain.notes || '');
   };
 
-  const queryLiveTelemetry = useCallback(async (domainName: string) => {
-    setIsRefreshingLive(true);
-    try {
-      const details = await fetchLiveDomainDetails(domainName);
-      setLiveInfo(details);
-      setLastCheckedDate(
-        new Date().toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })
-      );
+  const resolveMatchedInfrastructure = useCallback(
+    (
+      currentDomain: DomainItem,
+      currentLive: LiveDomainInfo | null,
+      accountList: ProviderAccount[],
+      serverList: ServerItem[]
+    ) => {
+      // 1. Resolve Provider Account
+      let matchedAcc: ProviderAccount | null = null;
 
-      const exp = details.expirationDate || '';
-      const reg = details.registrationDate || '';
+      // Direct ID link check
+      if (currentDomain.providerAccountId) {
+        matchedAcc = accountList.find((a) => a.id === currentDomain.providerAccountId) || null;
+      }
+      if (!matchedAcc && currentDomain.dnsProviderAccountId) {
+        matchedAcc = accountList.find((a) => a.id === currentDomain.dnsProviderAccountId) || null;
+      }
 
-      setDomain((prev) => {
-        if (!prev) return null;
-        const expTime = exp ? new Date(exp).getTime() : NaN;
-        const daysRemaining = isNaN(expTime)
-          ? prev.daysRemaining
-          : Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)));
+      // Check tags / notes for account ID or label mention
+      if (!matchedAcc) {
+        const notesAndTags = `${currentDomain.notes || ''} ${(currentDomain.tags || []).join(' ')}`.toLowerCase();
+        for (const a of accountList) {
+          if (a.id && notesAndTags.includes(a.id.toLowerCase())) {
+            matchedAcc = a;
+            break;
+          }
+          if (a.label && notesAndTags.includes(a.label.toLowerCase())) {
+            matchedAcc = a;
+            break;
+          }
+          if (a.externalAccountId && notesAndTags.includes(a.externalAccountId.toLowerCase())) {
+            matchedAcc = a;
+            break;
+          }
+        }
+      }
 
-        const updatedDomain: DomainItem = {
-          ...prev,
-          registrar: details.registrar || prev.registrar,
-          registrationDate: reg || prev.registrationDate,
-          expiresAt: exp ? new Date(exp).toISOString() : prev.expiresAt,
-          daysRemaining,
-          logoUrl: details.logoUrl,
-          nameservers: details.nameservers.length > 0 ? details.nameservers : prev.nameservers,
-        };
+      // Check detected provider key against connected accounts
+      if (!matchedAcc) {
+        const detectedKey = detectProviderKey(
+          currentLive?.registrar || currentDomain.registrar,
+          currentDomain.dnsProvider,
+          currentLive?.nameservers || currentDomain.nameservers,
+          currentDomain.tags
+        );
+        if (detectedKey) {
+          matchedAcc =
+            accountList.find((a) => (a.providerKey || '').toLowerCase() === detectedKey) || null;
+        }
+      }
 
-        updateDomainRecord(prev.id, updatedDomain).catch(() => {});
-        return updatedDomain;
-      });
-    } catch {
-      // Gracefully handle network failures
-    } finally {
-      setIsRefreshingLive(false);
-    }
-  }, []);
+      setMatchedProvider(matchedAcc);
+
+      // 2. Resolve Server / VPS
+      let foundServer: ServerItem | null = null;
+      let matchType = '';
+
+      const cleanDomainName = currentDomain.name.trim().toLowerCase();
+
+      // Check explicit serverId on domain
+      if (currentDomain.serverId) {
+        foundServer = serverList.find((s) => s.id === currentDomain.serverId) || null;
+        if (foundServer) matchType = 'Directly Assigned';
+      }
+
+      // Check server connectedDomains list
+      if (!foundServer) {
+        for (const s of serverList) {
+          if (Array.isArray(s.connectedDomains)) {
+            const hasDom = s.connectedDomains.some((cd) => {
+              const cdClean = (cd || '').trim().toLowerCase();
+              return cdClean === cleanDomainName || cleanDomainName.endsWith(`.${cdClean}`);
+            });
+            if (hasDom) {
+              foundServer = s;
+              matchType = 'Connected Domain';
+              break;
+            }
+          }
+        }
+      }
+
+      // Check live DNS A-records against Server public IP
+      if (!foundServer) {
+        const candidateIps: string[] = [];
+        if (currentLive?.ip) candidateIps.push(currentLive.ip.trim());
+        if (Array.isArray(currentLive?.dnsRecords)) {
+          for (const rec of currentLive.dnsRecords) {
+            if (rec.dnsType === 'A' && rec.address) {
+              candidateIps.push(rec.address.trim());
+            }
+          }
+        }
+        if (currentDomain.serverIp) candidateIps.push(currentDomain.serverIp.trim());
+
+        for (const ip of candidateIps) {
+          const s = serverList.find((srv) => srv.ipAddress && srv.ipAddress.trim() === ip);
+          if (s) {
+            foundServer = s;
+            matchType = `Live DNS A-Record (${ip})`;
+            break;
+          }
+        }
+      }
+
+      // Check server name or hostname matches domain name
+      if (!foundServer) {
+        for (const s of serverList) {
+          const sName = (s.name || '').trim().toLowerCase();
+          if (sName === cleanDomainName || sName.includes(cleanDomainName)) {
+            foundServer = s;
+            matchType = 'Hostname Match';
+            break;
+          }
+        }
+      }
+
+      setMatchedServer(foundServer);
+      setServerMatchReason(matchType);
+    },
+    []
+  );
+
+  const queryLiveTelemetry = useCallback(
+    async (domainName: string, currentAccounts?: ProviderAccount[], currentServers?: ServerItem[]) => {
+      setIsRefreshingLive(true);
+      try {
+        const details = await fetchLiveDomainDetails(domainName);
+        setLiveInfo(details);
+        setLastCheckedDate(
+          new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })
+        );
+
+        const exp = details.expirationDate || '';
+        const reg = details.registrationDate || '';
+
+        setDomain((prev) => {
+          if (!prev) return null;
+          const expTime = exp ? new Date(exp).getTime() : NaN;
+          const daysRemaining = isNaN(expTime)
+            ? prev.daysRemaining
+            : Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)));
+
+          const updatedDomain: DomainItem = {
+            ...prev,
+            registrar: details.registrar || prev.registrar,
+            registrationDate: reg || prev.registrationDate,
+            expiresAt: exp ? new Date(exp).toISOString() : prev.expiresAt,
+            daysRemaining,
+            logoUrl: details.logoUrl,
+            nameservers: details.nameservers.length > 0 ? details.nameservers : prev.nameservers,
+          };
+
+          updateDomainRecord(prev.id, updatedDomain).catch(() => {});
+          resolveMatchedInfrastructure(
+            updatedDomain,
+            details,
+            currentAccounts || providerAccounts,
+            currentServers || servers
+          );
+          return updatedDomain;
+        });
+      } catch {
+        // Gracefully handle network failures
+      } finally {
+        setIsRefreshingLive(false);
+      }
+    },
+    [providerAccounts, servers, resolveMatchedInfrastructure]
+  );
 
   useEffect(() => {
     async function loadDomain() {
-      const list = await fetchDomainsList();
+      const [list, accList, srvList] = await Promise.all([
+        fetchDomainsList(),
+        fetchProviderAccountsList(),
+        fetchServersList(),
+      ]);
+      setProviderAccounts(accList);
+      setServers(srvList);
+
       const domainNameFromId = decodeURIComponent(id || '').trim().toLowerCase();
       const found = list.find((d) => d.id === id || d.name.toLowerCase() === domainNameFromId);
 
@@ -416,7 +652,8 @@ export default function DomainDetailsScreen() {
         setDomain(found);
         activeDomainName = found.name;
         populateEditState(found, null);
-        queryLiveTelemetry(found.name);
+        resolveMatchedInfrastructure(found, null, accList, srvList);
+        queryLiveTelemetry(found.name, accList, srvList);
       } else {
         const dynamicDomain: DomainItem = {
           id: domainNameFromId,
@@ -438,7 +675,8 @@ export default function DomainDetailsScreen() {
         };
         setDomain(dynamicDomain);
         populateEditState(dynamicDomain, null);
-        queryLiveTelemetry(domainNameFromId);
+        resolveMatchedInfrastructure(dynamicDomain, null, accList, srvList);
+        queryLiveTelemetry(domainNameFromId, accList, srvList);
       }
 
       // Resolve associated mobile & web endpoints reliably
@@ -452,7 +690,95 @@ export default function DomainDetailsScreen() {
       }
     }
     loadDomain();
-  }, [id, queryLiveTelemetry]);
+  }, [id, queryLiveTelemetry, resolveMatchedInfrastructure]);
+
+  const handleNavigateToServer = (serverId: string) => {
+    router.push(`/server/${encodeURIComponent(serverId)}` as any);
+  };
+
+  const handleCopyServerIp = async (ip: string) => {
+    if (!ip) return;
+    setCopiedServerIp(true);
+    setTimeout(() => setCopiedServerIp(false), 2000);
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(ip);
+      } else {
+        await Share.share({
+          message: ip,
+          title: 'Server IP Address',
+        });
+      }
+    } catch {}
+  };
+
+  const handleSelectProviderAccount = async (account: ProviderAccount | null) => {
+    setIsLinkProviderModalOpen(false);
+    if (!domain) return;
+
+    if (!account) {
+      const updatedDomain: DomainItem = {
+        ...domain,
+        providerAccountId: undefined,
+        providerLabel: undefined,
+        providerKey: undefined,
+      };
+      setDomain(updatedDomain);
+      setMatchedProvider(null);
+      await updateDomainRecord(domain.id, updatedDomain);
+      return;
+    }
+
+    const updatedDomain: DomainItem = {
+      ...domain,
+      providerAccountId: account.id,
+      providerLabel: account.label,
+      providerKey: account.providerKey,
+    };
+    setDomain(updatedDomain);
+    setMatchedProvider(account);
+    await updateDomainRecord(domain.id, updatedDomain);
+  };
+
+  const handleSelectServer = async (server: ServerItem | null) => {
+    setIsLinkServerModalOpen(false);
+    if (!domain) return;
+
+    if (!server) {
+      const updatedDomain: DomainItem = {
+        ...domain,
+        serverId: undefined,
+        serverName: undefined,
+        serverIp: undefined,
+        serverProvider: undefined,
+      };
+      setDomain(updatedDomain);
+      setMatchedServer(null);
+      setServerMatchReason('');
+      await updateDomainRecord(domain.id, updatedDomain);
+      return;
+    }
+
+    const domName = domain.name.toLowerCase().trim();
+    const existingConnected = server.connectedDomains || [];
+    if (!existingConnected.map((d) => d.toLowerCase().trim()).includes(domName)) {
+      const updatedConnected = [...existingConnected, domName];
+      await updateServer(server.id, { connectedDomains: updatedConnected });
+      server.connectedDomains = updatedConnected;
+    }
+
+    const updatedDomain: DomainItem = {
+      ...domain,
+      serverId: server.id,
+      serverName: server.name,
+      serverIp: server.ipAddress,
+      serverProvider: server.provider,
+    };
+    setDomain(updatedDomain);
+    setMatchedServer(server);
+    setServerMatchReason('Directly Assigned');
+    await updateDomainRecord(domain.id, updatedDomain);
+  };
 
   const [copiedUrl, setCopiedUrl] = useState(false);
 
@@ -653,6 +979,16 @@ export default function DomainDetailsScreen() {
   const effectiveSslDays = liveInfo?.sslDaysRemaining !== undefined ? liveInfo.sslDaysRemaining : 79;
   const effectiveSslProtocol = liveInfo?.sslProtocol || 'TLS 1.3 / HTTPS (256-bit ECC)';
 
+  const detectedProviderKey = detectProviderKey(
+    effectiveRegistrar,
+    domain.dnsProvider,
+    effectiveNameservers,
+    domain.tags
+  );
+  const serverProviderKey = matchedServer
+    ? getServerProviderKey(matchedServer.provider, matchedServer.name, matchedServer.os)
+    : null;
+
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#0b0f19' : '#f8fafc', paddingTop: insets.top }]}>
       {/* Header Bar */}
@@ -820,7 +1156,325 @@ export default function DomainDetailsScreen() {
           </View>
         </View>
 
-        {/* 3. DATES Section Card */}
+        {/* 3. INFRASTRUCTURE & ACCOUNTS CARD */}
+        <View
+          style={[
+            styles.cardBox,
+            {
+              backgroundColor: isDark ? '#111827' : '#ffffff',
+              borderColor: isDark ? '#1f2937' : '#f1f5f9',
+            },
+          ]}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <View style={[styles.sectionHeaderDot, { backgroundColor: '#8b5cf6' }]} />
+            <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
+              INFRASTRUCTURE & ACCOUNTS
+            </Text>
+            <View style={{ flex: 1 }} />
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#f5f3ff',
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 10,
+                gap: 4,
+              }}
+            >
+              <Ionicons name="cube-outline" size={12} color="#8b5cf6" />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#8b5cf6' }}>
+                Cloud & Hosting
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.sectionDivider, { backgroundColor: isDark ? '#1f2937' : '#f1f5f9' }]} />
+
+          {/* Subcard 1: Registrar & DNS Provider Account */}
+          <View
+            style={[
+              styles.infraSubCard,
+              {
+                backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                borderColor: isDark ? '#334155' : '#e2e8f0',
+              },
+            ]}
+          >
+            <View style={styles.infraSubCardHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="business-outline" size={14} color={isDark ? '#94a3b8' : '#64748b'} />
+                <Text style={[styles.infraSubCardCategory, { color: colors.textSecondary }]}>
+                  REGISTRAR & DNS ACCOUNT
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsLinkProviderModalOpen(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.infraActionLink, { color: colors.primary }]}>
+                  {matchedProvider ? 'Switch Account' : 'Link Account'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {matchedProvider ? (
+              <View style={styles.infraAccountContent}>
+                <View style={[styles.infraLogoContainer, { backgroundColor: isDark ? '#0f172a' : '#ffffff' }]}>
+                  {PROVIDER_LOGOS[(matchedProvider.providerKey || '').toLowerCase()] ? (
+                    <Image
+                      source={PROVIDER_LOGOS[(matchedProvider.providerKey || '').toLowerCase()]}
+                      style={{ width: 32, height: 32 }}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <Ionicons name="shield-checkmark" size={24} color="#8b5cf6" />
+                  )}
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <Text style={[styles.infraAccountTitle, { color: colors.text }]} numberOfLines={1}>
+                      {matchedProvider.label}
+                    </Text>
+                    <View
+                      style={[
+                        styles.infraBadge,
+                        { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : '#eff6ff' },
+                      ]}
+                    >
+                      <Text style={[styles.infraBadgeText, { color: '#2563eb' }]}>
+                        {(matchedProvider.providerKey || 'PROVIDER').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={[styles.infraAccountSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {matchedProvider.externalAccountId
+                      ? `Account ID: ${matchedProvider.externalAccountId}`
+                      : `${getProviderDisplayTitle(matchedProvider.providerKey)} Linked`}
+                  </Text>
+
+                  <View style={styles.infraStatusRow}>
+                    <View style={styles.infraActiveDot} />
+                    <Text style={styles.infraActiveText}>Active & Synced Portfolio</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.infraEmptyStateRow}>
+                <View style={[styles.infraLogoContainer, { backgroundColor: isDark ? '#0f172a' : '#ffffff' }]}>
+                  {detectedProviderKey && PROVIDER_LOGOS[detectedProviderKey] ? (
+                    <Image
+                      source={PROVIDER_LOGOS[detectedProviderKey]}
+                      style={{ width: 32, height: 32 }}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <Ionicons name="globe-outline" size={24} color={colors.textSecondary} />
+                  )}
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <Text style={[styles.infraAccountTitle, { color: colors.text }]} numberOfLines={1}>
+                      {effectiveRegistrar || 'Authoritative Registry'}
+                    </Text>
+                    {detectedProviderKey ? (
+                      <View
+                        style={[
+                          styles.infraBadge,
+                          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+                        ]}
+                      >
+                        <Text style={[styles.infraBadgeText, { color: '#d97706' }]}>
+                          AUTO-DETECTED
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.infraAccountSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+                    Detected from WHOIS registry. Link to your connected account for automatic DNS zone sync.
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.infraAddPill,
+                    {
+                      backgroundColor: isDark ? '#0f172a' : '#eff6ff',
+                      borderColor: isDark ? '#334155' : '#bfdbfe',
+                    },
+                  ]}
+                  onPress={() => setIsLinkProviderModalOpen(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="link" size={13} color="#2563eb" />
+                  <Text style={[styles.infraAddPillText, { color: '#2563eb' }]}>Link</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* Subcard 2: Hosting & VPS Server */}
+          <View
+            style={[
+              styles.infraSubCard,
+              {
+                backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                borderColor: isDark ? '#334155' : '#e2e8f0',
+                marginTop: 10,
+              },
+            ]}
+          >
+            <View style={styles.infraSubCardHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="server-outline" size={14} color={isDark ? '#94a3b8' : '#64748b'} />
+                <Text style={[styles.infraSubCardCategory, { color: colors.textSecondary }]}>
+                  HOSTING & VPS SERVER
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsLinkServerModalOpen(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.infraActionLink, { color: colors.primary }]}>
+                  {matchedServer ? 'Change VPS' : 'Link VPS'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {matchedServer ? (
+              <View style={{ gap: 10 }}>
+                <TouchableOpacity
+                  style={styles.infraAccountContent}
+                  onPress={() => handleNavigateToServer(matchedServer.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.infraLogoContainer, { backgroundColor: isDark ? '#0f172a' : '#ffffff' }]}>
+                    {serverProviderKey && PROVIDER_LOGOS[serverProviderKey] ? (
+                      <Image
+                        source={PROVIDER_LOGOS[serverProviderKey]}
+                        style={{ width: 32, height: 32 }}
+                        contentFit="contain"
+                      />
+                    ) : (
+                      <Ionicons name="hardware-chip-outline" size={24} color="#10b981" />
+                    )}
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={[styles.infraAccountTitle, { color: colors.text }]} numberOfLines={1}>
+                        {matchedServer.name}
+                      </Text>
+                      <View
+                        style={[
+                          styles.infraBadge,
+                          { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#ecfdf5' },
+                        ]}
+                      >
+                        <Text style={[styles.infraBadgeText, { color: '#059669' }]}>
+                          {matchedServer.provider || 'VPS'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={[styles.infraAccountSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {matchedServer.region || 'Global'} • {matchedServer.os || 'Linux'}
+                    </Text>
+
+                    {serverMatchReason ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <Ionicons name="git-branch-outline" size={11} color={colors.textMuted} />
+                        <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '500' }}>
+                          {serverMatchReason}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                {/* Server IP and View Server Button Bar */}
+                <View
+                  style={[
+                    styles.infraServerBottomRow,
+                    {
+                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                      borderColor: isDark ? '#1e293b' : '#e2e8f0',
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.infraIpWrapper}
+                    onPress={() => handleCopyServerIp(matchedServer.ipAddress || '')}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.infraIpDot} />
+                    <Text style={[styles.infraIpText, { color: colors.text }]}>
+                      {matchedServer.ipAddress || '127.0.0.1'}
+                    </Text>
+                    <Ionicons
+                      name={copiedServerIp ? 'checkmark-circle' : 'copy-outline'}
+                      size={13}
+                      color={copiedServerIp ? '#10b981' : colors.textMuted}
+                    />
+                    {copiedServerIp && (
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#10b981', marginLeft: 2 }}>
+                        Copied!
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.infraViewServerBtn, { backgroundColor: colors.primary }]}
+                    onPress={() => handleNavigateToServer(matchedServer.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.infraViewServerBtnText}>View Server</Text>
+                    <Ionicons name="arrow-forward" size={13} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.infraEmptyStateRow}>
+                <View style={[styles.infraLogoContainer, { backgroundColor: isDark ? '#0f172a' : '#ffffff' }]}>
+                  <Ionicons name="cloud-offline-outline" size={24} color={colors.textSecondary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infraAccountTitle, { color: colors.text }]}>
+                    No VPS Directly Linked
+                  </Text>
+                  <Text style={[styles.infraAccountSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {liveInfo?.ip
+                      ? `Points to external IP ${liveInfo.ip}. Link to a tracked VPS node for server telemetry.`
+                      : 'Attach this domain to an AWS EC2 instance, Hostinger VPS, or Hetzner server node.'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.infraAddPill,
+                    {
+                      backgroundColor: isDark ? '#0f172a' : '#eff6ff',
+                      borderColor: isDark ? '#334155' : '#bfdbfe',
+                    },
+                  ]}
+                  onPress={() => setIsLinkServerModalOpen(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add" size={14} color="#2563eb" />
+                  <Text style={[styles.infraAddPillText, { color: '#2563eb' }]}>Link VPS</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* 4. DATES Section Card */}
         <View
           style={[
             styles.cardBox,
@@ -916,10 +1570,31 @@ export default function DomainDetailsScreen() {
             <Text style={[styles.dataValue, { color: colors.text }]}>{effectiveRegistrantState}</Text>
           </View>
 
+          {liveInfo?.registrantCountry ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Country</Text>
+              <Text style={[styles.dataValue, { color: colors.text }]}>{liveInfo.registrantCountry}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.dataRow}>
             <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Contact</Text>
             <Text style={[styles.dataValue, { color: colors.text }]}>{effectiveRegistrantContact}</Text>
           </View>
+
+          {liveInfo?.technicalContact ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Tech Contact</Text>
+              <Text style={[styles.dataValue, { color: colors.text }]}>{liveInfo.technicalContact}</Text>
+            </View>
+          ) : null}
+
+          {liveInfo?.administrativeContact ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Admin Contact</Text>
+              <Text style={[styles.dataValue, { color: colors.text }]}>{liveInfo.administrativeContact}</Text>
+            </View>
+          ) : null}
         </View>
 
         {/* 5. TECHNICAL Section Card */}
@@ -970,7 +1645,121 @@ export default function DomainDetailsScreen() {
           </View>
         </View>
 
-        {/* 6. SSL CERTIFICATE Section Card */}
+        {/* 6. LIVE DNS INTELLIGENCE Card (WhoisFreaks) */}
+        <View
+          style={[
+            styles.cardBox,
+            {
+              backgroundColor: isDark ? '#111827' : '#ffffff',
+              borderColor: isDark ? '#1f2937' : '#f1f5f9',
+            },
+          ]}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <View style={[styles.sectionHeaderDot, { backgroundColor: '#3b82f6' }]} />
+            <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
+              LIVE DNS RECORDS (WHOISFREAKS)
+            </Text>
+            <View style={{ flex: 1 }} />
+            {liveInfo?.dnsRecords && liveInfo.dnsRecords.length > 0 ? (
+              <View
+                style={{
+                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 10,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#3b82f6' }}>
+                  {liveInfo.dnsRecords.length} records
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={[styles.sectionDivider, { backgroundColor: isDark ? '#1f2937' : '#f1f5f9' }]} />
+
+          {liveInfo?.dnsRecords && liveInfo.dnsRecords.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              {liveInfo.dnsRecords.slice(0, 10).map((rec, idx) => {
+                const badgeColor =
+                  rec.dnsType === 'A'
+                    ? '#2563eb'
+                    : rec.dnsType === 'AAAA'
+                    ? '#0284c7'
+                    : rec.dnsType === 'MX'
+                    ? '#7c3aed'
+                    : rec.dnsType === 'TXT'
+                    ? '#d97706'
+                    : rec.dnsType === 'NS'
+                    ? '#059669'
+                    : '#475569';
+                const bgBadge = isDark ? `${badgeColor}25` : `${badgeColor}15`;
+                const val = rec.address || rec.target || rec.text || '-';
+
+                return (
+                  <View
+                    key={idx}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 6,
+                      borderBottomWidth: idx < Math.min(liveInfo.dnsRecords?.length || 0, 10) - 1 ? 1 : 0,
+                      borderBottomColor: isDark ? '#1f2937' : '#f8fafc',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <View
+                        style={{
+                          backgroundColor: bgBadge,
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          minWidth: 42,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: badgeColor }}>
+                          {rec.dnsType}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '600',
+                          color: colors.text,
+                          flex: 1,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {typeof rec.priority === 'number' ? `[${rec.priority}] ` : ''}
+                        {val}
+                      </Text>
+                    </View>
+                    {rec.ttl ? (
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginLeft: 8 }}>
+                        {rec.ttl}s
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={{ gap: 8 }}>
+              <View style={styles.dataRow}>
+                <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Primary A Record</Text>
+                <Text style={[styles.dataValue, { color: colors.text }]}>{liveInfo?.ip || 'Resolving...'}</Text>
+              </View>
+              <View style={styles.dataRow}>
+                <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>TTL</Text>
+                <Text style={[styles.dataValue, { color: colors.text }]}>{liveInfo?.ttl || 300} seconds</Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* 7. SSL CERTIFICATE Section Card */}
         <View
           style={[
             styles.cardBox,
@@ -1018,6 +1807,33 @@ export default function DomainDetailsScreen() {
               {effectiveSslIssuer}
             </Text>
           </View>
+
+          {liveInfo?.sslSubject ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Subject</Text>
+              <Text style={[styles.dataValue, { color: colors.text }]} numberOfLines={1}>
+                {liveInfo.sslSubject}
+              </Text>
+            </View>
+          ) : null}
+
+          {liveInfo?.sslSerialNumber ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Serial Number</Text>
+              <Text style={[styles.dataValue, { color: colors.text }]} numberOfLines={1}>
+                {liveInfo.sslSerialNumber}
+              </Text>
+            </View>
+          ) : null}
+
+          {liveInfo?.sslAltNames && liveInfo.sslAltNames.length > 0 ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>SANs</Text>
+              <Text style={[styles.dataValue, { color: colors.text }]} numberOfLines={1}>
+                {liveInfo.sslAltNames.slice(0, 3).join(', ')}
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.dataRow}>
             <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Protocol & Security</Text>
@@ -1474,9 +2290,410 @@ export default function DomainDetailsScreen() {
                   multiline
                 />
               </View>
+
+              {/* Linked Infrastructure Section in Edit Modal */}
+              <View
+                style={[
+                  styles.cardBox,
+                  {
+                    backgroundColor: isDark ? '#111827' : '#ffffff',
+                    borderColor: isDark ? '#1f2937' : '#f1f5f9',
+                  },
+                ]}
+              >
+                <View style={styles.sectionHeaderRow}>
+                  <View style={[styles.sectionHeaderDot, { backgroundColor: '#8b5cf6' }]} />
+                  <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
+                    LINKED INFRASTRUCTURE
+                  </Text>
+                </View>
+                <View style={[styles.sectionDivider, { backgroundColor: isDark ? '#1f2937' : '#f1f5f9' }]} />
+
+                <View style={styles.editRow}>
+                  <Text style={[styles.editLabel, { color: colors.textSecondary }]}>Provider</Text>
+                  <TouchableOpacity
+                    style={styles.editInputWrapper}
+                    onPress={() => setIsLinkProviderModalOpen(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.editInputText,
+                        { color: matchedProvider ? colors.text : colors.textMuted },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {matchedProvider ? matchedProvider.label : 'None (Auto WHOIS)'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.editRow}>
+                  <Text style={[styles.editLabel, { color: colors.textSecondary }]}>VPS Server</Text>
+                  <TouchableOpacity
+                    style={styles.editInputWrapper}
+                    onPress={() => setIsLinkServerModalOpen(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.editInputText,
+                        { color: matchedServer ? colors.text : colors.textMuted },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {matchedServer ? matchedServer.name : 'None Linked'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              </View>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* LINK / CHANGE PROVIDER ACCOUNT MODAL */}
+      <Modal
+        visible={isLinkProviderModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsLinkProviderModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.pickerModalBox,
+              {
+                backgroundColor: isDark ? '#111827' : '#ffffff',
+                borderColor: isDark ? '#1f2937' : '#e2e8f0',
+              },
+            ]}
+          >
+            <View style={styles.pickerModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.pickerModalTitle, { color: colors.text }]}>
+                  Link Provider Account
+                </Text>
+                <Text style={[styles.pickerModalSubtitle, { color: colors.textSecondary }]}>
+                  Choose the registrar or cloud account for {domain.name}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsLinkProviderModalOpen(false)}
+                style={styles.pickerCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
+            <View
+              style={[
+                styles.pickerSearchRow,
+                {
+                  backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                  borderColor: isDark ? '#334155' : '#e2e8f0',
+                },
+              ]}
+            >
+              <Ionicons name="search" size={16} color={colors.textMuted} />
+              <TextInput
+                style={[styles.pickerSearchInput, { color: colors.text }]}
+                placeholder="Search accounts by name or provider..."
+                placeholderTextColor={colors.textMuted}
+                value={accountSearchText}
+                onChangeText={setAccountSearchText}
+              />
+              {accountSearchText.length > 0 && (
+                <TouchableOpacity onPress={() => setAccountSearchText('')}>
+                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              {/* Option to Unlink / Clear */}
+              <TouchableOpacity
+                style={[
+                  styles.pickerItemRow,
+                  {
+                    backgroundColor: isDark ? '#1a2234' : '#f8fafc',
+                    borderColor: !matchedProvider ? colors.primary : (isDark ? '#1f2937' : '#e2e8f0'),
+                  },
+                ]}
+                onPress={() => handleSelectProviderAccount(null)}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.pickerLogoFallback,
+                    { backgroundColor: isDark ? '#0f172a' : '#f1f5f9' },
+                  ]}
+                >
+                  <Ionicons name="close-circle-outline" size={20} color={colors.textSecondary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pickerItemTitle, { color: colors.text }]}>
+                    No Provider Account (Unlink)
+                  </Text>
+                  <Text style={[styles.pickerItemSubtitle, { color: colors.textSecondary }]}>
+                    Rely on public WHOIS lookups only
+                  </Text>
+                </View>
+                {!matchedProvider ? (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                ) : (
+                  <Ionicons name="ellipse-outline" size={20} color={colors.textMuted} />
+                )}
+              </TouchableOpacity>
+
+              {/* Filtered Provider Accounts */}
+              {providerAccounts
+                .filter((acc) => {
+                  if (!accountSearchText.trim()) return true;
+                  const query = accountSearchText.toLowerCase();
+                  return (
+                    (acc.label || '').toLowerCase().includes(query) ||
+                    (acc.providerKey || '').toLowerCase().includes(query) ||
+                    (acc.externalAccountId || '').toLowerCase().includes(query)
+                  );
+                })
+                .map((acc) => {
+                  const isSelected = matchedProvider?.id === acc.id;
+                  const key = (acc.providerKey || '').toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={acc.id}
+                      style={[
+                        styles.pickerItemRow,
+                        {
+                          backgroundColor: isDark ? '#1a2234' : '#f8fafc',
+                          borderColor: isSelected ? colors.primary : (isDark ? '#1f2937' : '#e2e8f0'),
+                        },
+                      ]}
+                      onPress={() => handleSelectProviderAccount(acc)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.pickerLogoBox}>
+                        {PROVIDER_LOGOS[key] ? (
+                          <Image
+                            source={PROVIDER_LOGOS[key]}
+                            style={{ width: 28, height: 28 }}
+                            contentFit="contain"
+                          />
+                        ) : (
+                          <Ionicons name="cloud-outline" size={22} color="#8b5cf6" />
+                        )}
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.pickerItemTitle, { color: colors.text }]} numberOfLines={1}>
+                            {acc.label}
+                          </Text>
+                          <View
+                            style={[
+                              styles.infraBadge,
+                              { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : '#eff6ff' },
+                            ]}
+                          >
+                            <Text style={[styles.infraBadgeText, { color: '#2563eb' }]}>
+                              {key.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.pickerItemSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {acc.externalAccountId
+                            ? `Account ID: ${acc.externalAccountId}`
+                            : getProviderDisplayTitle(key)}
+                        </Text>
+                      </View>
+
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                      ) : (
+                        <Ionicons name="ellipse-outline" size={20} color={colors.textMuted} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* LINK / CHANGE VPS SERVER MODAL */}
+      <Modal
+        visible={isLinkServerModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsLinkServerModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.pickerModalBox,
+              {
+                backgroundColor: isDark ? '#111827' : '#ffffff',
+                borderColor: isDark ? '#1f2937' : '#e2e8f0',
+              },
+            ]}
+          >
+            <View style={styles.pickerModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.pickerModalTitle, { color: colors.text }]}>
+                  Link Hosting / VPS Server
+                </Text>
+                <Text style={[styles.pickerModalSubtitle, { color: colors.textSecondary }]}>
+                  Attach {domain.name} to a tracked VPS node or cloud server
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsLinkServerModalOpen(false)}
+                style={styles.pickerCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
+            <View
+              style={[
+                styles.pickerSearchRow,
+                {
+                  backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                  borderColor: isDark ? '#334155' : '#e2e8f0',
+                },
+              ]}
+            >
+              <Ionicons name="search" size={16} color={colors.textMuted} />
+              <TextInput
+                style={[styles.pickerSearchInput, { color: colors.text }]}
+                placeholder="Search servers by name, IP, provider..."
+                placeholderTextColor={colors.textMuted}
+                value={serverSearchText}
+                onChangeText={setServerSearchText}
+              />
+              {serverSearchText.length > 0 && (
+                <TouchableOpacity onPress={() => setServerSearchText('')}>
+                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              {/* Option to Unlink / Clear */}
+              <TouchableOpacity
+                style={[
+                  styles.pickerItemRow,
+                  {
+                    backgroundColor: isDark ? '#1a2234' : '#f8fafc',
+                    borderColor: !matchedServer ? colors.primary : (isDark ? '#1f2937' : '#e2e8f0'),
+                  },
+                ]}
+                onPress={() => handleSelectServer(null)}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.pickerLogoFallback,
+                    { backgroundColor: isDark ? '#0f172a' : '#f1f5f9' },
+                  ]}
+                >
+                  <Ionicons name="close-circle-outline" size={20} color={colors.textSecondary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pickerItemTitle, { color: colors.text }]}>
+                    No VPS Attached (Unlink)
+                  </Text>
+                  <Text style={[styles.pickerItemSubtitle, { color: colors.textSecondary }]}>
+                    Do not link to any internal VPS server node
+                  </Text>
+                </View>
+                {!matchedServer ? (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                ) : (
+                  <Ionicons name="ellipse-outline" size={20} color={colors.textMuted} />
+                )}
+              </TouchableOpacity>
+
+              {/* Filtered Servers */}
+              {servers
+                .filter((srv) => {
+                  if (!serverSearchText.trim()) return true;
+                  const query = serverSearchText.toLowerCase();
+                  return (
+                    (srv.name || '').toLowerCase().includes(query) ||
+                    (srv.provider || '').toLowerCase().includes(query) ||
+                    (srv.ipAddress || '').toLowerCase().includes(query) ||
+                    (srv.region || '').toLowerCase().includes(query) ||
+                    (srv.os || '').toLowerCase().includes(query)
+                  );
+                })
+                .map((srv) => {
+                  const isSelected = matchedServer?.id === srv.id;
+                  const srvKey = getServerProviderKey(srv.provider, srv.name, srv.os);
+                  return (
+                    <TouchableOpacity
+                      key={srv.id}
+                      style={[
+                        styles.pickerItemRow,
+                        {
+                          backgroundColor: isDark ? '#1a2234' : '#f8fafc',
+                          borderColor: isSelected ? colors.primary : (isDark ? '#1f2937' : '#e2e8f0'),
+                        },
+                      ]}
+                      onPress={() => handleSelectServer(srv)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.pickerLogoBox}>
+                        {PROVIDER_LOGOS[srvKey] ? (
+                          <Image
+                            source={PROVIDER_LOGOS[srvKey]}
+                            style={{ width: 28, height: 28 }}
+                            contentFit="contain"
+                          />
+                        ) : (
+                          <Ionicons name="hardware-chip-outline" size={22} color="#10b981" />
+                        )}
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.pickerItemTitle, { color: colors.text }]} numberOfLines={1}>
+                            {srv.name}
+                          </Text>
+                          <View
+                            style={[
+                              styles.infraBadge,
+                              { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#ecfdf5' },
+                            ]}
+                          >
+                            <Text style={[styles.infraBadgeText, { color: '#059669' }]}>
+                              {srv.provider || 'VPS'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.pickerItemSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {srv.ipAddress} • {srv.region || 'Global'}
+                        </Text>
+                      </View>
+
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                      ) : (
+                        <Ionicons name="ellipse-outline" size={20} color={colors.textMuted} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       {/* Delete Confirmation Modal */}
@@ -1899,5 +3116,218 @@ const styles = StyleSheet.create({
   modalBtnText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Infrastructure Cards Styles
+  infraSubCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+  },
+  infraSubCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  infraSubCardCategory: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  infraActionLink: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  infraAccountContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infraLogoContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infraLogoFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infraAccountTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  infraAccountSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  infraBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  infraBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  infraStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  infraActiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
+  },
+  infraActiveText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#10b981',
+  },
+  infraEmptyStateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infraAddPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  infraAddPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  infraServerBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  infraIpWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  infraIpDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10b981',
+  },
+  infraIpText: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  infraViewServerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  infraViewServerBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  // Picker Modals Styles
+  pickerModalBox: {
+    width: '100%',
+    maxHeight: '80%',
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  pickerModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  pickerModalSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  pickerCloseBtn: {
+    padding: 4,
+    borderRadius: 8,
+  },
+  pickerSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginVertical: 12,
+  },
+  pickerSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 2,
+  },
+  pickerItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  pickerLogoBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerLogoFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerItemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  pickerItemSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });

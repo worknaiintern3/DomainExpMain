@@ -63,4 +63,5 @@ export interface InventoryReadModelStore {
     entityId: string,
     options: InventoryRelationshipQueryOptions,
   ): Promise<readonly InventoryGraphRelationship[]>;
+  getInventorySummary?(workspaceId: string): Promise<any>;
 }

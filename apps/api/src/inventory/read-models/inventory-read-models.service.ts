@@ -118,4 +118,16 @@ export class InventoryReadModelService {
       query,
     );
   }
+
+  getInventorySummary(principal: WorkspacePrincipal) {
+    if (this.store.getInventorySummary) {
+      return this.store.getInventorySummary(principal.workspaceId);
+    }
+    return Promise.resolve({
+      domains: 0,
+      servers: 0,
+      applications: 0,
+      alerts: 0,
+    });
+  }
 }

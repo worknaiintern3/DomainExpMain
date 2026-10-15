@@ -42,6 +42,16 @@ export interface DomainItem {
   tags?: string[];
   notes?: string;
   logoUrl?: string;
+  providerAccountId?: string;
+  providerLabel?: string;
+  providerKey?: string;
+  dnsProviderAccountId?: string;
+  dnsProviderLabel?: string;
+  dnsProviderKey?: string;
+  serverId?: string;
+  serverName?: string;
+  serverIp?: string;
+  serverProvider?: string;
 }
 
 export interface ServerItem {
@@ -77,6 +87,38 @@ export interface ApplicationItem {
   installs?: string;
   rating?: number;
   releaseTrack?: string;
+}
+
+export interface GooglePlayDeveloperSearchResult {
+  id: string;
+  name: string;
+  icon?: string;
+  sampleApps: string[];
+  appCount: number;
+  verified: boolean;
+}
+
+export interface PlayStoreAppDetail {
+  id: string;
+  name: string;
+  packageId: string;
+  developerName: string;
+  developerId?: string;
+  iconUrl?: string;
+  playStoreUrl: string;
+  summary?: string;
+  score?: number;
+  scoreText?: string;
+  price?: string | number;
+  free?: boolean;
+  currency?: string;
+}
+
+export interface GooglePlayDeveloperAppsResult {
+  developerId: string;
+  developerName: string;
+  total: number;
+  apps: PlayStoreAppDetail[];
 }
 
 export interface WebsiteItem {

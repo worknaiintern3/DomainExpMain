@@ -8,6 +8,7 @@ export {
   SessionPersistenceError,
 } from './session.errors';
 export { PostgresSessionRepository } from './session.repository';
+export { MongoSessionRepository } from './mongo-session.repository';
 export type {
   AccessTokenIssuer,
   RefreshRotationPersistenceResult,

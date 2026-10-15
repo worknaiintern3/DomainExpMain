@@ -70,3 +70,80 @@ export interface NormalizedWhoisData {
   savedToDatabase: boolean;
   retrievedAt: string;
 }
+
+export interface WhoisFreaksDnsRecord {
+  name: string;
+  type?: number;
+  dnsType: string;
+  ttl?: number;
+  rawText?: string;
+  address?: string;
+  target?: string;
+  priority?: number;
+  text?: string;
+  admin?: string;
+  hostmaster?: string;
+  serial?: number;
+  refresh?: number;
+  retry?: number;
+  expire?: number;
+  minimumTtl?: number;
+}
+
+export interface WhoisFreaksDnsResponse {
+  domainName: string;
+  queryTime?: string;
+  dnsTypes?: Record<string, number>;
+  dnsRecords?: WhoisFreaksDnsRecord[];
+  status?: boolean;
+  message?: string;
+}
+
+export interface WhoisFreaksSslCertificate {
+  chainOrder?: string;
+  authenticationType?: string;
+  validityStartDate?: string;
+  validityEndDate?: string;
+  serialNumber?: string;
+  signatureAlgorithm?: string;
+  issuer?: Record<string, string>;
+  subject?: Record<string, string>;
+  subjectAltNames?: string[];
+}
+
+export interface WhoisFreaksSslResponse {
+  domainName: string;
+  queryTime?: string;
+  sslCertificates?: WhoisFreaksSslCertificate[];
+  status?: boolean;
+  message?: string;
+}
+
+export interface WhoisFreaksHistoricalItem {
+  num?: number;
+  domain_name?: string;
+  query_time?: string;
+  create_date?: string;
+  expiry_date?: string;
+  update_date?: string;
+  domain_registrar?: WhoisFreaksRegistrar;
+  registrant_contact?: WhoisFreaksContact;
+  administrative_contact?: WhoisFreaksContact;
+  technical_contact?: WhoisFreaksContact;
+  name_servers?: string[];
+  domain_status?: string[];
+  raw_whois?: string;
+}
+
+export interface WhoisFreaksHistoricalResponse {
+  status?: boolean;
+  whois?: string;
+  total_records?: string;
+  whois_domains_historical?: WhoisFreaksHistoricalItem[];
+  message?: string;
+}
+
+export interface WhoisFreaksAvailabilityResponse {
+  domain: string;
+  domainAvailability: boolean;
+}

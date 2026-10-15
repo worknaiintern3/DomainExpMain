@@ -3,6 +3,7 @@ export {
   LoginPersistenceError,
 } from './login.errors';
 export { PostgresLoginRepository } from './login.repository';
+export { MongoLoginRepository } from './mongo-login.repository';
 export type { LoginDatabaseHost } from './login.repository';
 export { DUMMY_PASSWORD_HASH, LOGIN_SESSION_TTL_MS, LoginService } from './login.service';
 export type {
