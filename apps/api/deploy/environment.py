@@ -33,7 +33,8 @@ def validate(env):
     required = ['BACKEND_HOST_PORT', 'NODE_ENV',
                 'CORS_ORIGINS', 'JWT_ACCESS_TOKEN_AUDIENCE',
                 'JWT_ACCESS_TOKEN_ISSUER', 'JWT_ACCESS_TOKEN_SECRET',
-                'PROVIDER_CREDENTIAL_ENCRYPTION_KEY_V1']
+                'PROVIDER_CREDENTIAL_ENCRYPTION_KEY_V1',
+                'GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_OAUTH_REDIRECT_URI']
     if 'MONGODB_URI' in env:
         required.append('MONGODB_URI')
     else:
