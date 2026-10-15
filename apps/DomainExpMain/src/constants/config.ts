@@ -4,17 +4,15 @@ const PRODUCTION_API_URL = 'https://app.domainexp.info/api/v1';
 const LOCAL_BACKEND_URL = 'http://192.168.1.39:4000/api/v1';
 
 const getInitialApiUrl = (): string => {
-  // If explicitly configured via env to a non-remote URL:
-  if (
-    process.env.EXPO_PUBLIC_API_URL &&
-    !process.env.EXPO_PUBLIC_API_URL.includes('app.domainexp.info')
-  ) {
+  // 1. Explicitly configured via environment variable
+  if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  // If running in production release build, target the live production backend
+  // 2. Production release build
   if (typeof __DEV__ !== 'undefined' && !__DEV__) {
     return PRODUCTION_API_URL;
   }
+  // 3. Web environment
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location?.hostname) {
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -24,8 +22,8 @@ const getInitialApiUrl = (): string => {
     }
     return 'http://localhost:4000/api/v1';
   }
-  // Development on physical phone or emulator: connect directly to local backend
-  return LOCAL_BACKEND_URL;
+  // 4. Default to live production URL
+  return PRODUCTION_API_URL;
 };
 
 export const API_CONFIG = {
@@ -36,7 +34,7 @@ export const API_CONFIG = {
   ANDROID_EMULATOR_URL: 'http://10.0.2.2:4000/api/v1',
   TIMEOUT_MS: 15000,
   APP_NAME: 'DomainPulse',
-  VERSION: '1.0.0',
+  VERSION: '1.0.1',
   RATE_LIMIT: {
     MAX_REQUESTS: 5000,
     WINDOW_MINUTES: 15,

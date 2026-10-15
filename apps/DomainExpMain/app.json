@@ -2,7 +2,7 @@
   "expo": {
     "name": "DomainPulse",
     "slug": "domainpulse-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "domainpulse",
@@ -41,7 +41,7 @@
         }
       },
       "package": "com.domainpulse.mobile",
-      "versionCode": 1
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",
