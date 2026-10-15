@@ -10,6 +10,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Inject,
   Param,
   Patch,
   Post,
@@ -34,7 +35,7 @@ export class ProjectsController {
     UpdateProjectRequest
   >;
 
-  constructor(service: InventoryService) {
+  constructor(@Inject(InventoryService) service: InventoryService) {
     this.handler = new InventoryResourceHttpHandler(
       service,
       'project',

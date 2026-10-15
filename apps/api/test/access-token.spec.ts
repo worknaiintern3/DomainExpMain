@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { sign } from 'jsonwebtoken';
 import { describe, expect, it } from 'vitest';
+import { MAX_ACCESS_TOKEN_TTL_SECONDS } from '../src/auth/access-token/access-token.config';
 
 import {
   AccessTokenConfigurationError,
@@ -217,7 +218,7 @@ describe('access-token configuration', () => {
       JWT_ACCESS_TOKEN_AUDIENCE: 'domainpulse-test-clients',
       JWT_ACCESS_TOKEN_ISSUER: 'domainpulse-test-api',
       JWT_ACCESS_TOKEN_SECRET: buildTestSigningKey(13).toString('base64url'),
-      JWT_ACCESS_TOKEN_TTL_SECONDS: '3600',
+      JWT_ACCESS_TOKEN_TTL_SECONDS: String(MAX_ACCESS_TOKEN_TTL_SECONDS + 1),
     },
   ])('rejects missing, weak, or out-of-range configuration', (environment) => {
     expect(() => parseAccessTokenEnvironment(environment)).toThrow(

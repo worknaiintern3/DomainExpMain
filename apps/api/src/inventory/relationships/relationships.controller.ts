@@ -13,6 +13,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Inject,
   Param,
   Patch,
   Post,
@@ -66,7 +67,7 @@ export function presentInventoryRelationship(
 @Controller('inventory-relationships')
 @UseGuards(AccessTokenGuard, WorkspaceContextGuard)
 export class InventoryRelationshipsController {
-  constructor(private readonly service: InventoryRelationshipService) {}
+  constructor(@Inject(InventoryRelationshipService) private readonly service: InventoryRelationshipService) {}
 
   @Post()
   create(@Req() request: WorkspaceContextRequest, @Body() body: unknown) {

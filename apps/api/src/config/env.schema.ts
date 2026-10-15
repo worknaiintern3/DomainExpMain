@@ -45,6 +45,8 @@ export const EnvironmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_HOST: z.string().trim().min(1).default('127.0.0.1'),
   API_PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
+  // Exactly one trusted reverse proxy in the production Compose network.
+  API_TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(1).default(0),
   CORS_ORIGINS: CorsOriginsSchema,
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])

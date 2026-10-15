@@ -1,7 +1,7 @@
 name: DomainExp production
 on:
   push:
-    branches: [main, Api-Branch]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,9 +28,8 @@ jobs:
       - name: Validate deployment sources
         run: |
           set -euo pipefail
-          if [ -d "apps/api/deploy" ]; then
-            for script in apps/api/deploy/*.sh; do [ -f "$script" ] && bash -n "$script" || true; done
-          fi
+          for script in apps/api/deploy/*.sh; do bash -n "$script"; done
+          python3 -m unittest discover -s apps/api/deploy/tests -p 'test_*.py' -v
       - name: Configure verified SSH access
         run: |
           set -euo pipefail
