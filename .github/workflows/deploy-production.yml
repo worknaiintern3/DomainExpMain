@@ -1,7 +1,7 @@
 name: DomainExp production
 on:
   push:
-    branches: [main]
+    branches: [main, Api-Branch]
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,7 +19,7 @@ jobs:
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
       VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-      PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+      PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE || secrets.ENV_FILE }}
     steps:
       - uses: actions/checkout@v4
         with:

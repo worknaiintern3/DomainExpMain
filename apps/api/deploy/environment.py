@@ -45,11 +45,13 @@ def validate(env):
                                                       'your-domain.com', 'your-client-id', 'your-client-secret',
                                                       'your_client_id', 'your_client_secret')):
             invalid.add(key)
-    for key, expected in {'BACKEND_HOST_PORT': '5011', 'NODE_ENV': 'production',
+    for key, expected in {'BACKEND_HOST_PORT': '5011',
                           'API_HOST': '0.0.0.0', 'API_PORT': '4000',
                           'API_TRUST_PROXY_HOPS': '1'}.items():
         if env.get(key, expected) != expected:
             invalid.add(key)
+    if env.get('NODE_ENV', 'production') not in ('production', 'development'):
+        invalid.add('NODE_ENV')
     if 'DATABASE_URL' in env:
         if env.get('RUN_MIGRATIONS') != 'true':
             invalid.add('RUN_MIGRATIONS')
@@ -95,7 +97,7 @@ def validate(env):
     if env.get('GOOGLE_OAUTH_REDIRECT_URI'):
         try:
             url = urlsplit(env['GOOGLE_OAUTH_REDIRECT_URI'])
-            if url.scheme != 'https' or not url.netloc or url.username or url.password:
+            if url.scheme not in ('https', 'http') or not url.netloc or url.username or url.password:
                 raise ValueError()
         except ValueError:
             invalid.add('GOOGLE_OAUTH_REDIRECT_URI')
