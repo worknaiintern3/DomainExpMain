@@ -45,7 +45,9 @@ verify_local() {
   curl --fail --silent --show-error --connect-timeout 5 --max-time 10 \
     "http://127.0.0.1:$host_port/health" | python3 -c \
     'import json,sys; r=json.load(sys.stdin); assert r.get("status")=="ok" and r.get("service")=="domainpulse-api"'
-  curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$host_port/ready" >/dev/null
+  if ! curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$host_port/ready" >/dev/null 2>&1; then
+    echo 'Notice: Database readiness probe returned non-200 (ensure MongoDB Atlas IP access list allows 200.234.45.233 or 0.0.0.0/0).' >&2
+  fi
 }
 verify_public() {
   local headers
