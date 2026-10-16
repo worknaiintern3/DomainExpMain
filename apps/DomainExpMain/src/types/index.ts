@@ -69,6 +69,7 @@ export interface ServerItem {
   memoryUsagePercent?: number;
   diskUsagePercent?: number;
   connectedDomains?: string[];
+  providerAccountId?: string;
 }
 
 export interface ApplicationItem {

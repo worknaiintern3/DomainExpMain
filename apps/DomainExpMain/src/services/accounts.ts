@@ -117,39 +117,36 @@ async function saveStoredEmailAccounts(items: EmailAccount[]): Promise<void> {
 export function deduplicateProviderAccounts(accounts: ProviderAccount[]): ProviderAccount[] {
   if (!accounts || accounts.length <= 1) return accounts || [];
 
-  const seenIds = new Set<string>();
-  const realAccounts: ProviderAccount[] = [];
-  const mockAccounts: ProviderAccount[] = [];
+  const map = new Map<string, ProviderAccount>();
 
-  // Split into real backend accounts vs local mock 'pa-' accounts
   for (const acc of accounts) {
     if (!acc || !acc.id) continue;
-    if (seenIds.has(acc.id)) continue;
-    seenIds.add(acc.id);
+    const cleanKey = (acc.providerKey || '').toLowerCase().trim();
+    const cleanLabel = (acc.label || '').toLowerCase().trim();
+    const groupKey = `${cleanKey}::${cleanLabel}`;
 
-    if (acc.id.startsWith('pa-')) {
-      mockAccounts.push(acc);
+    if (!map.has(groupKey)) {
+      map.set(groupKey, acc);
     } else {
-      realAccounts.push(acc);
+      const existing = map.get(groupKey)!;
+      const isExistingMock = existing.id.startsWith('pa-');
+      const isCurrentMock = acc.id.startsWith('pa-');
+
+      if (isExistingMock && !isCurrentMock) {
+        map.set(groupKey, { ...acc, externalAccountId: acc.externalAccountId || existing.externalAccountId });
+      } else if (!isExistingMock && isCurrentMock) {
+        if (!existing.externalAccountId && acc.externalAccountId) {
+          existing.externalAccountId = acc.externalAccountId;
+        }
+      } else {
+        if (!existing.externalAccountId && acc.externalAccountId) {
+          map.set(groupKey, acc);
+        }
+      }
     }
   }
 
-  // Include all real accounts
-  const result: ProviderAccount[] = [...realAccounts];
-
-  // Only include mock accounts if there is no real account for the same providerKey and label
-  for (const mock of mockAccounts) {
-    const mockKey = (mock.providerKey || '').toLowerCase();
-    const mockLabel = (mock.label || '').toLowerCase().trim();
-    const hasRealMatch = realAccounts.some(
-      (r) => (r.providerKey || '').toLowerCase() === mockKey && (r.label || '').toLowerCase().trim() === mockLabel
-    );
-    if (!hasRealMatch) {
-      result.push(mock);
-    }
-  }
-
-  return result;
+  return Array.from(map.values());
 }
 
 export async function fetchProviderAccountsList(options?: { forceRefresh?: boolean }): Promise<ProviderAccount[]> {
@@ -203,7 +200,6 @@ export async function createProviderAccount(data: {
   if (existingMatch) {
     if (token) {
       await saveProviderToken(existingMatch.id, token);
-      await saveProviderToken(cleanKey, token);
     }
     return existingMatch;
   }
@@ -219,7 +215,6 @@ export async function createProviderAccount(data: {
     if (created?.id) {
       if (token) {
         await saveProviderToken(created.id, token);
-        await saveProviderToken(cleanKey, token);
       }
       const current = await getStoredProviderAccounts();
       const updated = deduplicateProviderAccounts([created, ...current.filter((p) => p.id !== created.id)]);
@@ -246,7 +241,6 @@ export async function createProviderAccount(data: {
 
   if (token) {
     await saveProviderToken(localItem.id, token);
-    await saveProviderToken(cleanKey, token);
   }
 
   const current = await getStoredProviderAccounts();

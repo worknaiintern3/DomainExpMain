@@ -223,10 +223,7 @@ export async function clearUserData(userId?: string): Promise<void> {
   ]);
 }
 
-export const KNOWN_PROVIDER_TOKENS: Record<string, string> = {
-  hostinger: 'Ppr6lCPyr4xzrcdM8hnR5fMXSkd9Xiaq77C9dGWF8363d91b',
-  'pa-hostinger-main': 'Ppr6lCPyr4xzrcdM8hnR5fMXSkd9Xiaq77C9dGWF8363d91b',
-};
+export const KNOWN_PROVIDER_TOKENS: Record<string, string> = {};
 
 export async function saveProviderToken(idOrKey: string, token: string): Promise<void> {
   if (!idOrKey || !token) return;
@@ -248,9 +245,6 @@ export async function getProviderToken(idOrKey: string): Promise<string | null> 
       if (map[cleanKey]) return map[cleanKey];
     }
   } catch {}
-  if (KNOWN_PROVIDER_TOKENS[cleanKey]) {
-    return KNOWN_PROVIDER_TOKENS[cleanKey];
-  }
   return null;
 }
 

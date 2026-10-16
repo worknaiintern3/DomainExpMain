@@ -21,7 +21,7 @@ import { useTheme } from '../../store/theme-context';
 import { useAuth } from '../../store/auth-context';
 import { fetchDomainsList, createDomain, deleteDomain } from '../../services/domains';
 import { fetchServersList } from '../../services/servers';
-import { syncAllConnectedProviders } from '../../services/providerSync';
+import { syncAllConnectedProviders, isInfrastructureDomain } from '../../services/providerSync';
 import { getDomainLogoUrl } from '../../services/liveDomainLookup';
 import { DomainLogoImage } from '../../components/ui/DomainLogoImage';
 import type { DomainItem } from '../../types';
@@ -102,6 +102,7 @@ export default function DomainsScreen() {
 
   const filteredDomains = useMemo(() => {
     return domains.filter((d) => {
+      if (!d?.name || isInfrastructureDomain(d.name)) return false;
       const matchesSearch =
         d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         d.registrar.toLowerCase().includes(searchQuery.toLowerCase());

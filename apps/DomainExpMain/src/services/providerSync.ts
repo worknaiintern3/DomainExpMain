@@ -2,10 +2,11 @@ import { apiGet, apiPost, apiDelete } from './api';
 import { getUserItem, setUserItem, STORAGE_KEYS, saveProviderToken, getProviderToken } from './storage';
 import { WORKNAI_CONSOLE_APPS, findOfficialConsoleApp, saveConsoleAccount, isMobileApplicationItem, type ConsoleAccountConfig } from './applications';
 import { fetchGooglePlayStatus, fetchGooglePlayApps } from './googlePlay';
-import { createProviderAccount, fetchProviderAccountsList } from './accounts';
+import { createProviderAccount, fetchProviderAccountsList, deduplicateProviderAccounts } from './accounts';
 import { fetchRealDeveloperApps } from './playStoreService';
 import { fetchLiveDomainDetails, getDomainLogoUrl } from './liveDomainLookup';
 import { syncDiscoveredWebsites } from './websites';
+import { invalidateCache } from './dataCache';
 import { fetchAwsRoute53Domains, fetchAwsEc2Instances, type AwsCredentials } from './awsSigV4';
 import type { ApplicationItem, BackendApplication, BackendDomain, BackendServer, CursorPage, DomainItem, ServerItem } from '../types';
 
@@ -93,6 +94,10 @@ export const INFRASTRUCTURE_DOMAINS = new Set([
   'hostinger.com',
   'hostinger.in',
   'hostinger.net',
+  'hstr.cloud',
+  'main.hstr.cloud',
+  'hostingersite.com',
+  'hostingerdomain.com',
   'hostgator.com',
   'bluehost.com',
   'godaddy.com',
@@ -113,6 +118,9 @@ export function isInfrastructureDomain(dom?: string | null): boolean {
     .split('/')[0]
     .split(':')[0];
   if (!clean || !clean.includes('.')) return true;
+  if (clean === 'hstr.cloud' || clean.endsWith('.hstr.cloud') || clean.includes('hstr.cloud')) return true;
+  if (clean === 'hostingersite.com' || clean.endsWith('.hostingersite.com') || clean.includes('hostingersite.com')) return true;
+  if (clean === 'hostingerdomain.com' || clean.endsWith('.hostingerdomain.com') || clean.includes('hostingerdomain.com')) return true;
   if (INFRASTRUCTURE_DOMAINS.has(clean)) return true;
   for (const infra of INFRASTRUCTURE_DOMAINS) {
     if (clean === infra || clean.endsWith(`.${infra}`)) return true;
@@ -176,20 +184,17 @@ export function extractDomainFromHostname(str?: string | null): string | null {
 // Live Provider Fetchers & Token Sanitization
 // -------------------------------------------------------------
 
-/**
- * Strips accidental whitespace, line breaks, 'Bearer' prefixes, and quotes
- * that commonly get introduced when users copy/paste API tokens on mobile devices.
- */
 export function sanitizeSingleApiKey(token: string): string {
   if (!token) return '';
-  const trimmed = token.trim();
+  // Strip zero-width, non-breaking spaces, and invisible unicode characters
+  let cleaned = token.replace(/[\u200B-\u200D\uFEFF\u00A0\u2000-\u200F]/g, '').trim();
   // Don't strip internal whitespace if it's a JSON payload (AWS, GCP, Azure, Namecheap)
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-    return trimmed;
+  if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+    return cleaned;
   }
-  return trimmed
+  return cleaned
     .replace(/^Bearer\s+/i, '')
-    .replace(/^["']|["']$/g, '')
+    .replace(/^["'“”‘’`]|["'“”‘’`]$/g, '')
     .replace(/\s+/g, '')
     .trim();
 }
@@ -224,7 +229,7 @@ async function fetchHostingerResources(apiKey: string): Promise<{
         : [];
       for (const item of list) {
         const dom = (item.domain || item.name || '').trim().toLowerCase();
-        if (dom && dom.includes('.')) {
+        if (dom && dom.includes('.') && !isInfrastructureDomain(dom)) {
           domains.push({
             domain: dom,
             expiresAt: item.expires_at || undefined,
@@ -235,7 +240,66 @@ async function fetchHostingerResources(apiKey: string): Promise<{
         }
       }
     } else if (res.status === 401 || res.status === 403) {
-      apiError = `Authentication failed (HTTP ${res.status}): Hostinger rejected the API token. Please ensure your token was generated from Hostinger Developer Dashboard and has Read permissions.`;
+      // Auto-recovery 1: On mobile, accidental extra character appended at end (49 chars)
+      let recovered = false;
+      if (cleanToken.length > 48) {
+        const candidate48 = cleanToken.slice(0, 48);
+        try {
+          const retryRes = await fetch('https://developers.hostinger.com/api/domains/v1/portfolio', {
+            headers: { Authorization: `Bearer ${candidate48}`, Accept: 'application/json' },
+          });
+          if (retryRes.ok) {
+            recovered = true;
+            headers.Authorization = `Bearer ${candidate48}`;
+            const retryData = await retryRes.json();
+            const list = Array.isArray(retryData) ? retryData : Array.isArray(retryData?.data) ? retryData.data : [];
+            for (const item of list) {
+              const dom = (item.domain || item.name || '').trim().toLowerCase();
+              if (dom && dom.includes('.') && !isInfrastructureDomain(dom)) {
+                domains.push({
+                  domain: dom,
+                  expiresAt: item.expires_at || undefined,
+                  createdAt: item.created_at || undefined,
+                  status: item.status || 'active',
+                  autoRenew: true,
+                });
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // Auto-recovery 2: Character confusion: uppercase 'I' instead of lowercase 'l'
+      if (!recovered && cleanToken.includes('I')) {
+        const candidateL = cleanToken.replace(/I/g, 'l');
+        try {
+          const retryRes = await fetch('https://developers.hostinger.com/api/domains/v1/portfolio', {
+            headers: { Authorization: `Bearer ${candidateL}`, Accept: 'application/json' },
+          });
+          if (retryRes.ok) {
+            recovered = true;
+            headers.Authorization = `Bearer ${candidateL}`;
+            const retryData = await retryRes.json();
+            const list = Array.isArray(retryData) ? retryData : Array.isArray(retryData?.data) ? retryData.data : [];
+            for (const item of list) {
+              const dom = (item.domain || item.name || '').trim().toLowerCase();
+              if (dom && dom.includes('.') && !isInfrastructureDomain(dom)) {
+                domains.push({
+                  domain: dom,
+                  expiresAt: item.expires_at || undefined,
+                  createdAt: item.created_at || undefined,
+                  status: item.status || 'active',
+                  autoRenew: true,
+                });
+              }
+            }
+          }
+        } catch {}
+      }
+
+      if (!recovered) {
+        apiError = `Authentication failed (HTTP ${res.status}): Hostinger rejected the API token. Please ensure your token was generated from Hostinger Developer Dashboard and has Read permissions.`;
+      }
     }
   } catch (err: any) {
     if (!apiError) apiError = `Network error connecting to Hostinger: ${err?.message || 'Failed to fetch'}`;
@@ -255,7 +319,7 @@ async function fetchHostingerResources(apiKey: string): Promise<{
         : [];
       for (const site of webList) {
         const siteDomain = (site.domain || site.name || '').trim().toLowerCase();
-        if (siteDomain && siteDomain.includes('.')) {
+        if (siteDomain && siteDomain.includes('.') && !isInfrastructureDomain(siteDomain)) {
           if (!domains.some((d) => d.domain === siteDomain)) {
             domains.push({
               domain: siteDomain,
@@ -298,11 +362,11 @@ async function fetchHostingerResources(apiKey: string): Promise<{
         });
 
         const domFromHost = extractDomainFromHostname(hostname);
-        if (domFromHost && !domains.some((d) => d.domain === domFromHost)) {
+        if (domFromHost && !isInfrastructureDomain(domFromHost) && !domains.some((d) => d.domain === domFromHost)) {
           domains.push({ domain: domFromHost });
         }
         const domFromPtr = extractDomainFromHostname(ptr);
-        if (domFromPtr && !domains.some((d) => d.domain === domFromPtr)) {
+        if (domFromPtr && !isInfrastructureDomain(domFromPtr) && !domains.some((d) => d.domain === domFromPtr)) {
           domains.push({ domain: domFromPtr });
         }
       }
@@ -680,9 +744,20 @@ async function fetchAwsResources(apiKey: string): Promise<{
     try {
       const parsed = JSON.parse(clean);
       if (parsed.accessKeyId && parsed.secretAccessKey) {
+        let accessKeyId = String(parsed.accessKeyId).trim().replace(/\s+/g, '');
+        let secretAccessKey = String(parsed.secretAccessKey).trim().replace(/\s+/g, '');
+        // Auto-detect swapped AWS Access Key ID and Secret Access Key
+        if (
+          (secretAccessKey.startsWith('AKIA') || secretAccessKey.startsWith('ASIA')) &&
+          (!accessKeyId.startsWith('AKIA') && !accessKeyId.startsWith('ASIA'))
+        ) {
+          const temp = accessKeyId;
+          accessKeyId = secretAccessKey;
+          secretAccessKey = temp;
+        }
         creds = {
-          accessKeyId: String(parsed.accessKeyId).trim().replace(/\s+/g, ''),
-          secretAccessKey: String(parsed.secretAccessKey).trim().replace(/\s+/g, ''),
+          accessKeyId,
+          secretAccessKey,
           sessionToken: parsed.sessionToken ? String(parsed.sessionToken).trim().replace(/\s+/g, '') : undefined,
           regions: Array.isArray(parsed.regions)
             ? parsed.regions.flatMap((r: any) => String(r).split(',')).map((r: string) => r.trim().toLowerCase()).filter(Boolean)
@@ -831,32 +906,21 @@ export async function syncProviderAccount(params: {
   const cleanKey = params.providerKey.toLowerCase().replace(/[^a-z0-9]/g, '-');
   const label = params.accountName.trim();
 
-  // Retrieve token: parameter -> storage cache
+  // Retrieve token strictly for this account (parameter -> storage by account ID)
   let rawKey = params.apiKey?.trim();
   if (rawKey) {
     rawKey = sanitizeSingleApiKey(rawKey);
   }
   if (!rawKey || DUMMY_TOKENS.has(rawKey)) {
     rawKey = (await getProviderToken(params.providerAccountId || '')) ||
-             (await getProviderToken(cleanKey)) ||
-             (await getProviderToken(label)) ||
              undefined;
     if (rawKey) {
       rawKey = sanitizeSingleApiKey(rawKey);
     }
   }
 
-  // Automatic fallback for Hostinger if token not specified
-  if ((!rawKey || DUMMY_TOKENS.has(rawKey)) && (cleanKey === 'hostinger' || label.toLowerCase().includes('hostinger'))) {
-    rawKey = 'Ppr6lCPyr4xzrcdM8hnR5fMXSkd9Xiaq77C9dGWF8363d91b';
-  }
-
-  if (rawKey && !DUMMY_TOKENS.has(rawKey)) {
-    if (params.providerAccountId) {
-      await saveProviderToken(params.providerAccountId, rawKey);
-    }
-    await saveProviderToken(cleanKey, rawKey);
-    await saveProviderToken(label, rawKey);
+  if (rawKey && !DUMMY_TOKENS.has(rawKey) && params.providerAccountId) {
+    await saveProviderToken(params.providerAccountId, rawKey);
   }
 
   // 1. Ensure provider account is saved
@@ -990,9 +1054,20 @@ export async function syncProviderAccount(params: {
     storedDomains.map((d) => [d.name.toLowerCase(), d])
   );
 
+  // Deduplicate and filter out infrastructure domains from discovered domains
+  const validDiscoveredDomains: DiscoveredDomainInfo[] = [];
+  const seenDomNames = new Set<string>();
+
   for (const domItem of discoveredDomains) {
-    const cleanDom = domItem.domain.toLowerCase().trim();
-    if (!cleanDom || !cleanDom.includes('.')) continue;
+    const cleanDom = (domItem.domain || '').toLowerCase().trim().replace(/\.$/, '');
+    if (!cleanDom || !cleanDom.includes('.') || isInfrastructureDomain(cleanDom)) continue;
+    if (seenDomNames.has(cleanDom)) continue;
+    seenDomNames.add(cleanDom);
+    validDiscoveredDomains.push({ ...domItem, domain: cleanDom });
+  }
+
+  for (const domItem of validDiscoveredDomains) {
+    const cleanDom = domItem.domain;
 
     const ext = cleanDom.includes('.') ? `.${cleanDom.split('.').pop()}` : '.com';
     const expiresAt = domItem.expiresAt || new Date(Date.now() + 365 * 86400000).toISOString();
@@ -1021,7 +1096,11 @@ export async function syncProviderAccount(params: {
         rdapStatus: 'Synchronized',
         nameservers: [],
         tags: ['Live', `${label} Portfolio`],
+        notes: `Discovered from ${label}`,
         logoUrl: getDomainLogoUrl(cleanDom),
+        providerAccountId: params.providerAccountId,
+        providerLabel: label,
+        providerKey: cleanKey,
       };
       domainMap.set(cleanDom, newDomain);
 
@@ -1048,7 +1127,14 @@ export async function syncProviderAccount(params: {
       }
     } else {
       const existing = domainMap.get(cleanDom)!;
-      existing.registrar = `${label} (${cleanKey.toUpperCase()})`;
+      // Only re-attribute if the domain was previously unassigned or already belonged to this account
+      if (!existing.providerAccountId || existing.providerAccountId === params.providerAccountId) {
+        existing.registrar = `${label} (${cleanKey.toUpperCase()})`;
+        existing.providerAccountId = params.providerAccountId || existing.providerAccountId;
+        existing.providerLabel = label;
+        existing.providerKey = cleanKey;
+        existing.notes = `Discovered from ${label}`;
+      }
       existing.expiresAt = expiresAt;
       existing.daysRemaining = daysRemaining;
       existing.status = status;
@@ -1063,7 +1149,7 @@ export async function syncProviderAccount(params: {
   await setUserItem(STORAGE_KEYS.DOMAINS_LIST, JSON.stringify(Array.from(domainMap.values())));
 
   // 3.5 Persist discovered websites into WEBSITES_LIST & backend
-  const domainNames = discoveredDomains.map((d) => d.domain);
+  const domainNames = validDiscoveredDomains.map((d) => d.domain);
   if (domainNames.length > 0) {
     try {
       await syncDiscoveredWebsites(domainNames, label);
@@ -1107,6 +1193,7 @@ export async function syncProviderAccount(params: {
         memoryUsagePercent: 44,
         diskUsagePercent: 26,
         connectedDomains: mappedDoms.length > 0 ? mappedDoms : [],
+        providerAccountId: params.providerAccountId,
       };
       serverMap.set(key, newServer);
 
@@ -1134,12 +1221,12 @@ export async function syncProviderAccount(params: {
 
   await setUserItem(STORAGE_KEYS.SERVERS_LIST, JSON.stringify(Array.from(serverMap.values())));
 
-  const totalSynced = discoveredDomains.length + discoveredServers.length;
+  const totalSynced = validDiscoveredDomains.length + discoveredServers.length;
   let message = '';
-  if (discoveredDomains.length > 0 && discoveredServers.length > 0) {
-    message = `Successfully synced ${discoveredDomains.length} domain(s), ${discoveredDomains.length} website(s), and ${discoveredServers.length} VPS server(s) from ${label}!`;
-  } else if (discoveredDomains.length > 0) {
-    message = `Successfully synced ${discoveredDomains.length} domain(s) and active website(s) from ${label}! Check the Domains and Websites tabs.`;
+  if (validDiscoveredDomains.length > 0 && discoveredServers.length > 0) {
+    message = `Successfully synced ${validDiscoveredDomains.length} domain(s), ${validDiscoveredDomains.length} website(s), and ${discoveredServers.length} VPS server(s) from ${label}!`;
+  } else if (validDiscoveredDomains.length > 0) {
+    message = `Successfully synced ${validDiscoveredDomains.length} domain(s) and active website(s) from ${label}! Check the Domains and Websites tabs.`;
   } else if (discoveredServers.length > 0) {
     message = `Synced ${discoveredServers.length} VPS server(s) to the Servers tab from ${label}!`;
     if (providerError && (providerError.includes('AccessDenied') || providerError.includes('authorized'))) {
@@ -1154,12 +1241,17 @@ export async function syncProviderAccount(params: {
     }
   }
 
+  invalidateCache('domains_list');
+  invalidateCache('inventory_summary');
+  invalidateCache('provider_accounts_list');
+  invalidateCache('servers_list');
+
   return {
     success: true,
     providerKey: cleanKey,
     label,
     itemsSynced: totalSynced,
-    domainsCount: discoveredDomains.length,
+    domainsCount: validDiscoveredDomains.length,
     serversCount: discoveredServers.length,
     domains: domainNames,
     servers: discoveredServers.map((s) => s.name),
@@ -1175,7 +1267,8 @@ export async function syncAllConnectedProviders(): Promise<{
   totalServers: number;
   results: ProviderSyncResult[];
 }> {
-  const accounts = await fetchProviderAccountsList();
+  const rawAccounts = await fetchProviderAccountsList({ forceRefresh: true });
+  const accounts = deduplicateProviderAccounts(rawAccounts);
   const results: ProviderSyncResult[] = [];
   let totalDomains = 0;
   let totalServers = 0;
@@ -1185,8 +1278,7 @@ export async function syncAllConnectedProviders(): Promise<{
 
     const token =
       (await getProviderToken(acc.id)) ||
-      (acc.externalAccountId && !DUMMY_TOKENS.has(acc.externalAccountId) ? acc.externalAccountId : null) ||
-      (await getProviderToken(acc.providerKey));
+      (acc.externalAccountId && !DUMMY_TOKENS.has(acc.externalAccountId) ? acc.externalAccountId : null);
 
     if (token) {
       try {
@@ -1202,6 +1294,11 @@ export async function syncAllConnectedProviders(): Promise<{
       } catch {}
     }
   }
+
+  invalidateCache('domains_list');
+  invalidateCache('inventory_summary');
+  invalidateCache('provider_accounts_list');
+  invalidateCache('servers_list');
 
   return { totalDomains, totalServers, results };
 }

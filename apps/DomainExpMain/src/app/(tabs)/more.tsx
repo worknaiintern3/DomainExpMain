@@ -36,7 +36,7 @@ import {
   deduplicateProviderAccounts,
 } from '../../services/accounts';
 import { getEffectiveApiUrl, setCustomApiUrl, apiGet, apiPatch } from '../../services/api';
-import { syncConsoleAccount, syncDomainRegistrar, syncCloudServers, syncProviderAccount, syncAllConnectedProviders, sanitizeSingleApiKey } from '../../services/providerSync';
+import { syncConsoleAccount, syncDomainRegistrar, syncCloudServers, syncProviderAccount, syncAllConnectedProviders, sanitizeSingleApiKey, isInfrastructureDomain } from '../../services/providerSync';
 import { saveProviderToken, getProviderToken } from '../../services/storage';
 import { API_CONFIG } from '../../constants/config';
 import {
@@ -381,22 +381,43 @@ export default function MoreScreen() {
   const [editAzureClientSecret, setEditAzureClientSecret] = useState('');
   const [editAzureSubscriptionId, setEditAzureSubscriptionId] = useState('');
 
+  // Keyboard avoidance and token visibility state
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [showAddTokenText, setShowAddTokenText] = useState(false);
+  const [showEditTokenText, setShowEditTokenText] = useState(false);
+  const [showAwsSecretText, setShowAwsSecretText] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   // API Server Config State
   const [currentApiUrl, setCurrentApiUrl] = useState(getEffectiveApiUrl());
   const [apiDraftUrl, setApiDraftUrl] = useState(getEffectiveApiUrl());
   const [apiConnectionStatus, setApiConnectionStatus] = useState<'unknown' | 'testing' | 'online' | 'offline'>('unknown');
   const [apiPingLatency, setApiPingLatency] = useState<number | null>(null);
 
-  const loadAccounts = useCallback(async () => {
+  const loadAccounts = useCallback(async (forceRefresh = false) => {
     try {
       const [pList, eList, dList] = await Promise.all([
-        fetchProviderAccountsList(),
+        fetchProviderAccountsList({ forceRefresh }),
         fetchEmailAccountsList(),
-        fetchDomainsList(),
+        fetchDomainsList({ forceRefresh }),
       ]);
       setProviderAccounts(deduplicateProviderAccounts(pList));
       setEmailAccounts(eList);
-      setAllDomains(dList || []);
+      setAllDomains((dList || []).filter((d) => d?.name && !isInfrastructureDomain(d.name)));
     } catch {}
   }, []);
 
@@ -408,27 +429,34 @@ export default function MoreScreen() {
     const pExtId = (account.externalAccountId || '').toLowerCase().trim();
 
     return domainsList.filter((d) => {
+      if (!d?.name || isInfrastructureDomain(d.name)) return false;
+      const dAccId = (d.providerAccountId || '').toLowerCase().trim();
+      const dDnsAccId = (d.dnsProviderAccountId || '').toLowerCase().trim();
+      const dLabel = (d.providerLabel || '').toLowerCase().trim();
       const registrar = (d.registrar || '').toLowerCase();
       const dns = (d.dnsProvider || '').toLowerCase();
       const tags = (d.tags || []).map((t) => t.toLowerCase());
       const notes = (d.notes || '').toLowerCase();
 
-      // 1. Direct ID match
-      if (pId && (registrar.includes(`(${pId})`) || dns.includes(`(${pId})`) || notes.includes(pId))) {
+      // 1. Direct explicit account ID match (primary & infallible)
+      if (pId && (dAccId === pId || dDnsAccId === pId || registrar.includes(`(${pId})`) || dns.includes(`(${pId})`) || notes.includes(pId))) {
         return true;
       }
-      // 2. Direct external ID / token match
-      if (pExtId && pExtId.length > 5 && (notes.includes(pExtId) || registrar.includes(pExtId))) {
-        return true;
+
+      // 2. Exact or scoped label match (e.g. 'salim sir', 'green-aura', 'punarmilan2', 'punebus2', 'aibus', 'raktadaan')
+      if (pLabel && pLabel.length > 2 && !['hostinger', 'aws', 'cloudflare', 'godaddy', 'digitalocean', 'namecheap', 'vultr', 'linode', 'hetzner'].includes(pLabel)) {
+        if (dLabel === pLabel) return true;
+        if (notes.includes(`discovered from ${pLabel}`)) return true;
+        if (tags.some((t) => t === `${pLabel} portfolio` || t.includes(`${pLabel} portfolio`))) return true;
+        if (registrar.startsWith(pLabel) || registrar.includes(`(${pLabel})`)) return true;
+        if (dns.startsWith(pLabel)) return true;
       }
-      // 3. Provider key match (e.g., 'hostinger', 'cloudflare', 'godaddy', 'namecheap', 'aws')
-      if (pKey && pKey !== 'other') {
-        if (registrar.includes(pKey) || dns.includes(pKey) || tags.some((t) => t.includes(pKey))) return true;
+
+      // 3. Direct external ID / token match (if distinct token)
+      if (pExtId && pExtId.length > 8 && !['hostinger', 'aws', 'cloudflare', 'godaddy'].includes(pExtId)) {
+        if (notes.includes(pExtId) || registrar.includes(pExtId)) return true;
       }
-      // 4. Provider label match (e.g., 'Hostinger Production VPS')
-      if (pLabel && (registrar.includes(pLabel) || dns.includes(pLabel) || tags.some((t) => t.includes(pLabel)))) {
-        return true;
-      }
+
       return false;
     });
   }, []);
@@ -441,7 +469,7 @@ export default function MoreScreen() {
     setIsSyncingAll(true);
     try {
       const res = await syncAllConnectedProviders();
-      await loadAccounts();
+      await loadAccounts(true);
       showFeedback(
         'Portfolio Synced',
         `Discovered ${res.totalDomains} domains and ${res.totalServers} servers across connected providers.`,
@@ -499,7 +527,7 @@ export default function MoreScreen() {
 
   const handleOpenEditToken = async (p: ProviderAccount) => {
     setEditingTokenAccount(p);
-    const existing = (await getProviderToken(p.id)) || (await getProviderToken(p.providerKey)) || p.externalAccountId || '';
+    const existing = (await getProviderToken(p.id)) || p.externalAccountId || '';
     setEditingTokenValue(existing);
 
     if (p.providerKey === 'aws') {
@@ -568,9 +596,19 @@ export default function MoreScreen() {
         showFeedback('Missing Secret Key', 'Please enter your AWS Secret Access Key.', 'error');
         return;
       }
-      const cleanAccessKey = editAwsAccessKeyId.trim().replace(/\s+/g, '');
-      const cleanSecretKey = editAwsSecretAccessKey.trim().replace(/\s+/g, '');
+      let cleanAccessKey = editAwsAccessKeyId.trim().replace(/\s+/g, '');
+      let cleanSecretKey = editAwsSecretAccessKey.trim().replace(/\s+/g, '');
       const cleanSessionToken = editAwsSessionToken.trim().replace(/\s+/g, '');
+
+      // Auto-detect and swap if user pasted AKIA... into Secret Key
+      if (
+        (cleanSecretKey.startsWith('AKIA') || cleanSecretKey.startsWith('ASIA')) &&
+        (!cleanAccessKey.startsWith('AKIA') && !cleanAccessKey.startsWith('ASIA'))
+      ) {
+        const temp = cleanAccessKey;
+        cleanAccessKey = cleanSecretKey;
+        cleanSecretKey = temp;
+      }
       const regionsList = (editAwsRegions.trim() || 'us-east-1, ap-south-1')
         .split(',')
         .map((r) => r.trim().toLowerCase())
@@ -624,10 +662,6 @@ export default function MoreScreen() {
     setIsSavingToken(true);
     try {
       await saveProviderToken(editingTokenAccount.id, tokenToSave);
-      const existingGeneric = await getProviderToken(editingTokenAccount.providerKey);
-      if (!existingGeneric) {
-        await saveProviderToken(editingTokenAccount.providerKey, tokenToSave);
-      }
       if (!editingTokenAccount.id.startsWith('pa-')) {
         apiPatch(`/provider-accounts/${encodeURIComponent(editingTokenAccount.id)}`, {
           externalAccountId: tokenToSave,
@@ -639,9 +673,11 @@ export default function MoreScreen() {
         apiKey: tokenToSave,
         providerAccountId: editingTokenAccount.id,
       });
-      await loadAccounts();
+      await loadAccounts(true);
       setEditingTokenAccount(null);
       setEditingTokenValue('');
+      setShowEditTokenText(false);
+      setShowAwsSecretText(false);
       showFeedback(
         res.success ? 'Token Saved & Synced' : 'Sync Notice',
         res.message,
@@ -665,9 +701,19 @@ export default function MoreScreen() {
       let externalAccountIdToStore = newAccExternalId.trim();
 
       if (newAccProviderKey === 'aws') {
-        const cleanAccessKey = newAwsAccessKeyId.trim().replace(/\s+/g, '');
-        const cleanSecretKey = newAwsSecretAccessKey.trim().replace(/\s+/g, '');
+        let cleanAccessKey = newAwsAccessKeyId.trim().replace(/\s+/g, '');
+        let cleanSecretKey = newAwsSecretAccessKey.trim().replace(/\s+/g, '');
         const cleanSessionToken = newAwsSessionToken.trim().replace(/\s+/g, '');
+
+        // Auto-detect and swap if user pasted AKIA... into Secret Key
+        if (
+          (cleanSecretKey.startsWith('AKIA') || cleanSecretKey.startsWith('ASIA')) &&
+          (!cleanAccessKey.startsWith('AKIA') && !cleanAccessKey.startsWith('ASIA'))
+        ) {
+          const temp = cleanAccessKey;
+          cleanAccessKey = cleanSecretKey;
+          cleanSecretKey = temp;
+        }
 
         if (!cleanAccessKey) {
           showFeedback('Missing Access Key', 'Please enter your AWS Access Key ID (e.g. AKIA...).', 'error');
@@ -783,6 +829,8 @@ export default function MoreScreen() {
         setNewAzureClientId('');
         setNewAzureClientSecret('');
         setNewAzureSubscriptionId('');
+        setShowAddTokenText(false);
+        setShowAwsSecretText(false);
       } catch (err: any) {
         showFeedback('Failed', err?.message || 'Could not connect provider account.', 'error');
       } finally {
@@ -1483,8 +1531,8 @@ export default function MoreScreen() {
             style={[
               styles.modalSheet,
               activeModal && MODAL_CONFIG[activeModal]
-                ? { height: MODAL_CONFIG[activeModal].heightPercentage, maxHeight: '95%' }
-                : { height: '88%', maxHeight: '95%' },
+                ? { height: keyboardHeight > 0 ? '94%' : MODAL_CONFIG[activeModal].heightPercentage, maxHeight: '96%' }
+                : { height: keyboardHeight > 0 ? '94%' : '88%', maxHeight: '96%' },
               {
                 backgroundColor: colors.surface,
                 paddingBottom: Math.max(insets.bottom, 24),
@@ -1570,7 +1618,11 @@ export default function MoreScreen() {
                 style={{ flex: 1 }}
                 contentContainerStyle={[
                   styles.sheetBody,
-                  { paddingBottom: activeModal === 'providers' ? Math.max(insets.bottom + 48, 64) : Spacing.xxl },
+                  {
+                    paddingBottom: keyboardHeight > 0
+                      ? keyboardHeight + 80
+                      : (activeModal === 'providers' ? Math.max(insets.bottom + 48, 64) : Spacing.xxl),
+                  },
                 ]}
                 showsVerticalScrollIndicator={true}
                 keyboardShouldPersistTaps="handled"
@@ -2208,7 +2260,7 @@ export default function MoreScreen() {
                                           apiKey: p.externalAccountId || undefined,
                                           providerAccountId: p.id,
                                         });
-                                        await loadAccounts();
+                                        await loadAccounts(true);
                                         showFeedback(
                                           res.success ? 'Provider Synced' : 'Sync Notice',
                                           res.message,
@@ -3430,7 +3482,12 @@ export default function MoreScreen() {
           <View
             style={[
               styles.modalSheet,
-              { backgroundColor: isDark ? '#0f172a' : '#ffffff', height: '88%', maxHeight: '95%', paddingBottom: Math.max(insets.bottom, 20) },
+              {
+                backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                height: keyboardHeight > 0 ? '94%' : '88%',
+                maxHeight: '96%',
+                paddingBottom: Math.max(insets.bottom, 16),
+              },
             ]}
           >
             <View style={styles.dragHandleWrapper}>
@@ -3449,7 +3506,14 @@ export default function MoreScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={[styles.sheetBody, { paddingBottom: 24 }]} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              contentContainerStyle={[
+                styles.sheetBody,
+                { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 36 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={true}
+            >
               {/* Type Switcher */}
               <View
                 style={{
@@ -3579,16 +3643,30 @@ export default function MoreScreen() {
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Secret Access Key *</Text>
-                      <TextInput
-                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
-                        placeholder="Paste your AWS secret access key"
-                        placeholderTextColor={colors.textMuted}
-                        value={newAwsSecretAccessKey}
-                        onChangeText={setNewAwsSecretAccessKey}
-                        secureTextEntry
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
+                      <View style={{ position: 'relative', marginBottom: 12 }}>
+                        <TextInput
+                          style={[styles.input, { color: colors.text, borderColor: colors.border, paddingRight: 50, marginBottom: 0 }]}
+                          placeholder="Paste your AWS secret access key"
+                          placeholderTextColor={colors.textMuted}
+                          value={newAwsSecretAccessKey}
+                          onChangeText={setNewAwsSecretAccessKey}
+                          secureTextEntry={!showAwsSecretText}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          spellCheck={false}
+                        />
+                        <TouchableOpacity
+                          style={{ position: 'absolute', right: 12, top: 14, padding: 4 }}
+                          onPress={() => setShowAwsSecretText((prev) => !prev)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Ionicons
+                            name={showAwsSecretText ? 'eye-off-outline' : 'eye-outline'}
+                            size={20}
+                            color={colors.textSecondary}
+                          />
+                        </TouchableOpacity>
+                      </View>
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Session Token (optional)</Text>
                       <TextInput
@@ -3758,16 +3836,57 @@ export default function MoreScreen() {
                       <Text style={[styles.label, { color: colors.textSecondary }]}>
                         {newAccProviderKey === 'google-play' ? 'Developer ID / Organization Key (Optional)' : 'API Token / Key (Required for live domain & server discovery)'}
                       </Text>
-                      <TextInput
-                        style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
-                        placeholder={newAccProviderKey === 'google-play' ? 'e.g. WorknAi Technologies India Pvt Ltd' : 'Paste API token (e.g. Hostinger, DO, Hetzner, Vultr)'}
-                        placeholderTextColor={colors.textMuted}
-                        value={newAccExternalId}
-                        onChangeText={setNewAccExternalId}
-                        secureTextEntry={newAccProviderKey !== 'google-play'}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
+                      <View style={{ position: 'relative', marginBottom: 12 }}>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            {
+                              color: colors.text,
+                              borderColor: colors.border,
+                              paddingRight: newAccProviderKey === 'google-play' ? 14 : 50,
+                              marginBottom: 0,
+                            },
+                          ]}
+                          placeholder={newAccProviderKey === 'google-play' ? 'e.g. WorknAi Technologies India Pvt Ltd' : 'Paste API token (e.g. Hostinger, DO, Hetzner, Vultr)'}
+                          placeholderTextColor={colors.textMuted}
+                          value={newAccExternalId}
+                          onChangeText={setNewAccExternalId}
+                          secureTextEntry={newAccProviderKey !== 'google-play' && !showAddTokenText}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          spellCheck={false}
+                        />
+                        {newAccProviderKey !== 'google-play' && (
+                          <TouchableOpacity
+                            style={{
+                              position: 'absolute',
+                              right: 12,
+                              top: 14,
+                              padding: 4,
+                            }}
+                            onPress={() => setShowAddTokenText((prev) => !prev)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Ionicons
+                              name={showAddTokenText ? 'eye-off-outline' : 'eye-outline'}
+                              size={20}
+                              color={colors.textSecondary}
+                            />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      {newAccExternalId.trim().length > 0 && newAccProviderKey !== 'google-play' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -6, marginBottom: 12, paddingHorizontal: 2 }}>
+                          <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
+                            ✓ {newAccExternalId.trim().length} characters detected
+                          </Text>
+                          {showAddTokenText && (
+                            <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                              {newAccExternalId.trim().slice(0, 6)}...{newAccExternalId.trim().slice(-4)}
+                            </Text>
+                          )}
+                        </View>
+                      )}
                     </>
                   )}
 
@@ -3881,9 +4000,9 @@ export default function MoreScreen() {
               styles.modalSheet,
               {
                 backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
-                height: '65%',
-                maxHeight: '90%',
-                paddingBottom: Math.max(insets.bottom, 20),
+                height: keyboardHeight > 0 ? '92%' : '68%',
+                maxHeight: '95%',
+                paddingBottom: Math.max(insets.bottom, 16),
               },
             ]}
           >
@@ -3903,7 +4022,14 @@ export default function MoreScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={[styles.sheetBody, { paddingBottom: 24 }]} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              contentContainerStyle={[
+                styles.sheetBody,
+                { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 36 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={true}
+            >
               {editingTokenAccount?.providerKey === 'aws' ? (
                 <>
                   <View style={{ backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#eff6ff', padding: 12, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: isDark ? '#0369a1' : '#bfdbfe' }}>
@@ -3927,16 +4053,30 @@ export default function MoreScreen() {
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Secret Access Key *</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 12 }]}
-                    placeholder="Paste your AWS secret access key"
-                    placeholderTextColor={colors.textMuted}
-                    value={editAwsSecretAccessKey}
-                    onChangeText={setEditAwsSecretAccessKey}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <View style={{ position: 'relative', marginBottom: 12 }}>
+                    <TextInput
+                      style={[styles.input, { color: colors.text, borderColor: colors.border, paddingRight: 50, marginBottom: 0 }]}
+                      placeholder="Paste your AWS secret access key"
+                      placeholderTextColor={colors.textMuted}
+                      value={editAwsSecretAccessKey}
+                      onChangeText={setEditAwsSecretAccessKey}
+                      secureTextEntry={!showAwsSecretText}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      spellCheck={false}
+                    />
+                    <TouchableOpacity
+                      style={{ position: 'absolute', right: 12, top: 14, padding: 4 }}
+                      onPress={() => setShowAwsSecretText((prev) => !prev)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons
+                        name={showAwsSecretText ? 'eye-off-outline' : 'eye-outline'}
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Session Token (optional)</Text>
                   <TextInput
@@ -4108,16 +4248,55 @@ export default function MoreScreen() {
                   </Text>
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>API Token / Key</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 20 }]}
-                    placeholder="Paste API token / key"
-                    placeholderTextColor={colors.textMuted}
-                    value={editingTokenValue}
-                    onChangeText={setEditingTokenValue}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <View style={{ position: 'relative', marginBottom: 12 }}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          color: colors.text,
+                          borderColor: colors.border,
+                          paddingRight: 50,
+                          marginBottom: 0,
+                        },
+                      ]}
+                      placeholder="Paste API token / key"
+                      placeholderTextColor={colors.textMuted}
+                      value={editingTokenValue}
+                      onChangeText={setEditingTokenValue}
+                      secureTextEntry={!showEditTokenText}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      spellCheck={false}
+                    />
+                    <TouchableOpacity
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: 14,
+                        padding: 4,
+                      }}
+                      onPress={() => setShowEditTokenText((prev) => !prev)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons
+                        name={showEditTokenText ? 'eye-off-outline' : 'eye-outline'}
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  {editingTokenValue.trim().length > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -6, marginBottom: 16, paddingHorizontal: 2 }}>
+                      <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
+                        ✓ {editingTokenValue.trim().length} characters detected
+                      </Text>
+                      {showEditTokenText && (
+                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                          {editingTokenValue.trim().slice(0, 6)}...{editingTokenValue.trim().slice(-4)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </>
               )}
 
@@ -4380,7 +4559,7 @@ export default function MoreScreen() {
                             apiKey: selectedAccountForDomains.externalAccountId || undefined,
                             providerAccountId: selectedAccountForDomains.id,
                           });
-                          await loadAccounts();
+                          await loadAccounts(true);
                           showFeedback(
                             res.success ? 'Provider Synced' : 'Sync Notice',
                             res.message,

@@ -16,6 +16,11 @@ export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
   const status: 'critical' | 'warning' | 'safe' =
     daysRemaining <= 14 ? 'critical' : daysRemaining <= 30 ? 'warning' : 'safe';
 
+  let providerLabel: string | undefined;
+  if (d.notes && d.notes.startsWith('Discovered from ')) {
+    providerLabel = d.notes.replace('Discovered from ', '').trim();
+  }
+
   return {
     id: d.id,
     name: cleanName,
@@ -37,6 +42,7 @@ export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
     notes: d.notes || undefined,
     logoUrl,
     providerAccountId: d.registrarProviderAccountId || undefined,
+    providerLabel,
     dnsProviderAccountId: d.dnsProviderAccountId || undefined,
   };
 }
@@ -122,6 +128,12 @@ async function getStoredServerDomains(): Promise<DomainItem[]> {
           nameservers: [],
           tags: ['Live', 'VPS Server Endpoint'],
           logoUrl: getDomainLogoUrl(dom),
+          providerAccountId: s.providerAccountId,
+          providerLabel: s.provider,
+          serverId: s.id,
+          serverName: s.name,
+          serverIp: s.ipAddress,
+          serverProvider: s.provider,
         });
       }
     }
@@ -164,6 +176,9 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
                 id: m.id || existing.id,
                 nameservers: existing.nameservers && existing.nameservers.length > 0 ? existing.nameservers : m.nameservers,
                 registrar: existing.registrar && !existing.registrar.includes('Provider (') ? existing.registrar : m.registrar,
+                providerAccountId: m.providerAccountId || existing.providerAccountId,
+                providerLabel: m.providerLabel || existing.providerLabel,
+                notes: m.notes || existing.notes,
                 logoUrl: existing.logoUrl || m.logoUrl,
               });
             } else {
@@ -171,7 +186,7 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
             }
           }
 
-          const combined = Array.from(combinedMap.values());
+          const combined = Array.from(combinedMap.values()).filter((d) => d?.name && !isInfrastructureDomain(d.name));
           await saveStoredDomains(combined);
           return combined;
         }
@@ -305,7 +320,7 @@ export async function updateDomainRecord(id: string, patch: Partial<DomainItem>)
 
 export async function deleteDomain(id: string): Promise<void> {
   const current = await getStoredDomains();
-  const updated = current.filter((d) => d.id !== id);
+  const updated = current.filter((d) => d.id !== id && d.name.toLowerCase() !== id.toLowerCase());
   await saveStoredDomains(updated);
   invalidateCache('domains_list');
   invalidateCache('inventory_summary');
@@ -340,7 +355,7 @@ export async function importDomainsBatch(
 
   for (const item of items) {
     const cleanName = item.name.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
-    if (!cleanName || !cleanName.includes('.')) {
+    if (!cleanName || !cleanName.includes('.') || isInfrastructureDomain(cleanName)) {
       skipped++;
       continue;
     }
