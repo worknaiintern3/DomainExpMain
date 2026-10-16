@@ -2,7 +2,7 @@
   "expo": {
     "name": "DomainPulse",
     "slug": "domainpulse-mobile",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "domainpulse",
@@ -27,6 +27,7 @@
       }
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#00040f"
@@ -41,7 +42,7 @@
         }
       },
       "package": "com.domainpulse.mobile",
-      "versionCode": 2
+      "versionCode": 3
     },
     "web": {
       "bundler": "metro",

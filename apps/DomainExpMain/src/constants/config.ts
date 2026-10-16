@@ -34,7 +34,7 @@ export const API_CONFIG = {
   ANDROID_EMULATOR_URL: 'http://10.0.2.2:4000/api/v1',
   TIMEOUT_MS: 15000,
   APP_NAME: 'DomainPulse',
-  VERSION: '1.0.1',
+  VERSION: '1.0.2',
   RATE_LIMIT: {
     MAX_REQUESTS: 5000,
     WINDOW_MINUTES: 15,
