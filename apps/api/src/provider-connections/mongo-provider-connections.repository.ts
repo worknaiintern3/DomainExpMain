@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import {
   ProviderConnectionAlreadyExistsError,
@@ -14,6 +14,15 @@ import type {
   ValidationResultInput,
 } from './provider-connections.types';
 import type { DatabaseService } from '../database/database.service';
+
+const UUID_REGEX =
+  /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
+
+export function ensureValidUuid(id: string): string {
+  if (id && UUID_REGEX.test(id)) return id;
+  const hex = (id || '').replace(/[^0-9a-fA-F]/g, '').padEnd(32, '0').slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
 
 function initialIdempotencyKey(connectionId: string): string {
   return createHash('sha256').update(`${connectionId}:initial`).digest('hex');
@@ -153,7 +162,7 @@ export class MongoProviderConnectionsRepository
 
       // Create initial sync run
       await (cols.providerSyncRuns as any).insertOne({
-        id: createHash('sha256').update(`${input.id}:initial:id`).digest('hex').slice(0, 32),
+        id: randomUUID(),
         workspaceId,
         providerConnectionId: input.id,
         trigger: 'INITIAL',
@@ -325,10 +334,7 @@ export class MongoProviderConnectionsRepository
     const cols = this.database.collections;
     if (!cols) throw new ProviderConnectionPersistenceError('Database not initialized');
 
-    const id = createHash('sha256')
-      .update(`${connectionId}:${internalIdempotencyKey}`)
-      .digest('hex')
-      .slice(0, 32);
+    const id = randomUUID();
 
     await (cols.providerSyncRuns as any).insertOne({
       id,
@@ -374,7 +380,7 @@ export class MongoProviderConnectionsRepository
       .toArray();
 
     return runs.map((r: any) => ({
-      id: r.id,
+      id: ensureValidUuid(r.id),
       trigger: r.trigger,
       status: r.status,
       startedAt: r.startedAt ?? null,

@@ -273,9 +273,11 @@ export function extractAwsError(xml: string, httpStatus: number): string {
 export async function fetchAwsRoute53Domains(creds: AwsCredentials): Promise<{
   domains: string[];
   error?: string;
+  authVerified?: boolean;
 }> {
   const domains: string[] = [];
   let primaryError: string | undefined;
+  let authVerified = false;
 
   // 1. Live Route53 Hosted Zones (DNS)
   try {
@@ -294,6 +296,7 @@ export async function fetchAwsRoute53Domains(creds: AwsCredentials): Promise<{
     const text = await res.text();
 
     if (res.ok) {
+      authVerified = true;
       const matches = text.matchAll(/<HostedZone>[\s\S]*?<Name>([^<]+)<\/Name>/g);
       for (const match of matches) {
         let domain = match[1].trim();
@@ -363,6 +366,7 @@ export async function fetchAwsRoute53Domains(creds: AwsCredentials): Promise<{
 
     const resDomains = await fetch(`https://${host}/`, { method: 'POST', headers, body });
     if (resDomains.ok) {
+      authVerified = true;
       const json = await resDomains.json();
       if (Array.isArray(json?.Domains)) {
         for (const d of json.Domains) {
@@ -378,7 +382,7 @@ export async function fetchAwsRoute53Domains(creds: AwsCredentials): Promise<{
     }
   } catch {}
 
-  return { domains, error: domains.length > 0 ? undefined : primaryError };
+  return { domains, error: (domains.length > 0 || authVerified) ? undefined : primaryError, authVerified };
 }
 
 // -------------------------------------------------------------
@@ -421,31 +425,39 @@ export async function fetchAwsEc2Instances(
   servers: DiscoveredAwsServer[];
   inferredDomains: string[];
   error?: string;
+  authVerified?: boolean;
 }> {
   const servers: DiscoveredAwsServer[] = [];
   const inferredDomains: string[] = [];
   let primaryError: string | undefined;
+  let authVerified = false;
 
-  let targetRegions =
+  const rawRegions =
     regions && regions.length > 0
       ? regions
       : creds.regions && creds.regions.length > 0
       ? creds.regions
       : [];
 
+  let targetRegions = rawRegions
+    .flatMap((r) => String(r).split(','))
+    .map((r) => r.trim().toLowerCase())
+    .filter(Boolean);
+
   // If no region or default ['us-east-1', 'ap-south-1'] specified, dynamically query DescribeRegions to inventory all user regions
   const isDefaultOrSingle =
     targetRegions.length === 0 ||
-    (targetRegions.length <= 2 && targetRegions.every((r) => r.toLowerCase() === 'us-east-1' || r.toLowerCase() === 'ap-south-1'));
+    (targetRegions.length <= 2 && targetRegions.every((r) => r === 'us-east-1' || r === 'ap-south-1'));
 
   if (isDefaultOrSingle) {
     const discoveredRegions = await fetchAwsDescribeRegions(creds);
     targetRegions = [...new Set([...targetRegions, ...discoveredRegions])];
   }
 
-  for (const region of targetRegions) {
-    const cleanRegion = region.trim().toLowerCase();
-    if (!cleanRegion) continue;
+  await Promise.allSettled(
+    targetRegions.map(async (region) => {
+      const cleanRegion = region.trim().toLowerCase();
+      if (!cleanRegion) return;
 
     try {
       const body = 'Action=DescribeInstances&Version=2016-11-15';
@@ -472,6 +484,7 @@ export async function fetchAwsEc2Instances(
       const text = await res.text();
 
       if (res.ok) {
+        authVerified = true;
         const instancesSets = text.match(/<instancesSet>[\s\S]*?<\/instancesSet>/g) || [];
         for (const set of instancesSets) {
           // Boundary-aware instance block extraction: each instance begins at <instanceId>
@@ -537,7 +550,7 @@ export async function fetchAwsEc2Instances(
         primaryError = `Failed to query EC2 in ${cleanRegion}: ${err?.message || 'Network error'}`;
       }
     }
-  }
+  }));
 
-  return { servers, inferredDomains, error: servers.length > 0 ? undefined : primaryError };
+  return { servers, inferredDomains, error: (servers.length > 0 || authVerified) ? undefined : primaryError, authVerified };
 }

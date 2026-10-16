@@ -173,8 +173,26 @@ export function extractDomainFromHostname(str?: string | null): string | null {
 }
 
 // -------------------------------------------------------------
-// Live Provider Fetchers
+// Live Provider Fetchers & Token Sanitization
 // -------------------------------------------------------------
+
+/**
+ * Strips accidental whitespace, line breaks, 'Bearer' prefixes, and quotes
+ * that commonly get introduced when users copy/paste API tokens on mobile devices.
+ */
+export function sanitizeSingleApiKey(token: string): string {
+  if (!token) return '';
+  const trimmed = token.trim();
+  // Don't strip internal whitespace if it's a JSON payload (AWS, GCP, Azure, Namecheap)
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    return trimmed;
+  }
+  return trimmed
+    .replace(/^Bearer\s+/i, '')
+    .replace(/^["']|["']$/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
 
 async function fetchHostingerResources(apiKey: string): Promise<{
   domains: DiscoveredDomainInfo[];
@@ -185,11 +203,7 @@ async function fetchHostingerResources(apiKey: string): Promise<{
   const servers: Array<{ name: string; ip?: string; hostname?: string; os?: string; status?: string; ptr?: string }> = [];
   let apiError: string | undefined;
 
-  const cleanToken = apiKey
-    .trim()
-    .replace(/^Bearer\s+/i, '')
-    .replace(/^["']|["']$/g, '')
-    .trim();
+  const cleanToken = sanitizeSingleApiKey(apiKey);
 
   const headers = {
     Authorization: `Bearer ${cleanToken}`,
@@ -317,11 +331,11 @@ async function fetchCloudflareResources(apiKey: string): Promise<{
   let apiError: string | undefined;
 
   let headers: Record<string, string> = { Accept: 'application/json' };
-  const clean = apiKey.trim();
+  const clean = sanitizeSingleApiKey(apiKey);
   if (clean.includes(':')) {
     const parts = clean.split(':');
-    headers['X-Auth-Email'] = parts[0].trim();
-    headers['X-Auth-Key'] = parts[1].trim();
+    headers['X-Auth-Email'] = parts[0].trim().replace(/\s+/g, '');
+    headers['X-Auth-Key'] = parts[1].trim().replace(/\s+/g, '');
   } else {
     headers['Authorization'] = `Bearer ${clean}`;
   }
@@ -383,8 +397,9 @@ async function fetchDigitalOceanResources(apiKey: string): Promise<{
   const servers: Array<{ name: string; ip?: string; hostname?: string; os?: string; status?: string }> = [];
   let apiError: string | undefined;
 
+  const cleanToken = sanitizeSingleApiKey(apiKey);
   const headers = {
-    Authorization: `Bearer ${apiKey.trim()}`,
+    Authorization: `Bearer ${cleanToken}`,
     Accept: 'application/json',
   };
 
@@ -441,8 +456,9 @@ async function fetchHetznerResources(apiKey: string): Promise<{
   const servers: Array<{ name: string; ip?: string; hostname?: string; os?: string; status?: string }> = [];
   let apiError: string | undefined;
 
+  const cleanToken = sanitizeSingleApiKey(apiKey);
   const headers = {
-    Authorization: `Bearer ${apiKey.trim()}`,
+    Authorization: `Bearer ${cleanToken}`,
     Accept: 'application/json',
   };
 
@@ -499,7 +515,7 @@ async function fetchGoDaddyResources(apiKey: string): Promise<{
   const domains: string[] = [];
   let apiError: string | undefined;
 
-  const cleanKey = apiKey.trim();
+  const cleanKey = sanitizeSingleApiKey(apiKey);
   const authHeader = cleanKey.includes(':')
     ? `sso-key ${cleanKey}`
     : cleanKey.startsWith('sso-key ')
@@ -546,8 +562,9 @@ async function fetchVultrResources(apiKey: string): Promise<{
   const servers: Array<{ name: string; ip?: string; hostname?: string; os?: string; status?: string }> = [];
   let apiError: string | undefined;
 
+  const cleanToken = sanitizeSingleApiKey(apiKey);
   const headers = {
-    Authorization: `Bearer ${apiKey.trim()}`,
+    Authorization: `Bearer ${cleanToken}`,
     Accept: 'application/json',
   };
 
@@ -600,8 +617,9 @@ async function fetchLinodeResources(apiKey: string): Promise<{
   const servers: Array<{ name: string; ip?: string; hostname?: string; os?: string; status?: string }> = [];
   let apiError: string | undefined;
 
+  const cleanToken = sanitizeSingleApiKey(apiKey);
   const headers = {
-    Authorization: `Bearer ${apiKey.trim()}`,
+    Authorization: `Bearer ${cleanToken}`,
     Accept: 'application/json',
   };
 
@@ -663,11 +681,11 @@ async function fetchAwsResources(apiKey: string): Promise<{
       const parsed = JSON.parse(clean);
       if (parsed.accessKeyId && parsed.secretAccessKey) {
         creds = {
-          accessKeyId: String(parsed.accessKeyId).trim(),
-          secretAccessKey: String(parsed.secretAccessKey).trim(),
-          sessionToken: parsed.sessionToken ? String(parsed.sessionToken).trim() : undefined,
+          accessKeyId: String(parsed.accessKeyId).trim().replace(/\s+/g, ''),
+          secretAccessKey: String(parsed.secretAccessKey).trim().replace(/\s+/g, ''),
+          sessionToken: parsed.sessionToken ? String(parsed.sessionToken).trim().replace(/\s+/g, '') : undefined,
           regions: Array.isArray(parsed.regions)
-            ? parsed.regions.map((r: any) => String(r).trim().toLowerCase()).filter(Boolean)
+            ? parsed.regions.flatMap((r: any) => String(r).split(',')).map((r: string) => r.trim().toLowerCase()).filter(Boolean)
             : ['us-east-1', 'ap-south-1'],
         };
       }
@@ -678,9 +696,9 @@ async function fetchAwsResources(apiKey: string): Promise<{
     const parts = clean.split(':').map((p) => p.trim());
     if (parts.length >= 2 && parts[0].startsWith('AKIA')) {
       creds = {
-        accessKeyId: parts[0],
-        secretAccessKey: parts[1],
-        regions: parts[2] ? [parts[2].toLowerCase()] : ['us-east-1', 'ap-south-1'],
+        accessKeyId: parts[0].replace(/\s+/g, ''),
+        secretAccessKey: parts[1].replace(/\s+/g, ''),
+        regions: parts[2] ? parts[2].split(',').map((r: string) => r.trim().toLowerCase()).filter(Boolean) : ['us-east-1', 'ap-south-1'],
       };
     }
   } else if (clean.includes('AWS_ACCESS_KEY_ID') || clean.includes('aws_access_key_id')) {
@@ -689,9 +707,9 @@ async function fetchAwsResources(apiKey: string): Promise<{
     const regionMatch = clean.match(/(?:AWS_DEFAULT_REGION|aws_region)\s*=\s*([^\s]+)/i);
     if (accessMatch && secretMatch) {
       creds = {
-        accessKeyId: accessMatch[1].replace(/["']/g, '').trim(),
-        secretAccessKey: secretMatch[1].replace(/["']/g, '').trim(),
-        regions: regionMatch ? [regionMatch[1].replace(/["']/g, '').trim().toLowerCase()] : ['us-east-1', 'ap-south-1'],
+        accessKeyId: accessMatch[1].replace(/["']/g, '').replace(/\s+/g, '').trim(),
+        secretAccessKey: secretMatch[1].replace(/["']/g, '').replace(/\s+/g, '').trim(),
+        regions: regionMatch ? regionMatch[1].replace(/["']/g, '').split(',').map((r: string) => r.trim().toLowerCase()).filter(Boolean) : ['us-east-1', 'ap-south-1'],
       };
     }
   }
@@ -729,12 +747,18 @@ async function fetchAwsResources(apiKey: string): Promise<{
         const dom = extractDomainFromHostname(d);
         if (dom && !isInfrastructureDomain(dom) && !domains.includes(dom)) domains.push(dom);
       }
-      if (ec2Result.error && !apiError) {
-        apiError = ec2Result.error;
-      }
-      // If live EC2 servers were discovered, do not fail sync because of Route53 permissions
-      if (servers.length > 0 && apiError && (apiError.includes('route53') || apiError.includes('HostedZone') || apiError.includes('AccessDenied'))) {
+
+      // If credentials authenticated with EITHER EC2 or Route53, clear partial AccessDenied from the other service
+      const isAnyServiceAuthenticated =
+        ec2Result.authVerified ||
+        ec2Result.servers.length > 0 ||
+        r53Result.authVerified ||
+        r53Result.domains.length > 0;
+
+      if (isAnyServiceAuthenticated) {
         apiError = undefined;
+      } else if (ec2Result.error) {
+        apiError = ec2Result.error;
       }
     } catch (err: any) {
       apiError = `AWS Query error: ${err?.message || 'Failed to query AWS API'}`;
@@ -743,7 +767,7 @@ async function fetchAwsResources(apiKey: string): Promise<{
     apiError = 'Invalid AWS credentials. Please provide valid AWS Access Key ID and Secret Access Key.';
   }
 
-  return { domains, servers, error: servers.length > 0 || domains.length > 0 ? undefined : apiError };
+  return { domains, servers, error: (servers.length > 0 || domains.length > 0) ? undefined : apiError };
 }
 
 async function fetchNamecheapResources(apiKey: string): Promise<{
@@ -809,11 +833,17 @@ export async function syncProviderAccount(params: {
 
   // Retrieve token: parameter -> storage cache
   let rawKey = params.apiKey?.trim();
+  if (rawKey) {
+    rawKey = sanitizeSingleApiKey(rawKey);
+  }
   if (!rawKey || DUMMY_TOKENS.has(rawKey)) {
     rawKey = (await getProviderToken(params.providerAccountId || '')) ||
              (await getProviderToken(cleanKey)) ||
              (await getProviderToken(label)) ||
              undefined;
+    if (rawKey) {
+      rawKey = sanitizeSingleApiKey(rawKey);
+    }
   }
 
   // Automatic fallback for Hostinger if token not specified

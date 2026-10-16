@@ -35,7 +35,7 @@ import {
   deduplicateProviderAccounts,
 } from '../../services/accounts';
 import { getEffectiveApiUrl, setCustomApiUrl, apiGet, apiPatch } from '../../services/api';
-import { syncConsoleAccount, syncDomainRegistrar, syncCloudServers, syncProviderAccount, syncAllConnectedProviders } from '../../services/providerSync';
+import { syncConsoleAccount, syncDomainRegistrar, syncCloudServers, syncProviderAccount, syncAllConnectedProviders, sanitizeSingleApiKey } from '../../services/providerSync';
 import { saveProviderToken, getProviderToken } from '../../services/storage';
 import { API_CONFIG } from '../../constants/config';
 import {
@@ -566,14 +566,17 @@ export default function MoreScreen() {
         showFeedback('Missing Secret Key', 'Please enter your AWS Secret Access Key.', 'error');
         return;
       }
+      const cleanAccessKey = editAwsAccessKeyId.trim().replace(/\s+/g, '');
+      const cleanSecretKey = editAwsSecretAccessKey.trim().replace(/\s+/g, '');
+      const cleanSessionToken = editAwsSessionToken.trim().replace(/\s+/g, '');
       const regionsList = (editAwsRegions.trim() || 'us-east-1, ap-south-1')
         .split(',')
         .map((r) => r.trim().toLowerCase())
         .filter(Boolean);
       tokenToSave = JSON.stringify({
-        accessKeyId: editAwsAccessKeyId.trim(),
-        secretAccessKey: editAwsSecretAccessKey.trim(),
-        ...(editAwsSessionToken.trim() ? { sessionToken: editAwsSessionToken.trim() } : {}),
+        accessKeyId: cleanAccessKey,
+        secretAccessKey: cleanSecretKey,
+        ...(cleanSessionToken ? { sessionToken: cleanSessionToken } : {}),
         regions: regionsList.length > 0 ? regionsList : ['us-east-1', 'ap-south-1'],
       });
     } else if (editingTokenAccount.providerKey === 'namecheap') {
@@ -613,6 +616,7 @@ export default function MoreScreen() {
         showFeedback('Token Required', 'Please enter a valid API token or key.', 'error');
         return;
       }
+      tokenToSave = sanitizeSingleApiKey(tokenToSave);
     }
 
     setIsSavingToken(true);
@@ -659,11 +663,15 @@ export default function MoreScreen() {
       let externalAccountIdToStore = newAccExternalId.trim();
 
       if (newAccProviderKey === 'aws') {
-        if (!newAwsAccessKeyId.trim()) {
+        const cleanAccessKey = newAwsAccessKeyId.trim().replace(/\s+/g, '');
+        const cleanSecretKey = newAwsSecretAccessKey.trim().replace(/\s+/g, '');
+        const cleanSessionToken = newAwsSessionToken.trim().replace(/\s+/g, '');
+
+        if (!cleanAccessKey) {
           showFeedback('Missing Access Key', 'Please enter your AWS Access Key ID (e.g. AKIA...).', 'error');
           return;
         }
-        if (!newAwsSecretAccessKey.trim()) {
+        if (!cleanSecretKey) {
           showFeedback('Missing Secret Key', 'Please enter your AWS Secret Access Key.', 'error');
           return;
         }
@@ -672,12 +680,12 @@ export default function MoreScreen() {
           .map((r) => r.trim().toLowerCase())
           .filter(Boolean);
         credentialToken = JSON.stringify({
-          accessKeyId: newAwsAccessKeyId.trim(),
-          secretAccessKey: newAwsSecretAccessKey.trim(),
-          ...(newAwsSessionToken.trim() ? { sessionToken: newAwsSessionToken.trim() } : {}),
+          accessKeyId: cleanAccessKey,
+          secretAccessKey: cleanSecretKey,
+          ...(cleanSessionToken ? { sessionToken: cleanSessionToken } : {}),
           regions: regionsList.length > 0 ? regionsList : ['us-east-1', 'ap-south-1'],
         });
-        externalAccountIdToStore = newAwsAccessKeyId.trim();
+        externalAccountIdToStore = cleanAccessKey;
       } else if (newAccProviderKey === 'namecheap') {
         if (!newNamecheapApiKey.trim() || !newNamecheapApiUser.trim()) {
           showFeedback('Missing Credentials', 'Please enter your Namecheap API Key and API User.', 'error');
@@ -712,7 +720,11 @@ export default function MoreScreen() {
           clientSecret: newAzureClientSecret.trim(),
           subscriptionId: newAzureSubscriptionId.trim(),
         });
-        externalAccountIdToStore = newAzureClientId.trim();
+      }
+
+      if (credentialToken && !credentialToken.startsWith('{')) {
+        credentialToken = sanitizeSingleApiKey(credentialToken);
+        externalAccountIdToStore = sanitizeSingleApiKey(externalAccountIdToStore);
       }
 
       setIsCreatingAccount(true);

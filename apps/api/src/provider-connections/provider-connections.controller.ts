@@ -149,6 +149,15 @@ function presentConnection(connection: ProviderConnectionSummary): ProviderConne
   return ProviderConnectionSummaryResponseSchema.parse(presented);
 }
 
+const UUID_REGEX =
+  /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
+
+function ensureValidUuid(id: string): string {
+  if (id && UUID_REGEX.test(id)) return id;
+  const hex = (id || '').replace(/[^0-9a-fA-F]/g, '').padEnd(32, '0').slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 function presentSyncRun(run: ProviderSyncRunSummary) {
   return {
     attemptNo: run.attemptNo,
@@ -156,7 +165,7 @@ function presentSyncRun(run: ProviderSyncRunSummary) {
     durationMs: run.durationMs,
     errorCode: run.errorCode,
     finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
-    id: run.id,
+    id: ensureValidUuid(run.id),
     itemsCreated: run.itemsCreated,
     itemsDiscovered: run.itemsDiscovered,
     itemsMissing: run.itemsMissing,
