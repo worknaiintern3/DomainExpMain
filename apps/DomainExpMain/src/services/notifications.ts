@@ -60,17 +60,22 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   }
 
   try {
-    // 1. Configure Android Notification Channel
+    // 1. Configure Android Notification Channel (supported in standalone APK/AAB builds)
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('expiry-alerts', {
-        name: 'Asset Expiry Reminders',
-        description: 'Notifications for domain, server, hosting, and SSL certificate expiry',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#2563EB',
-        sound: 'default',
-        showBadge: true,
-      });
+      try {
+        await Notifications.setNotificationChannelAsync('expiry-alerts', {
+          name: 'Asset Expiry Reminders',
+          description: 'Notifications for domain, server, hosting, and SSL certificate expiry',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#2563EB',
+          sound: 'default',
+          showBadge: true,
+        });
+      } catch (channelErr: any) {
+        // In Expo Go client, custom channels are unavailable; handled automatically in standalone builds.
+        console.log('Notice: Custom notification channel skipped in Expo Go');
+      }
     }
 
     // 2. Request / check OS permissions
@@ -93,10 +98,15 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       (Constants as any)?.easConfig?.projectId ??
       'a17e35d7-b48f-4816-8485-18119bd4f7c4';
 
-    const tokenResult = await Notifications.getExpoPushTokenAsync({
-      projectId,
-    });
-    const pushToken = tokenResult.data;
+    let pushToken: string | null = null;
+    try {
+      const tokenResult = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
+      pushToken = tokenResult.data;
+    } catch (tokenErr: any) {
+      console.log('Notice: Remote push token registration requires standalone APK or production build (Expo Go on Android disables remote push).');
+    }
 
     if (!pushToken) {
       return null;
@@ -269,24 +279,28 @@ export async function sendLocalTestNotificationAsync(days: number): Promise<{
       isGranted = Boolean(requested?.granted || requested?.status === 'granted');
     }
 
-    // 2. Configure Android Notification Channel with highest priority
+    // 2. Configure Android Notification Channel with highest priority (standalone APK/AAB)
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('expiry-alerts', {
-        name: 'Asset Expiry Reminders',
-        description: 'Expiry reminders for domains, servers, SSL certificates and hosting',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#2563EB',
-        sound: 'default',
-        enableLights: true,
-        enableVibrate: true,
-        showBadge: true,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        bypassDnd: true,
-      });
+      try {
+        await Notifications.setNotificationChannelAsync('expiry-alerts', {
+          name: 'Asset Expiry Reminders',
+          description: 'Expiry reminders for domains, servers, SSL certificates and hosting',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#2563EB',
+          sound: 'default',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
+        });
+      } catch (channelErr: any) {
+        // Fallback in Expo Go
+      }
     }
 
-    // 3. Schedule notification with explicit channelId
+    // 3. Schedule notification
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
