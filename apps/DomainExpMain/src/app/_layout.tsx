@@ -17,12 +17,16 @@ import {
   registerForPushNotificationsAsync,
 } from '../services/notifications';
 
+import { RemoteConfigProvider, useRemoteConfig } from '../store/remote-config-context';
+import { MaintenanceBarrier, UpdateRequiredBarrier } from '../components/AdminBarriers';
+
 // Keep splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function NavigationRoot() {
   const { colors, isDark } = useTheme();
   const { isAuthenticated } = useAuth();
+  const { maintenanceMode, isUpdateRequired } = useRemoteConfig();
   const router = useRouter();
 
   useEffect(() => {
@@ -104,6 +108,12 @@ function NavigationRoot() {
           }}
         />
       </Stack>
+
+      {/* Admin Controlled Emergency Kill-Switch Overlay */}
+      {maintenanceMode && <MaintenanceBarrier />}
+
+      {/* Admin Controlled Forced Version Update Overlay */}
+      {isUpdateRequired && <UpdateRequiredBarrier />}
     </>
   );
 }
@@ -130,7 +140,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <SettingsProvider>
-            <NavigationRoot />
+            <RemoteConfigProvider>
+              <NavigationRoot />
+            </RemoteConfigProvider>
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>

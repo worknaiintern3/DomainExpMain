@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 import { useTheme } from '../../store/theme-context';
 import { useAuth } from '../../store/auth-context';
+import { useRemoteConfig, type RemoteNavigationItem } from '../../store/remote-config-context';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
@@ -34,7 +35,22 @@ function getTabIconName(route: string, focused: boolean): IoniconName {
   }
 }
 
-function getTabTitle(route: string): string {
+function getTabTitle(route: string, navItems?: RemoteNavigationItem[]): string {
+  if (navItems && navItems.length > 0) {
+    const keyMap: Record<string, string[]> = {
+      dashboard: ['home'],
+      domains: ['domains'],
+      servers: ['servers'],
+      applications: ['applications', 'websites', 'apps'],
+      more: ['more', 'settings'],
+    };
+    const matchingKeys = keyMap[route] || [route];
+    const item = navItems.find((n) => matchingKeys.includes(n.key.toLowerCase()));
+    if (item?.label) {
+      return item.label;
+    }
+  }
+
   switch (route) {
     case 'dashboard':
       return 'Home';
@@ -127,12 +143,14 @@ function AnimatedTabButton({
   onPress,
   onLongPress,
   isDark,
+  navItems,
 }: {
   route: { key: string; name: string };
   isFocused: boolean;
   onPress: () => void;
   onLongPress: () => void;
   isDark: boolean;
+  navItems?: RemoteNavigationItem[];
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -208,7 +226,7 @@ function AnimatedTabButton({
         ]}
         numberOfLines={1}
       >
-        {getTabTitle(route.name)}
+        {getTabTitle(route.name, navItems)}
       </Text>
     </TouchableOpacity>
   );
@@ -216,15 +234,52 @@ function AnimatedTabButton({
 
 function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { isDark } = useTheme();
+  const { navigationItems, isFeatureEnabled } = useRemoteConfig();
   const insets = useSafeAreaInsets();
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Exactly 5 main tabs
-  const visibleRoutes = state.routes.filter((route) => {
-    if (HIDDEN_ROUTES.has(route.name)) return false;
-    const options = descriptors[route.key]?.options as { href?: string | null } | undefined;
-    return options?.href !== null;
-  });
+  // Dynamic feature-flag and admin-controlled tab filtering & sorting
+  const visibleRoutes = useMemo(() => {
+    return state.routes
+      .filter((route) => {
+        if (HIDDEN_ROUTES.has(route.name)) return false;
+        const options = descriptors[route.key]?.options as { href?: string | null } | undefined;
+        if (options?.href === null) return false;
+
+        // 1. Feature Flag Filtering
+        if (route.name === 'domains' && !isFeatureEnabled('domains')) return false;
+        if (route.name === 'servers' && !isFeatureEnabled('servers')) return false;
+        if (route.name === 'applications' && !isFeatureEnabled('websites')) return false;
+
+        // 2. Admin Navigation Item Enabled Check
+        const keyMap: Record<string, string[]> = {
+          dashboard: ['home'],
+          domains: ['domains'],
+          servers: ['servers'],
+          applications: ['applications', 'websites', 'apps'],
+          more: ['more', 'settings'],
+        };
+        const matchingKeys = keyMap[route.name] || [route.name];
+        const navItem = navigationItems.find((n) => matchingKeys.includes(n.key.toLowerCase()));
+        if (navItem && !navItem.enabled) return false;
+
+        return true;
+      })
+      .sort((a, b) => {
+        const keyMap: Record<string, string[]> = {
+          dashboard: ['home'],
+          domains: ['domains'],
+          servers: ['servers'],
+          applications: ['applications', 'websites', 'apps'],
+          more: ['more', 'settings'],
+        };
+        const matchA = keyMap[a.name] || [a.name];
+        const matchB = keyMap[b.name] || [b.name];
+        const orderA = navigationItems.find((n) => matchA.includes(n.key.toLowerCase()))?.sortOrder ?? 99;
+        const orderB = navigationItems.find((n) => matchB.includes(n.key.toLowerCase()))?.sortOrder ?? 99;
+        return orderA - orderB;
+      });
+  }, [state.routes, descriptors, navigationItems, isFeatureEnabled]);
 
   const activeRouteName = state.routes[state.index]?.name;
   const activeVisibleIndex = Math.max(
@@ -335,6 +390,7 @@ function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarPr
                 onPress={onPress}
                 onLongPress={onLongPress}
                 isDark={isDark}
+                navItems={navigationItems}
               />
             );
           })}

@@ -154,25 +154,17 @@ export const mobileAdminClient = {
   // App Config
   getConfig: async (): Promise<MobileAppConfig> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileAppConfig>('/config');
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileAppConfig>('/config');
     }
     return getStored<MobileAppConfig>(STORAGE_KEYS.config, DEFAULT_APP_CONFIG);
   },
 
   updateConfig: async (body: UpdateMobileAppConfigRequest): Promise<MobileAppConfig> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileAppConfig>('/config', {
-          method: 'PATCH',
-          body: JSON.stringify(body),
-        });
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileAppConfig>('/config', {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
     }
     const current = getStored<MobileAppConfig>(STORAGE_KEYS.config, DEFAULT_APP_CONFIG);
     const updated: MobileAppConfig = {
@@ -191,25 +183,17 @@ export const mobileAdminClient = {
   // Features
   getFeatures: async (): Promise<MobileFeatureFlag[]> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileFeatureFlag[]>('/features');
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileFeatureFlag[]>('/features');
     }
     return getStored<MobileFeatureFlag[]>(STORAGE_KEYS.features, DEFAULT_FEATURE_FLAGS);
   },
 
   updateFeature: async (key: string, body: UpdateMobileFeatureFlagRequest): Promise<MobileFeatureFlag> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileFeatureFlag>(`/features/${key}`, {
-          method: 'PATCH',
-          body: JSON.stringify(body),
-        });
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileFeatureFlag>(`/features/${key}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
     }
     const features = getStored<MobileFeatureFlag[]>(STORAGE_KEYS.features, DEFAULT_FEATURE_FLAGS);
     const idx = features.findIndex((f) => f.key === key);
@@ -229,25 +213,17 @@ export const mobileAdminClient = {
   // Navigation
   getNavigation: async (): Promise<MobileNavigationItem[]> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileNavigationItem[]>('/navigation');
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileNavigationItem[]>('/navigation');
     }
     return getStored<MobileNavigationItem[]>(STORAGE_KEYS.navigation, DEFAULT_NAVIGATION);
   },
 
   updateNavigation: async (items: MobileNavigationItem[]): Promise<MobileNavigationItem[]> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileNavigationItem[]>('/navigation', {
-          method: 'PUT',
-          body: JSON.stringify({ items }),
-        });
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileNavigationItem[]>('/navigation', {
+        method: 'PUT',
+        body: JSON.stringify({ items }),
+      });
     }
     setStored(STORAGE_KEYS.navigation, items);
     return items;
@@ -256,25 +232,17 @@ export const mobileAdminClient = {
   // Home Layout
   getHomeConfig: async (): Promise<MobileHomeSection[]> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileHomeSection[]>('/home');
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileHomeSection[]>('/home');
     }
     return getStored<MobileHomeSection[]>(STORAGE_KEYS.home, DEFAULT_HOME_SECTIONS);
   },
 
   updateHomeConfig: async (sections: MobileHomeSection[]): Promise<MobileHomeSection[]> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileHomeSection[]>('/home', {
-          method: 'PUT',
-          body: JSON.stringify({ sections }),
-        });
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileHomeSection[]>('/home', {
+        method: 'PUT',
+        body: JSON.stringify({ sections }),
+      });
     }
     setStored(STORAGE_KEYS.home, sections);
     return sections;
@@ -283,25 +251,17 @@ export const mobileAdminClient = {
   // Versions
   getVersions: async (): Promise<MobileAppVersion[]> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileAppVersion[]>('/versions');
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileAppVersion[]>('/versions');
     }
     return getStored<MobileAppVersion[]>(STORAGE_KEYS.versions, DEFAULT_VERSIONS);
   },
 
   updateVersion: async (platform: string, body: UpdateMobileAppVersionRequest): Promise<MobileAppVersion> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileAppVersion>(`/versions/${platform}`, {
-          method: 'PUT',
-          body: JSON.stringify(body),
-        });
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileAppVersion>(`/versions/${platform}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
     }
     const versions = getStored<MobileAppVersion[]>(STORAGE_KEYS.versions, DEFAULT_VERSIONS);
     const target = versions.find((v) => v.platform === platform) || versions[0];
@@ -320,25 +280,17 @@ export const mobileAdminClient = {
   // Announcements
   getAnnouncements: async (): Promise<MobileAnnouncement[]> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileAnnouncement[]>('/announcements');
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileAnnouncement[]>('/announcements');
     }
     return getStored<MobileAnnouncement[]>(STORAGE_KEYS.announcements, []);
   },
 
   createAnnouncement: async (body: CreateMobileAnnouncementRequest): Promise<MobileAnnouncement> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileAnnouncement>('/announcements', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileAnnouncement>('/announcements', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
     }
     const current = getStored<MobileAnnouncement[]>(STORAGE_KEYS.announcements, []);
     const newAnnouncement: MobileAnnouncement = {
@@ -358,13 +310,9 @@ export const mobileAdminClient = {
 
   deleteAnnouncement: async (id: string): Promise<{ success: boolean }> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<{ success: boolean }>(`/announcements/${id}`, {
-          method: 'DELETE',
-        });
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<{ success: boolean }>(`/announcements/${id}`, {
+        method: 'DELETE',
+      });
     }
     const current = getStored<MobileAnnouncement[]>(STORAGE_KEYS.announcements, []);
     setStored(STORAGE_KEYS.announcements, current.filter((a) => a.id !== id));
@@ -374,11 +322,7 @@ export const mobileAdminClient = {
   // Audit Logs
   getAuditLogs: async (): Promise<MobileAuditLogResponse[]> => {
     if (mobileAdminClient.hasToken()) {
-      try {
-        return await request<MobileAuditLogResponse[]>('/audit-logs');
-      } catch (err: any) {
-        if (!err.message?.includes('401')) throw err;
-      }
+      return await request<MobileAuditLogResponse[]>('/audit-logs');
     }
     return getStored<MobileAuditLogResponse[]>(STORAGE_KEYS.auditLogs, [
       {

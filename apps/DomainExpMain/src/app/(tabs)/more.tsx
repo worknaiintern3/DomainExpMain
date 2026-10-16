@@ -24,6 +24,7 @@ import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
 import { useAuth } from '../../store/auth-context';
 import { useSettings } from '../../store/settings-context';
+import { useRemoteConfig } from '../../store/remote-config-context';
 import { fetchDomainsList, importDomainsBatch, deleteDomain } from '../../services/domains';
 import {
   fetchProviderAccountsList,
@@ -157,6 +158,7 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const { colors, themeMode, setThemeMode, isDark, toggleTheme } = useTheme();
   const { user, logout, deleteAccount, updateUser, changePassword } = useAuth();
+  const { appBranding, isFeatureEnabled, versionPolicy } = useRemoteConfig();
   const {
     currency,
     currencySymbol,
@@ -1122,72 +1124,84 @@ export default function MoreScreen() {
     showFeedback('Ticket Submitted', 'Our support team has received your ticket and will reply within 2 hours.', 'success');
   };
 
-  const menuItems = [
-    {
-      id: 'profile' as ModalType,
-      icon: '👤',
-      iconBg: isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe',
-      iconColor: '#0284c7',
-      label: 'Profile',
-      subtitle: 'View and edit your personal information',
-    },
-    {
-      id: 'providers' as ModalType,
-      icon: '🔗',
-      iconBg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#dcfce7',
-      iconColor: '#10b981',
-      label: 'Provider Connections',
-      subtitle: 'Manage your DNS & cloud provider accounts',
-    },
-    {
-      id: 'import_export' as ModalType,
-      icon: '📤',
-      iconBg: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
-      iconColor: '#f59e0b',
-      label: 'Import / Export',
-      subtitle: 'Import or export your domain data',
-    },
-    {
-      id: 'settings' as ModalType,
-      icon: '⚙️',
-      iconBg: isDark ? 'rgba(139, 92, 246, 0.15)' : '#f3e8ff',
-      iconColor: '#8b5cf6',
-      label: 'Settings',
-      subtitle: 'App preferences and customization',
-    },
-    {
-      id: 'security' as ModalType,
-      icon: '🛡️',
-      iconBg: isDark ? 'rgba(244, 63, 94, 0.15)' : '#ffe4e6',
-      iconColor: '#f43f5e',
-      label: 'Security',
-      subtitle: 'Password, 2FA and security options',
-    },
-    {
-      id: 'billing' as ModalType,
-      icon: '💳',
-      iconBg: isDark ? 'rgba(249, 115, 22, 0.15)' : '#ffedd5',
-      iconColor: '#f97316',
-      label: 'Billing',
-      subtitle: 'Manage your subscription and payments',
-    },
-    {
-      id: 'help' as ModalType,
-      icon: '❓',
-      iconBg: isDark ? 'rgba(244, 63, 94, 0.15)' : '#ffe4e6',
-      iconColor: '#f43f5e',
-      label: 'Help & Support',
-      subtitle: 'Get help or contact our support team',
-    },
-    {
-      id: 'about' as ModalType,
-      icon: 'ℹ️',
-      iconBg: isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe',
-      iconColor: '#0284c7',
-      label: 'About DomainPulse',
-      subtitle: 'App version, terms and privacy policy',
-    },
-  ];
+  const menuItems = useMemo(() => {
+    const list = [
+      {
+        id: 'profile' as ModalType,
+        icon: '👤',
+        iconBg: isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe',
+        iconColor: '#0284c7',
+        label: 'Profile',
+        subtitle: 'View and edit your personal information',
+        visible: true,
+      },
+      {
+        id: 'providers' as ModalType,
+        icon: '🔗',
+        iconBg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#dcfce7',
+        iconColor: '#10b981',
+        label: 'Provider Connections',
+        subtitle: 'Manage your DNS & cloud provider accounts',
+        visible: isFeatureEnabled('providers'),
+      },
+      {
+        id: 'import_export' as ModalType,
+        icon: '📤',
+        iconBg: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
+        iconColor: '#f59e0b',
+        label: 'Import / Export',
+        subtitle: 'Import or export your domain data',
+        visible: isFeatureEnabled('domains'),
+      },
+      {
+        id: 'settings' as ModalType,
+        icon: '⚙️',
+        iconBg: isDark ? 'rgba(139, 92, 246, 0.15)' : '#f3e8ff',
+        iconColor: '#8b5cf6',
+        label: 'Settings',
+        subtitle: 'App preferences and customization',
+        visible: true,
+      },
+      {
+        id: 'security' as ModalType,
+        icon: '🛡️',
+        iconBg: isDark ? 'rgba(244, 63, 94, 0.15)' : '#ffe4e6',
+        iconColor: '#f43f5e',
+        label: 'Security',
+        subtitle: 'Password, 2FA and security options',
+        visible: true,
+      },
+      {
+        id: 'billing' as ModalType,
+        icon: '💳',
+        iconBg: isDark ? 'rgba(249, 115, 22, 0.15)' : '#ffedd5',
+        iconColor: '#f97316',
+        label: 'Billing',
+        subtitle: 'Manage your subscription and payments',
+        visible: true,
+      },
+      {
+        id: 'help' as ModalType,
+        icon: '❓',
+        iconBg: isDark ? 'rgba(244, 63, 94, 0.15)' : '#ffe4e6',
+        iconColor: '#f43f5e',
+        label: 'Help & Support',
+        subtitle: 'Get help or contact our support team',
+        visible: true,
+      },
+      {
+        id: 'about' as ModalType,
+        icon: 'ℹ️',
+        iconBg: isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe',
+        iconColor: '#0284c7',
+        label: `About ${appBranding.appName || 'DomainPulse'}`,
+        subtitle: 'App version, terms and privacy policy',
+        visible: true,
+      },
+    ];
+
+    return list.filter((item) => item.visible);
+  }, [isDark, isFeatureEnabled, appBranding.appName]);
 
   const connectedProviders = [
     {
@@ -3378,16 +3392,16 @@ export default function MoreScreen() {
                         contentFit="contain"
                       />
                     </View>
-                    <Text style={[styles.aboutTitle, { color: colors.text }]}>DomainPulse</Text>
+                    <Text style={[styles.aboutTitle, { color: colors.text }]}>{appBranding.appName || 'DomainPulse'}</Text>
                     <Text style={[styles.aboutVersion, { color: colors.textMuted }]}>
-                      Version 1.0.4 (Build 2026.09.28)
+                      Version {versionPolicy.latestVersion || '1.0.4'}
                     </Text>
                     <Text style={[styles.aboutDesc, { color: colors.textSecondary }]}>
-                      DomainPulse is an enterprise infrastructure and domain portfolio monitoring suite designed for modern DevOps and site reliability engineers.
+                      {appBranding.appName || 'DomainPulse'} is an enterprise infrastructure and domain portfolio monitoring suite designed for modern DevOps and site reliability engineers.
                     </Text>
                     <View style={[styles.divider, { backgroundColor: colors.borderSubtle, marginVertical: Spacing.lg }]} />
                     <Text style={[styles.copyrightText, { color: colors.textMuted }]}>
-                      © 2026 DomainPulse Inc. All rights reserved.
+                      © {new Date().getFullYear()} {appBranding.appName || 'DomainPulse'} Inc. All rights reserved.
                     </Text>
                   </View>
                 )}

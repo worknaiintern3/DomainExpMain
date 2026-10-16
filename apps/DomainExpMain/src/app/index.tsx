@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/auth-context';
+import { useRemoteConfig } from '../store/remote-config-context';
 import { Spacing } from '../constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -65,6 +66,8 @@ export default function SplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, user } = useAuth();
+  const { appBranding } = useRemoteConfig();
+  const appName = appBranding.appName || 'DomainPulse';
 
   // Animation controllers
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -294,8 +297,14 @@ export default function SplashScreen() {
             {/* Typography */}
             <Animated.View style={[styles.brandInfo, { opacity: fadeAnim }]}>
               <View style={styles.titleRow}>
-                <Text style={styles.brandTitleMain}>Domain</Text>
-                <Text style={styles.brandTitleAccent}>Pulse</Text>
+                {appName.toLowerCase().includes('domain') && appName.length > 6 ? (
+                  <>
+                    <Text style={styles.brandTitleMain}>{appName.slice(0, 6)}</Text>
+                    <Text style={styles.brandTitleAccent}>{appName.slice(6)}</Text>
+                  </>
+                ) : (
+                  <Text style={styles.brandTitleMain}>{appName}</Text>
+                )}
                 <View style={styles.onlineBadgeDot} />
               </View>
 

@@ -214,7 +214,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@domainpulse.dev"
+                  placeholder="v@gmail.com"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -232,13 +232,26 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all disabled:opacity-50"
-              >
-                {loading ? 'Authenticating...' : 'Sign In with Backend'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all disabled:opacity-50"
+                >
+                  {loading ? 'Authenticating...' : 'Sign In with Backend'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('v@gmail.com');
+                    setPassword('Admin123!@#');
+                  }}
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700"
+                  title="Autofill Super Admin Credentials"
+                >
+                  Autofill Super Admin
+                </button>
+              </div>
             </form>
 
             <div className="relative flex py-2 items-center">

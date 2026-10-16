@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   ImageBackground,
+  Linking,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
 import { useAuth } from '../../store/auth-context';
+import { useRemoteConfig } from '../../store/remote-config-context';
 import { fetchInventorySummary } from '../../services/monitoring';
 import { fetchDomainsList } from '../../services/domains';
 import { fetchServersList } from '../../services/servers';
@@ -64,6 +66,13 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
+  const {
+    appBranding,
+    announcements,
+    homeSections,
+    isFeatureEnabled,
+    refreshConfig,
+  } = useRemoteConfig();
 
   const [summary, setSummary] = useState<InventorySummary | null>(null);
   const [domains, setDomains] = useState<DomainItem[]>([]);
@@ -72,7 +81,6 @@ export default function DashboardScreen() {
   const [websites, setWebsites] = useState<WebsiteItem[]>([]);
   const [providers, setProviders] = useState<ProviderAccount[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const [showAllActivities, setShowAllActivities] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async (isRefresh = false) => {
@@ -108,7 +116,10 @@ export default function DashboardScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await syncAllConnectedProviders();
+      await Promise.allSettled([
+        syncAllConnectedProviders(),
+        refreshConfig(),
+      ]);
     } catch {}
     await loadData(true);
     setRefreshing(false);
@@ -117,12 +128,6 @@ export default function DashboardScreen() {
   const handleDeleteActivity = async (id: string) => {
     await deleteActivity(id);
     setAlerts((prev) => prev.filter((a) => a.id !== id));
-  };
-
-  const handleClearAllActivities = async () => {
-    const ids = alerts.map((a) => a.id);
-    await clearAllActivities(ids);
-    setAlerts([]);
   };
 
   // Time-aware greeting
@@ -140,7 +145,6 @@ export default function DashboardScreen() {
   const totalWebsites = websites.length;
   const totalProviders = providers.length;
   const totalAlerts = summary?.alerts ?? alerts.length;
-
 
   // Active unread alerts count
   const unreadAlertsCount = useMemo(() => {
@@ -167,98 +171,143 @@ export default function DashboardScreen() {
     return { text: 'Systems Synchronized', color: '#10b981' };
   }, [alerts, servers, domains]);
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-      <View style={[styles.headerBar, { borderBottomColor: colors.borderSubtle }]}>
-        <View style={styles.headerLeft}>
-          <Image
-            source={require('../../../assets/images/icon.png')}
-            style={{ width: 26, height: 26, borderRadius: 6 }}
-            resizeMode="contain"
-          />
-          <Text style={[styles.brandText, { color: colors.text }]}>DomainPulse</Text>
-        </View>
+  // Sort home sections by admin-persisted order and filter visible ones
+  const sortedSections = useMemo(() => {
+    return [...homeSections]
+      .filter((sec) => sec.isVisible !== false)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  }, [homeSections]);
 
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[styles.bellButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            onPress={() => router.push('/(tabs)/alerts')}
-            activeOpacity={0.7}
-            accessibilityLabel="Alerts"
-          >
-            <Ionicons name="notifications-outline" size={17} color={colors.textSecondary} />
-            {unreadAlertsCount > 0 && (
-              <View style={[styles.unreadDot, { borderColor: colors.surfaceElevated }]} />
-            )}
-          </TouchableOpacity>
+  const renderAnnouncements = () => {
+    if (!announcements || announcements.length === 0) return null;
+    return (
+      <View style={{ marginBottom: Spacing.md, gap: 10 }}>
+        {announcements.map((ann) => {
+          const isCrit = ann.type === 'critical';
+          const isWarn = ann.type === 'warning';
+          const isPromo = ann.type === 'promo';
 
-          <TouchableOpacity
-            style={[styles.avatarButton, { backgroundColor: colors.primaryMuted, borderColor: colors.primary }]}
-            onPress={() => router.push('/(tabs)/more')}
-            activeOpacity={0.7}
-            accessibilityLabel="Settings"
-          >
-            <Ionicons name="settings-outline" size={18} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
+          const bannerBg = isCrit
+            ? (isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2')
+            : isWarn
+            ? (isDark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb')
+            : isPromo
+            ? (isDark ? 'rgba(168, 85, 247, 0.15)' : '#faf5ff')
+            : (isDark ? 'rgba(56, 189, 248, 0.15)' : '#eff6ff');
+
+          const bannerBorder = isCrit
+            ? (isDark ? '#ef4444' : '#fecaca')
+            : isWarn
+            ? (isDark ? '#f59e0b' : '#fde68a')
+            : isPromo
+            ? (isDark ? '#a855f7' : '#e9d5ff')
+            : (isDark ? '#38bdf8' : '#bfdbfe');
+
+          const bannerTextColor = isCrit
+            ? '#ef4444'
+            : isWarn
+            ? '#f59e0b'
+            : isPromo
+            ? '#a855f7'
+            : (isDark ? '#38bdf8' : '#0284c7');
+
+          const iconName = isCrit
+            ? 'alert-circle'
+            : isWarn
+            ? 'warning'
+            : isPromo
+            ? 'sparkles'
+            : 'information-circle';
+
+          return (
+            <View
+              key={ann.id}
+              style={[
+                styles.announcementCard,
+                { backgroundColor: bannerBg, borderColor: bannerBorder },
+              ]}
+            >
+              <View style={styles.announcementHeader}>
+                <Ionicons name={iconName as any} size={20} color={bannerTextColor} />
+                <Text style={[styles.announcementTitle, { color: bannerTextColor }]}>
+                  {ann.title}
+                </Text>
+              </View>
+              <Text style={[styles.announcementMessage, { color: colors.textSecondary }]}>
+                {ann.message}
+              </Text>
+              {Boolean(ann.actionUrl && ann.actionText) && (
+                <TouchableOpacity
+                  style={[styles.announcementBtn, { backgroundColor: bannerTextColor }]}
+                  onPress={() => {
+                    if (ann.actionUrl?.startsWith('http')) {
+                      Linking.openURL(ann.actionUrl).catch(() => {});
+                    } else if (ann.actionUrl?.startsWith('/')) {
+                      router.push(ann.actionUrl as any);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.announcementBtnText}>{ann.actionText}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
       </View>
+    );
+  };
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero Greeting Card */}
-        <ImageBackground
-          source={require('../../../assets/images/hero-card-bg.png')}
+  const renderHeroCard = () => (
+    <ImageBackground
+      key="hero_card"
+      source={require('../../../assets/images/hero-card-bg.png')}
+      style={[
+        styles.heroCard,
+        {
+          backgroundColor: isDark ? '#111726' : '#f0f9ff',
+          borderColor: isDark ? colors.border : '#bae6fd',
+        },
+      ]}
+      imageStyle={[styles.heroCardImage, isDark && { opacity: 0.15 }]}
+      resizeMode="cover"
+    >
+      <View style={styles.heroLeft}>
+        <Text style={[styles.greetingTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+          {greeting.text} {greeting.icon}
+        </Text>
+        <Text style={[styles.heroSubtitle, { color: isDark ? '#94a3b8' : '#334155' }]}>
+          {totalDomains > 0 || totalServers > 0 || totalWebsites > 0
+            ? `${totalDomains} domains, ${totalServers} servers & ${totalWebsites} websites active`
+            : 'All infrastructure nodes and domain portfolios are currently synchronized.'}
+        </Text>
+
+        <TouchableOpacity
           style={[
-            styles.heroCard,
+            styles.statusPill,
             {
-              backgroundColor: isDark ? '#111726' : '#f0f9ff',
-              borderColor: isDark ? colors.border : '#bae6fd',
+              backgroundColor: isDark ? 'rgba(24, 32, 50, 0.92)' : 'rgba(255, 255, 255, 0.95)',
+              borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255, 255, 255, 0.8)',
             },
           ]}
-          imageStyle={[
-            styles.heroCardImage,
-            isDark && { opacity: 0.15 },
-          ]}
-          resizeMode="cover"
+          onPress={() => router.push('/(tabs)/alerts')}
+          activeOpacity={0.8}
         >
-          <View style={styles.heroLeft}>
-            <Text style={[styles.greetingTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
-              {greeting.text} {greeting.icon}
-            </Text>
-            <Text style={[styles.heroSubtitle, { color: isDark ? '#94a3b8' : '#334155' }]}>
-              {totalDomains > 0 || totalServers > 0 || totalWebsites > 0
-                ? `${totalDomains} domains, ${totalServers} servers & ${totalWebsites} websites active`
-                : 'All infrastructure nodes and domain portfolios are currently synchronized.'}
-            </Text>
+          <View style={[styles.greenPulseDot, { backgroundColor: systemStatus.color }]} />
+          <Text style={[styles.statusPillText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+            {systemStatus.text}
+          </Text>
+          <Text style={[styles.statusPillChevron, { color: isDark ? colors.primary : '#64748b' }]}>›</Text>
+        </TouchableOpacity>
+      </View>
+    </ImageBackground>
+  );
 
-            <TouchableOpacity
-              style={[
-                styles.statusPill,
-                {
-                  backgroundColor: isDark ? 'rgba(24, 32, 50, 0.92)' : 'rgba(255, 255, 255, 0.95)',
-                  borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255, 255, 255, 0.8)',
-                },
-              ]}
-              onPress={() => router.push('/(tabs)/alerts')}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.greenPulseDot, { backgroundColor: systemStatus.color }]} />
-              <Text style={[styles.statusPillText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
-                {systemStatus.text}
-              </Text>
-              <Text style={[styles.statusPillChevron, { color: isDark ? colors.primary : '#64748b' }]}>›</Text>
-            </TouchableOpacity>
-          </View>
-        </ImageBackground>
-
-        {/* 6 Stat Cards (3x2 Grid) */}
-        <View style={styles.statsGrid}>
-          {/* Card 1: Domains */}
+  const renderStatsSection = (title?: string) => (
+    <View key="sec_stats" style={{ marginBottom: Spacing.xl }}>
+      <View style={styles.statsGrid}>
+        {/* Card 1: Domains */}
+        {isFeatureEnabled('domains') && (
           <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/(tabs)/domains')}
@@ -281,8 +330,10 @@ export default function DashboardScreen() {
               <MicroBarChart color="#0284c7" />
             </View>
           </TouchableOpacity>
+        )}
 
-          {/* Card 2: Servers */}
+        {/* Card 2: Servers */}
+        {isFeatureEnabled('servers') && (
           <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/(tabs)/servers')}
@@ -305,8 +356,10 @@ export default function DashboardScreen() {
               <MicroBarChart color="#9333ea" />
             </View>
           </TouchableOpacity>
+        )}
 
-          {/* Card 3: Websites */}
+        {/* Card 3: Websites */}
+        {isFeatureEnabled('websites') && (
           <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/(tabs)/applications?section=websites' as any)}
@@ -329,32 +382,34 @@ export default function DashboardScreen() {
               <MicroBarChart color="#10b981" />
             </View>
           </TouchableOpacity>
+        )}
 
-          {/* Card 4: Applications */}
-          <TouchableOpacity
-            style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => router.push('/(tabs)/applications?section=apps' as any)}
-            activeOpacity={0.85}
-          >
-            <View style={styles.statCardHeader}>
-              <View style={[styles.iconBadge, { backgroundColor: isDark ? 'rgba(217, 119, 6, 0.15)' : '#fef3c7' }]}>
-                <Text style={styles.iconGlyph}>📦</Text>
-              </View>
-              <View style={[styles.arrowCircle, { backgroundColor: isDark ? 'rgba(217, 119, 6, 0.15)' : '#fffbeb' }]}>
-                <Text style={[styles.arrowCircleText, { color: '#d97706' }]}>→</Text>
-              </View>
+        {/* Card 4: Applications */}
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => router.push('/(tabs)/applications?section=apps' as any)}
+          activeOpacity={0.85}
+        >
+          <View style={styles.statCardHeader}>
+            <View style={[styles.iconBadge, { backgroundColor: isDark ? 'rgba(217, 119, 6, 0.15)' : '#fef3c7' }]}>
+              <Text style={styles.iconGlyph}>📦</Text>
             </View>
-
-            <View style={styles.statCardBottom}>
-              <View>
-                <Text style={[styles.statNumber, { color: colors.text }]}>{totalApps}</Text>
-                <Text style={[styles.statSublabel, { color: colors.textSecondary }]}>Total Apps</Text>
-              </View>
-              <MicroBarChart color="#d97706" />
+            <View style={[styles.arrowCircle, { backgroundColor: isDark ? 'rgba(217, 119, 6, 0.15)' : '#fffbeb' }]}>
+              <Text style={[styles.arrowCircleText, { color: '#d97706' }]}>→</Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
-          {/* Card 5: Accounts */}
+          <View style={styles.statCardBottom}>
+            <View>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{totalApps}</Text>
+              <Text style={[styles.statSublabel, { color: colors.textSecondary }]}>Total Apps</Text>
+            </View>
+            <MicroBarChart color="#d97706" />
+          </View>
+        </TouchableOpacity>
+
+        {/* Card 5: Cloud Accounts */}
+        {isFeatureEnabled('providers') && (
           <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/(tabs)/more')}
@@ -377,8 +432,10 @@ export default function DashboardScreen() {
               <MicroBarChart color="#0284c7" />
             </View>
           </TouchableOpacity>
+        )}
 
-          {/* Card 6: Alerts */}
+        {/* Card 6: Alerts */}
+        {isFeatureEnabled('alerts') && (
           <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/(tabs)/alerts')}
@@ -401,48 +458,51 @@ export default function DashboardScreen() {
               <MicroBarChart color="#e11d48" />
             </View>
           </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderQuickConnectSection = (title?: string) => (
+    <View key="sec_quickActions" style={{ marginBottom: Spacing.xl }}>
+      <View style={[styles.sectionHeader, { marginBottom: 10 }]}>
+        <View style={styles.sectionHeaderLeft}>
+          <Text style={styles.sectionIcon}>🔗</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title || 'Quick Connect'}</Text>
         </View>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/more')} activeOpacity={0.7}>
+          <Text style={[styles.viewAllLink, { color: colors.primary }]}>Manage →</Text>
+        </TouchableOpacity>
+      </View>
 
-
-        {/* Quick Connect Integrations Strip */}
-        <View style={[styles.sectionHeader, { marginTop: Spacing.xl, marginBottom: 10 }]}>
-          <View style={styles.sectionHeaderLeft}>
-            <Text style={styles.sectionIcon}>🔗</Text>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Connect</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/more')} activeOpacity={0.7}>
-            <Text style={[styles.viewAllLink, { color: colors.primary }]}>Manage →</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 2, paddingBottom: 4, gap: 10 }}
-          style={{ marginBottom: Spacing.xl }}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 2, paddingBottom: 4, gap: 10 }}
+      >
+        {/* Card 1: Google Play Console → Applications */}
+        <TouchableOpacity
+          style={[
+            styles.quickConnectCard,
+            { backgroundColor: isDark ? '#0a1628' : '#f0fdf4', borderColor: isDark ? '#1a2e4a' : '#bbf7d0' },
+          ]}
+          onPress={() => router.push('/(tabs)/applications')}
+          activeOpacity={0.82}
         >
-          {/* Card 1: Google Play Console → Applications */}
-          <TouchableOpacity
-            style={[
-              styles.quickConnectCard,
-              { backgroundColor: isDark ? '#0a1628' : '#f0fdf4', borderColor: isDark ? '#1a2e4a' : '#bbf7d0' },
-            ]}
-            onPress={() => router.push('/(tabs)/applications')}
-            activeOpacity={0.82}
-          >
-            <View style={[styles.quickConnectIconBox, { backgroundColor: isDark ? '#112240' : '#dcfce7' }]}>
-              <Text style={{ fontSize: 20 }}>▶</Text>
-            </View>
-            <Text style={[styles.quickConnectTitle, { color: colors.text }]}>Play Console</Text>
-            <Text style={[styles.quickConnectSubtitle, { color: colors.textSecondary }]}>
-              Sync Android apps from your Google developer console
-            </Text>
-            <View style={[styles.quickConnectBtn, { backgroundColor: '#16a34a' }]}>
-              <Text style={styles.quickConnectBtnText}>Connect →</Text>
-            </View>
-          </TouchableOpacity>
+          <View style={[styles.quickConnectIconBox, { backgroundColor: isDark ? '#112240' : '#dcfce7' }]}>
+            <Text style={{ fontSize: 20 }}>▶</Text>
+          </View>
+          <Text style={[styles.quickConnectTitle, { color: colors.text }]}>Play Console</Text>
+          <Text style={[styles.quickConnectSubtitle, { color: colors.textSecondary }]}>
+            Sync Android apps from your Google developer console
+          </Text>
+          <View style={[styles.quickConnectBtn, { backgroundColor: '#16a34a' }]}>
+            <Text style={styles.quickConnectBtnText}>Connect →</Text>
+          </View>
+        </TouchableOpacity>
 
-          {/* Card 2: Domain Registrar → More */}
+        {/* Card 2: Domain Registrar → More */}
+        {(isFeatureEnabled('domains') || isFeatureEnabled('providers')) && (
           <TouchableOpacity
             style={[
               styles.quickConnectCard,
@@ -462,8 +522,10 @@ export default function DashboardScreen() {
               <Text style={styles.quickConnectBtnText}>Connect →</Text>
             </View>
           </TouchableOpacity>
+        )}
 
-          {/* Card 3: Cloud Servers → More */}
+        {/* Card 3: Cloud Servers → More */}
+        {(isFeatureEnabled('servers') || isFeatureEnabled('providers')) && (
           <TouchableOpacity
             style={[
               styles.quickConnectCard,
@@ -483,13 +545,20 @@ export default function DashboardScreen() {
               <Text style={styles.quickConnectBtnText}>Connect →</Text>
             </View>
           </TouchableOpacity>
-        </ScrollView>
+        )}
+      </ScrollView>
+    </View>
+  );
 
-        {/* Recent Activity Section */}
-        <View style={[styles.sectionHeader, { marginTop: Spacing.xl }]}>
+  const renderActivitySection = (title?: string) => {
+    if (!isFeatureEnabled('alerts')) return null;
+
+    return (
+      <View key="sec_alerts" style={{ marginBottom: Spacing.xl }}>
+        <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderLeft}>
             <Text style={styles.sectionIcon}>📈</Text>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{title || 'Recent Activity'}</Text>
             {alerts.length > 0 && (
               <View style={[styles.activityBadge, { backgroundColor: colors.primaryMuted }]}>
                 <Text style={[styles.activityBadgeText, { color: colors.primary }]}>{alerts.length}</Text>
@@ -622,6 +691,74 @@ export default function DashboardScreen() {
             )}
           </View>
         )}
+      </View>
+    );
+  };
+
+  const renderSectionByKey = (section: (typeof homeSections)[0]) => {
+    switch (section.sectionKey) {
+      case 'banner':
+        return (
+          <View key="sec_banner">
+            {renderAnnouncements()}
+            {renderHeroCard()}
+          </View>
+        );
+      case 'stats':
+        return renderStatsSection(section.title);
+      case 'quickActions':
+        return renderQuickConnectSection(section.title);
+      case 'alerts':
+        return renderActivitySection(section.title);
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View style={[styles.headerBar, { borderBottomColor: colors.borderSubtle }]}>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require('../../../assets/images/icon.png')}
+            style={{ width: 26, height: 26, borderRadius: 6 }}
+            resizeMode="contain"
+          />
+          <Text style={[styles.brandText, { color: colors.text }]}>{appBranding.appName || 'DomainPulse'}</Text>
+        </View>
+
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.bellButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            onPress={() => router.push('/(tabs)/alerts')}
+            activeOpacity={0.7}
+            accessibilityLabel="Alerts"
+          >
+            <Ionicons name="notifications-outline" size={17} color={colors.textSecondary} />
+            {unreadAlertsCount > 0 && (
+              <View style={[styles.unreadDot, { borderColor: colors.surfaceElevated }]} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.avatarButton, { backgroundColor: colors.primaryMuted, borderColor: colors.primary }]}
+            onPress={() => router.push('/(tabs)/more')}
+            activeOpacity={0.7}
+            accessibilityLabel="Settings"
+          >
+            <Ionicons name="settings-outline" size={18} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {sortedSections.map((section) => renderSectionByKey(section))}
       </ScrollView>
     </View>
   );
@@ -992,6 +1129,38 @@ const styles = StyleSheet.create({
   },
   seeAllActivitiesText: {
     fontSize: 13,
+    fontWeight: '700',
+  },
+  announcementCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: Spacing.md,
+    gap: 6,
+  },
+  announcementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  announcementTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+  },
+  announcementMessage: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  announcementBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  announcementBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: '700',
   },
 });
