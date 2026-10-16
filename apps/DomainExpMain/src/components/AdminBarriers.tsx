@@ -111,7 +111,11 @@ export function UpdateRequiredBarrier() {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 9999,
     justifyContent: 'center',
     alignItems: 'center',

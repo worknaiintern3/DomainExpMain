@@ -174,7 +174,7 @@ export default function DashboardScreen() {
   // Sort home sections by admin-persisted order and filter visible ones
   const sortedSections = useMemo(() => {
     return [...homeSections]
-      .filter((sec) => sec.isVisible !== false)
+      .filter((sec) => sec.enabled !== false && (sec as any).isVisible !== false)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [homeSections]);
 
@@ -219,6 +219,8 @@ export default function DashboardScreen() {
             ? 'sparkles'
             : 'information-circle';
 
+          const actionLabel = ann.actionLabel || (ann as any).actionText;
+
           return (
             <View
               key={ann.id}
@@ -236,7 +238,7 @@ export default function DashboardScreen() {
               <Text style={[styles.announcementMessage, { color: colors.textSecondary }]}>
                 {ann.message}
               </Text>
-              {Boolean(ann.actionUrl && ann.actionText) && (
+              {Boolean(ann.actionUrl && actionLabel) && (
                 <TouchableOpacity
                   style={[styles.announcementBtn, { backgroundColor: bannerTextColor }]}
                   onPress={() => {
@@ -248,7 +250,7 @@ export default function DashboardScreen() {
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.announcementBtnText}>{ann.actionText}</Text>
+                  <Text style={styles.announcementBtnText}>{actionLabel}</Text>
                 </TouchableOpacity>
               )}
             </View>

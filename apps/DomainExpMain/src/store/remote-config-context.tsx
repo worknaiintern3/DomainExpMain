@@ -7,7 +7,7 @@ import React, {
   useMemo,
   type ReactNode,
 } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem, setItem } from '../services/storage';
 import { getEffectiveApiUrl } from '../services/api';
 
 const REMOTE_CONFIG_CACHE_KEY = '@domainpulse_mobile_remote_config';
@@ -45,6 +45,7 @@ export interface RemoteHomeSection {
   title: string;
   sortOrder: number;
   enabled: boolean;
+  isVisible?: boolean;
   configJson?: Record<string, unknown> | null;
 }
 
@@ -64,6 +65,7 @@ export interface RemoteAnnouncement {
   type: 'info' | 'warning' | 'critical' | 'promo';
   actionUrl?: string | null;
   actionLabel?: string | null;
+  actionText?: string | null;
   isActive: boolean;
   startsAt?: string | null;
   expiresAt?: string | null;
@@ -182,7 +184,7 @@ export function RemoteConfigProvider({ children }: { children: ReactNode }) {
         if (data && data.app && data.features) {
           setConfig(data);
           // Persist to local cache for instant boot next time
-          AsyncStorage.setItem(REMOTE_CONFIG_CACHE_KEY, JSON.stringify(data)).catch(() => {});
+          setItem(REMOTE_CONFIG_CACHE_KEY, JSON.stringify(data)).catch(() => {});
           return;
         }
       }
@@ -192,7 +194,7 @@ export function RemoteConfigProvider({ children }: { children: ReactNode }) {
 
     // Try loading cached config
     try {
-      const cached = await AsyncStorage.getItem(REMOTE_CONFIG_CACHE_KEY);
+      const cached = await getItem(REMOTE_CONFIG_CACHE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached) as RemoteBootstrapConfig;
         if (parsed?.app && parsed?.features) {

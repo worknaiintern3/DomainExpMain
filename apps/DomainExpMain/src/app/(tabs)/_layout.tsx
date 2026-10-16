@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Tabs, Redirect } from 'expo-router';
 import {
   View,
@@ -284,7 +284,7 @@ function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarPr
   const activeRouteName = state.routes[state.index]?.name;
   const activeVisibleIndex = Math.max(
     0,
-    visibleRoutes.findIndex((r) => r.name === activeRouteName)
+    visibleRoutes.findIndex((r: { name: string }) => r.name === activeRouteName)
   );
 
   const paddingH = 6;
@@ -360,7 +360,7 @@ function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
         {/* Tabs Row */}
         <View style={styles.tabsRow}>
-          {visibleRoutes.map((route) => {
+          {visibleRoutes.map((route: { key: string; name: string }) => {
             const isFocused = route.name === activeRouteName;
 
             const onPress = () => {
