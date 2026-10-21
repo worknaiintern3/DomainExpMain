@@ -37,7 +37,7 @@ function stateBadge(state: DomainAvailabilityResult['state']): string {
 function describeResult(result: DomainAvailabilityResult): string {
   switch (result.state) {
     case 'AVAILABLE':
-      return result.definitive ? 'Available · live check' : 'Available';
+      return result.definitive ? 'Available · live check' : 'Possibly available · verify with registrar';
     case 'PREMIUM':
       return 'Available · premium tier';
     case 'UNAVAILABLE':
@@ -88,7 +88,7 @@ export const DomainLookupInspector: React.FC<DomainLiveInspectorProps> = ({
             </span>
           </div>
           <span className="font-caption-xs text-caption-xs text-secondary mt-0.5">
-            Live registrar availability · per-provider results
+            Backend availability estimate · verify with a registrar
           </span>
         </div>
         <button

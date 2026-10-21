@@ -12,12 +12,10 @@ export const PricingDisclaimer: React.FC = () => {
           info
         </span>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          <strong className="font-label-md text-on-surface">Live registrar pricing:</strong>{' '}
-          Prices are fetched in real time from each registrar&apos;s official API and shown in that
-          registrar&apos;s own currency. Nothing is converted. GoDaddy prices are indicative until
-          a quote locks them. Multi-year totals and savings comparisons are estimates from those
-          returned prices. Taxes, promotions and fees can change the final price, so verify with
-          the registrar before registering.
+          <strong className="font-label-md text-on-surface">Availability estimate:</strong>{' '}
+          The current backend checks domain availability via WHOIS/DNS,
+          but <strong className="text-amber-700">does not provide live registrar prices</strong>. An available result may use a DNS fallback and is not a purchase guarantee.
+          Confirm availability and the final price directly with a registrar before purchasing.
         </p>
       </div>
       <div className="flex items-center gap-unit-md shrink-0 ml-unit-base">

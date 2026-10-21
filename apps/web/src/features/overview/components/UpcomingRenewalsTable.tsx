@@ -172,7 +172,7 @@ export const UpcomingRenewalsTable: React.FC<UpcomingRenewalsTableProps> = ({ re
                   />
                 </td>
                 <td className="px-unit-md py-2">
-                  <Link to={`/domains/${row.domain}`} className="flex items-center gap-unit-sm">
+                  <Link to={`/domains/${row.id}`} className="flex items-center gap-unit-sm">
                     <div
                       className={`w-6 h-6 rounded ${row.initialBgClass} flex items-center justify-center ${row.initialTextClass} font-label-mono text-[11px] font-bold shrink-0`}
                     >
@@ -243,7 +243,7 @@ export const UpcomingRenewalsTable: React.FC<UpcomingRenewalsTableProps> = ({ re
                 <td className="px-unit-md py-2 text-right">
                   <div className="inline-flex items-center gap-unit-xs">
                     <Link
-                      to={`/domains/${row.domain}`}
+                      to={`/domains/${row.id}`}
                       className={`h-7 px-unit-sm rounded font-caption-xs text-caption-xs font-semibold transition-colors flex items-center justify-center ${
                         row.status === 'critical'
                           ? 'bg-primary text-on-primary hover:bg-tertiary shadow-sm'

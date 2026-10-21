@@ -12,25 +12,28 @@ const apiRequestMock = vi.mocked(apiRequest);
 
 beforeEach(() => {
   apiRequestMock.mockReset();
-  apiRequestMock.mockResolvedValue({ domain: 'example.com', results: [] });
+  apiRequestMock.mockResolvedValue([{ domain: 'example.com', tld: '.com', available: false, nameservers: [] }]);
 });
 
 describe('domain-search adapter', () => {
-  it('queries the fixed search path with an encoded domain and signal', async () => {
+  it('queries the deployed availability endpoint and marks its result as an estimate', async () => {
     const controller = new AbortController();
-    await searchDomainAvailability('Example.COM.', controller.signal);
+    const response = await searchDomainAvailability('Example.COM.', controller.signal);
 
     expect(apiRequestMock).toHaveBeenCalledTimes(1);
     const [path, options] = apiRequestMock.mock.calls[0] as [string, { signal?: AbortSignal }];
-    expect(path).toBe('/domain-search?domain=Example.COM.');
+    expect(path).toBe('/whois/availability?query=example&tlds=.com');
     expect(options.signal).toBe(controller.signal);
+    expect(response.results[0]).toMatchObject({ provider: 'whois', state: 'UNAVAILABLE', definitive: false, registrationPriceMinorUnits: null });
   });
 
   it('encodes special characters in the domain query', async () => {
-    await searchDomainAvailability('münchen.de');
+    apiRequestMock.mockResolvedValue([{ domain: 'münchen.de', tld: '.de', available: true, nameservers: [] }]);
+    const response = await searchDomainAvailability('münchen.de');
 
     const [path] = apiRequestMock.mock.calls[0] as [string];
-    expect(path).toBe('/domain-search?domain=m%C3%BCnchen.de');
+    expect(path).toBe('/whois/availability?query=m%C3%BCnchen&tlds=.de');
+    expect(response.results[0]).toMatchObject({ state: 'AVAILABLE', definitive: false, currency: null });
   });
 
   it('formats minor units only when both amount and currency exist', () => {

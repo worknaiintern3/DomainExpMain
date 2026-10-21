@@ -63,7 +63,10 @@ const VALIDATION_ERROR_LABELS: Record<string, string> = {
 };
 
 function safeErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) return error.detail;
+  if (error instanceof ApiError) {
+    if (error.status >= 500) return 'The deployed backend could not load provider connections (server error). Check its logs and database migrations, then retry.';
+    return error.detail;
+  }
   return fallback;
 }
 

@@ -145,7 +145,9 @@ export const GooglePlayPage: React.FC = () => {
     setActionError(null);
     setNotice(null);
     try {
-      const { authUrl } = await startGooglePlayAuth();
+      const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+      const redirectUri = env?.VITE_GOOGLE_PLAY_REDIRECT_URI?.trim();
+      const { authUrl } = await startGooglePlayAuth(redirectUri ? { redirectUri } : {});
       awaitingOAuthRef.current = true;
       const popup = window.open(authUrl, '_blank');
       if (!popup) {

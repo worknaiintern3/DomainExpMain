@@ -146,6 +146,7 @@ export const PricingPage: React.FC = () => {
   const currencies = useMemo(() => pricedCurrencies(results), [results]);
 
   const hasResults = searchState === 'results' && results.length > 0;
+  const availabilityOnly = hasResults && results.every((result) => result.provider === 'whois');
   const allUnconfigured = hasResults && results.every((r) => r.state === 'UNCONFIGURED');
   const unconfiguredCount = results.filter((r) => r.state === 'UNCONFIGURED').length;
   const definitive = results.filter(isDefinitive);
@@ -164,7 +165,7 @@ export const PricingPage: React.FC = () => {
         <div className="px-unit-base py-2 rounded-lg bg-secondary-container/40 flex items-center justify-between gap-unit-sm border border-secondary-container">
           <div className="flex items-center gap-unit-xs text-caption-xs font-caption-xs">
             <span className="material-symbols-outlined text-primary text-[18px]">travel_explore</span>
-            <span className="text-secondary">Comparing live registrar pricing for:</span>
+            <span className="text-secondary">Checking domain availability for:</span>
             <span className="font-label-mono font-bold text-primary text-body-sm">{activeDomain}</span>
             {tldShortcutOf(activeDomain) && (
               <span className="px-1.5 py-0.2 rounded bg-secondary-container text-primary font-semibold text-[10px]">
@@ -205,7 +206,7 @@ export const PricingPage: React.FC = () => {
 
         {searchState === 'loading' && (
           <p role="status" className="font-caption-xs text-caption-xs text-secondary">
-            Fetching live prices from registrars…
+            Checking domain availability…
           </p>
         )}
 
@@ -287,11 +288,20 @@ export const PricingPage: React.FC = () => {
           </aside>
         )}
 
+        {availabilityOnly && activeDomain && (
+          <aside className="rounded-xl border border-amber-200 bg-amber-50 px-unit-base py-unit-md text-body-sm text-amber-950" role="status">
+            <strong>{results[0]?.available ? 'Possibly available' : 'Likely registered'}: {activeDomain}.</strong>{' '}
+            The deployed backend returned an availability estimate, but has no registrar price comparison endpoint.
+            Registration, renewal and transfer prices cannot be shown until that service is deployed.
+            Check availability and prices directly with a registrar before buying.
+          </aside>
+        )}
+
         {/* SUMMARY STRIP */}
-        {hasResults && <PricingSummaryStrip results={results} />}
+        {hasResults && !availabilityOnly && <PricingSummaryStrip results={results} />}
 
         {/* OWNERSHIP COST BENCHMARK */}
-        {hasResults && (
+        {hasResults && !availabilityOnly && (
           <OwnershipCostBenchmark
             results={results}
             horizon={horizon}
@@ -301,7 +311,7 @@ export const PricingPage: React.FC = () => {
         )}
 
         {/* MAIN DATA MATRIX & PROVIDER INSPECTION DRAWER (SPLIT VIEW) */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-unit-md items-start">
+        {!availabilityOnly && <div className="grid grid-cols-1 xl:grid-cols-12 gap-unit-md items-start">
           <div className="xl:col-span-8">
             <RegistrarComparisonMatrix
               results={sortedResults}
@@ -317,10 +327,10 @@ export const PricingPage: React.FC = () => {
           <div className="xl:col-span-4">
             <PricingInspector result={hasResults ? selectedResult : undefined} />
           </div>
-        </div>
+        </div>}
 
         {/* TRANSFER SAVINGS CALCULATOR */}
-        {hasResults && <TransferSavingsCalculator results={results} domain={activeDomain} />}
+        {hasResults && !availabilityOnly && <TransferSavingsCalculator results={results} domain={activeDomain} />}
       </div>
 
       {/* Methodology Modal */}
@@ -351,17 +361,13 @@ export const PricingPage: React.FC = () => {
 
             <div className="flex flex-col gap-unit-sm text-body-sm text-secondary leading-relaxed">
               <p>
-                <strong>Live sources.</strong> Each search queries the registrars&apos; official
-                APIs in real time through DomainPulse&apos;s central service accounts.{' '}
-                <strong>GoDaddy</strong>: availability pricing (indicative, not a locked quote).{' '}
-                <strong>Namecheap</strong>: the official price list (list price; the separate ICANN
-                fee is not added). <strong>Cloudflare</strong>: Registrar domain-check pricing
-                (registration and renewal; no transfer price is returned).
+                <strong>Current source.</strong> The deployed backend uses its domain availability
+                endpoint. It may fall back to DNS checks, so the result is an estimate. Confirm
+                availability with a registrar.
               </p>
               <p>
-                <strong>Only what the API returns.</strong> A dash means the registrar did not
-                return that price. Nothing is estimated, scraped or filled in. Prices are only
-                returned for domains that can be registered right now.
+                <strong>Pricing.</strong> This backend does not currently provide registrar quotes.
+                The website does not invent prices. Live comparison needs a pricing endpoint.
               </p>
               <p>
                 <strong>Currencies.</strong> Each registrar is shown in its own currency. There is no

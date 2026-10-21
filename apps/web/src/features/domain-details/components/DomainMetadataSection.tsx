@@ -69,9 +69,9 @@ const Field: React.FC<{ label: string; value: React.ReactNode }> = ({ label, val
   </div>
 );
 
-const Values: React.FC<{ empty?: string; values: readonly string[] }> = ({ empty = 'None reported', values }) => (
-  values.length > 0
-    ? <ul className="space-y-1">{values.map((value) => <li className="break-all font-label-mono text-caption-xs" key={value}>{value}</li>)}</ul>
+const Values: React.FC<{ empty?: string; values?: readonly string[] | null }> = ({ empty = 'None reported', values }) => (
+  (values?.length ?? 0) > 0
+    ? <ul className="space-y-1">{values?.map((value) => <li className="break-all font-label-mono text-caption-xs" key={value}>{value}</li>)}</ul>
     : <span className="text-secondary">{empty}</span>
 );
 
@@ -140,8 +140,8 @@ const RdapCard: React.FC<{
         <Field label="Domain statuses" value={<Values values={metadata.statuses} />} />
         <Field label="Nameservers" value={<Values values={metadata.nameservers} />} />
         <Field label="Registration events" value={
-          metadata.events.length > 0
-            ? <ul className="space-y-1">{metadata.events.map((event) => <li key={`${event.action}:${event.date}`} className="text-caption-xs">{event.action} · {formatDate(event.date)}</li>)}</ul>
+          (metadata.events?.length ?? 0) > 0
+            ? <ul className="space-y-1">{metadata.events?.map((event) => <li key={`${event.action}:${event.date}`} className="text-caption-xs">{event.action} · {formatDate(event.date)}</li>)}</ul>
             : <span className="text-secondary">None reported</span>
         } />
         <Field label="Abuse contact emails" value={<Values empty="Unavailable" values={metadata.abuseEmails} />} />
@@ -157,7 +157,7 @@ const DnsCard: React.FC<{
   onRetrySource?: () => void;
   retrying?: boolean;
 }> = ({ metadata, onRetrySource, retrying }) => {
-  const recordErrors = metadata ? Object.entries(metadata.recordErrors) : [];
+  const recordErrors = metadata ? Object.entries(metadata.recordErrors ?? {}) : [];
   return (
     <MetadataCard icon="dns" metadata={metadata} onRetrySource={onRetrySource} retrying={retrying} source="dns" title="DNS">
       {metadata && (
@@ -165,15 +165,15 @@ const DnsCard: React.FC<{
           <Field label="A" value={<Values values={metadata.aRecords} />} />
           <Field label="AAAA" value={<Values values={metadata.aaaaRecords} />} />
           <Field label="CNAME" value={<Values values={metadata.cnameRecords} />} />
-          <Field label="MX" value={<Values values={metadata.mxRecords.map(({ exchange, priority }) => `${priority} ${exchange}`)} />} />
+          <Field label="MX" value={<Values values={metadata.mxRecords?.map(({ exchange, priority }) => `${priority} ${exchange}`)} />} />
           <Field label="NS" value={<Values values={metadata.nsRecords} />} />
           <Field label="CAA" value={<Values values={metadata.caaRecords} />} />
           <Field label="SOA" value={metadata.soaRecord ? `${metadata.soaRecord.mname} · serial ${metadata.soaRecord.serial}` : 'Not reported'} />
-          <Field label="SRV" value={<Values values={metadata.srvRecords.map(({ name, port, priority, target, weight }) => `${name} ${priority} ${weight} ${port} ${target}`)} />} />
-          <Field label="DS records retrieved" value={<Values values={metadata.dsRecords.map(({ algorithm, digest, digestType, keyTag }) => `${keyTag} ${algorithm} ${digestType} ${digest}`)} />} />
-          <Field label="DNSKEY records retrieved" value={<Values values={metadata.dnskeyRecords.map(({ algorithm, flags }) => `flags ${flags} · alg ${algorithm}`)} />} />
-          <Field label="RRSIG records retrieved" value={<Values values={metadata.rrsigRecords.map(({ keyTag, signerName, typeCovered }) => `${typeCovered} · ${signerName} · key ${keyTag}`)} />} />
-          <Field label="TXT" value={`${metadata.txtRecordCount} TXT ${metadata.txtRecordCount === 1 ? 'record' : 'records'} detected`} />
+          <Field label="SRV" value={<Values values={metadata.srvRecords?.map(({ name, port, priority, target, weight }) => `${name} ${priority} ${weight} ${port} ${target}`)} />} />
+          <Field label="DS records retrieved" value={<Values values={metadata.dsRecords?.map(({ algorithm, digest, digestType, keyTag }) => `${keyTag} ${algorithm} ${digestType} ${digest}`)} />} />
+          <Field label="DNSKEY records retrieved" value={<Values values={metadata.dnskeyRecords?.map(({ algorithm, flags }) => `flags ${flags} · alg ${algorithm}`)} />} />
+          <Field label="RRSIG records retrieved" value={<Values values={metadata.rrsigRecords?.map(({ keyTag, signerName, typeCovered }) => `${typeCovered} · ${signerName} · key ${keyTag}`)} />} />
+          <Field label="TXT" value={metadata.txtRecordCount == null ? 'Not reported' : `${metadata.txtRecordCount} TXT ${metadata.txtRecordCount === 1 ? 'record' : 'records'} detected`} />
           {recordErrors.length > 0 && (
             <Field label="Partial lookup details" value={<ul>{recordErrors.map(([type, code]) => <li key={type}>{type}: {humanizeCode(code)}</li>)}</ul>} />
           )}
@@ -224,8 +224,8 @@ const TlsCard: React.FC<{
         <Field label="Serial number" value={metadata.serialNumber ?? 'Not reported'} />
         <Field label="SHA-256 fingerprint" value={<span className="break-all font-label-mono text-caption-xs">{metadata.fingerprint256 ?? 'Not reported'}</span>} />
         <Field label="Chain" value={
-          metadata.chain.length > 0
-            ? <ul className="space-y-1">{metadata.chain.map((entry, index) => <li key={index} className="text-caption-xs">{entry.subject ?? 'Unknown subject'} · issued by {entry.issuer ?? 'unknown issuer'}</li>)}</ul>
+          (metadata.chain?.length ?? 0) > 0
+            ? <ul className="space-y-1">{metadata.chain?.map((entry, index) => <li key={index} className="text-caption-xs">{entry.subject ?? 'Unknown subject'} · issued by {entry.issuer ?? 'unknown issuer'}</li>)}</ul>
             : <span className="text-secondary">None reported</span>
         } />
       </>
@@ -245,8 +245,8 @@ const HttpCard: React.FC<{
         <Field label="HTTP status" value={metadata.httpStatus === null ? 'Not reported' : String(metadata.httpStatus)} />
         <Field label="Final URL" value={metadata.finalUrl ?? 'Not reported'} />
         <Field label="Redirect chain" value={
-          metadata.redirectChain.length > 0
-            ? <ul className="space-y-1">{metadata.redirectChain.map((entry) => <li key={entry.url} className="break-all text-caption-xs">{entry.status ?? '—'} · {entry.url}</li>)}</ul>
+          (metadata.redirectChain?.length ?? 0) > 0
+            ? <ul className="space-y-1">{metadata.redirectChain?.map((entry) => <li key={entry.url} className="break-all text-caption-xs">{entry.status ?? '—'} · {entry.url}</li>)}</ul>
             : <span className="text-secondary">No redirects</span>
         } />
         <Field label="Response time" value={metadata.responseTimeMs === null ? 'Not reported' : `${metadata.responseTimeMs} ms`} />
@@ -255,8 +255,8 @@ const HttpCard: React.FC<{
         <Field label="Server header" value={metadata.serverHeader ?? 'Not reported'} />
         <Field label="HSTS" value={metadata.hstsEnabled === null ? 'Not reported' : metadata.hstsEnabled ? 'Enabled' : 'Not enabled'} />
         <Field label="Security headers" value={
-          Object.keys(metadata.securityHeaders).length > 0
-            ? <ul className="space-y-1">{Object.entries(metadata.securityHeaders).map(([name, value]) => <li key={name} className="break-all text-caption-xs">{name}: {value.slice(0, 120)}</li>)}</ul>
+          Object.keys(metadata.securityHeaders ?? {}).length > 0
+            ? <ul className="space-y-1">{Object.entries(metadata.securityHeaders ?? {}).map(([name, value]) => <li key={name} className="break-all text-caption-xs">{name}: {value.slice(0, 120)}</li>)}</ul>
             : <span className="text-secondary">None reported</span>
         } />
       </>

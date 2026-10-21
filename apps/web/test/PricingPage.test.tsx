@@ -124,7 +124,7 @@ describe('PricingPage live registrar pricing', () => {
     expect(screen.queryByText(/Illustrative Benchmark/iu)).not.toBeInTheDocument();
     expect(screen.queryByText(/Future capability/iu)).not.toBeInTheDocument();
     expect(screen.queryByText(/Saved Comparisons/iu)).not.toBeInTheDocument();
-    expect(screen.getByText(/Live registrar pricing:/iu)).toBeInTheDocument();
+    expect(screen.getByText(/Availability estimate:/iu)).toBeInTheDocument();
   });
 
   it('renders the real registrar prices for a domain in the comparison table', async () => {
@@ -193,7 +193,7 @@ describe('PricingPage live registrar pricing', () => {
     compare('example.com');
 
     expect(await screen.findAllByTestId('pricing-skeleton-row')).toHaveLength(3);
-    expect(screen.getByRole('status')).toHaveTextContent(/Fetching live prices/iu);
+    expect(screen.getByRole('status')).toHaveTextContent(/Checking domain availability/iu);
     expect(screen.queryByText(/\$11\.99/u)).not.toBeInTheDocument();
 
     resolveSearch(livePricing('example.com'));

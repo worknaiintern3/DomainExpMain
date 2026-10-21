@@ -1,6 +1,6 @@
 import { apiRequest } from './client';
 
-export type DomainAvailabilityProvider = 'godaddy' | 'namecheap' | 'cloudflare';
+export type DomainAvailabilityProvider = 'godaddy' | 'namecheap' | 'cloudflare' | 'whois';
 
 export type DomainAvailabilityState =
   | 'AVAILABLE'
@@ -43,14 +43,45 @@ export const AVAILABILITY_PROVIDER_LABELS: Record<DomainAvailabilityProvider, st
   cloudflare: 'Cloudflare',
   godaddy: 'GoDaddy',
   namecheap: 'Namecheap',
+  whois: 'Domain availability check',
 };
 
-/** Live registrar availability and pricing for one fully-qualified domain name. */
-export function searchDomainAvailability(
+type WhoisAvailability = { domain: string; tld: string; available: boolean; nameservers: string[] };
+
+/** The deployed backend provides availability but no registrar pricing endpoint. */
+export async function searchDomainAvailability(
   domain: string,
   signal?: AbortSignal,
 ): Promise<DomainSearchResponse> {
-  return apiRequest(`/domain-search?domain=${encodeURIComponent(domain)}`, { signal });
+  const normalized = domain.trim().toLowerCase().replace(/\.$/u, '');
+  const dot = normalized.indexOf('.');
+  if (dot < 1 || dot === normalized.length - 1) throw new Error('Enter a full domain name.');
+  const query = normalized.slice(0, dot);
+  const tld = normalized.slice(dot);
+  const search = new URLSearchParams({ query, tlds: tld });
+  const checks = await apiRequest<WhoisAvailability[]>(`/whois/availability?${search.toString()}`, { signal });
+  const check = checks.find((entry) => entry.domain.toLowerCase() === normalized);
+  if (!check) throw new Error('The availability service returned no result for this domain.');
+  return {
+    domain: normalized,
+    results: [{
+      provider: 'whois',
+      domain: normalized,
+      state: check.available ? 'AVAILABLE' : 'UNAVAILABLE',
+      available: check.available,
+      definitive: false,
+      currency: null,
+      registrationPriceMinorUnits: null,
+      renewalPriceMinorUnits: null,
+      transferPriceMinorUnits: null,
+      pricingNature: 'UNKNOWN',
+      premium: false,
+      tier: null,
+      reason: 'Availability is an estimate. Confirm with a registrar before purchasing.',
+      errorCode: null,
+      fetchedAt: new Date().toISOString(),
+    }],
+  };
 }
 
 /** Fraction digits of an ISO 4217 currency (USD 2, JPY 0, TND 3); null if unknown. */

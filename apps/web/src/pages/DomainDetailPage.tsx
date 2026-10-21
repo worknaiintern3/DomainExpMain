@@ -41,8 +41,8 @@ function expiryDetail(value: string | null) {
 const POLL_INTERVAL_MS = 2500;
 const POLL_MAX_DURATION_MS = 30_000;
 
-function isTerminalSource(value: { lastAttemptStatus: string } | null): boolean {
-  return value !== null && ['SUCCESS', 'PARTIAL', 'FAILED'].includes(value.lastAttemptStatus);
+function isTerminalSource(value: { lastAttemptStatus: string } | null | undefined): boolean {
+  return value != null && ['SUCCESS', 'PARTIAL', 'FAILED'].includes(value.lastAttemptStatus);
 }
 
 function isMetadataTerminal(response: DomainMetadataResponse | null, sources?: readonly DomainMetadataSource[]): boolean {

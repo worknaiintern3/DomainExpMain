@@ -85,7 +85,7 @@ export async function listProviderResourceCapabilities(signal?: AbortSignal): Pr
   try {
     return await apiRequest('/provider-connections/capabilities', { signal });
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    if (!(error instanceof ApiError) || (error.status !== 404 && error.status !== 400)) throw error;
     return backendProviderResourceCapabilities();
   }
 }

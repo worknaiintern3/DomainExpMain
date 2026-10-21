@@ -9,6 +9,7 @@ export const PROVIDER_ICONS: Record<DomainAvailabilityProvider, string> = {
   cloudflare: 'cloud',
   godaddy: 'language',
   namecheap: 'tag',
+  whois: 'travel_explore',
 };
 
 export interface StatusPresentation {
@@ -20,6 +21,11 @@ export interface StatusPresentation {
 
 /** Truthful per-provider status: never implies availability the API did not confirm. */
 export function describeStatus(result: DomainAvailabilityResult): StatusPresentation {
+  if (result.provider === 'whois') {
+    return result.available
+      ? { className: 'bg-amber-50 text-amber-800 border-amber-200/50', detail: result.reason, label: 'Possibly available' }
+      : { className: 'bg-rose-50 text-rose-700 border-rose-200/50', detail: result.reason, label: 'Likely registered' };
+  }
   switch (result.state) {
     case 'AVAILABLE':
       return result.errorCode !== null

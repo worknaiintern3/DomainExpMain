@@ -52,8 +52,8 @@ function aggregateStatus(results: DomainAvailabilityResult[]): DomainAvailabilit
 }
 
 function statusLabel(status: DomainAvailabilityStatus, premium: boolean): string {
-  if (status === 'available') return premium ? 'Available · Premium' : 'Available';
-  if (status === 'registered') return 'Registered';
+  if (status === 'available') return premium ? 'Available · Premium' : 'Possibly available';
+  if (status === 'registered') return 'Likely registered';
   return 'Unknown';
 }
 

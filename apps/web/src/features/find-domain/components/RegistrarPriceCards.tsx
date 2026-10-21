@@ -72,11 +72,11 @@ export const RegistrarPriceCards: React.FC<RegistrarPriceCardsProps> = ({
                   isAvailable ? 'bg-emerald-500' : 'bg-rose-500'
                 }`}
               ></span>
-              {isAvailable ? 'Available' : 'Registered'}
+              {isAvailable ? 'Possibly available' : 'Likely registered'}
             </span>
           </div>
           <span className="font-caption-xs text-caption-xs text-secondary mt-0.5">
-            Live registrar pricing · only what providers returned
+            Registrar pricing is unavailable on this backend
           </span>
         </div>
         <span className="material-symbols-outlined text-[20px] text-primary">price_change</span>
@@ -129,15 +129,14 @@ export const RegistrarPriceCards: React.FC<RegistrarPriceCardsProps> = ({
         </>
       ) : (
         <p className="font-caption-xs text-caption-xs text-secondary rounded-lg bg-surface-container-low p-unit-sm border border-outline-variant/20">
-          No live pricing returned by registrars for this domain. Availability above is
-          still a real registry result.
+          No registrar prices are available from this backend. The availability result is an
+          estimate; confirm both availability and price with a registrar.
         </p>
       )}
 
       {/* Footnote Disclaimer */}
       <p className="font-caption-xs text-caption-xs text-secondary italic">
-        Live registry results from registrar providers. Prices are indicative; confirm at
-        registration. DomainPulse does not sell domains directly.
+        Availability may use a DNS fallback. DomainPulse does not sell domains directly.
       </p>
     </div>
   );

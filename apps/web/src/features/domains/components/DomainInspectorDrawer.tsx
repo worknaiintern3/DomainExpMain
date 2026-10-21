@@ -152,7 +152,7 @@ export const DomainInspectorDrawer: React.FC<DomainInspectorDrawerProps> = ({
       {/* Action CTAs */}
       <div className="flex flex-col gap-unit-xs mt-unit-xs">
         <Link
-          to={`/domains/${domain.domain}`}
+          to={`/domains/${domain.id}`}
           className="w-full h-9 rounded-lg bg-primary text-on-primary font-label-md text-label-md shadow-sm hover:bg-primary-container flex items-center justify-center gap-1.5 transition-colors"
         >
           <span className="material-symbols-outlined text-[16px]">payment</span>
@@ -167,7 +167,7 @@ export const DomainInspectorDrawer: React.FC<DomainInspectorDrawerProps> = ({
             Edit Domain
           </button>
           <button
-            onClick={() => navigate(`/domains/${domain.domain}`)}
+            onClick={() => navigate(`/domains/${domain.id}`)}
             className="h-8 rounded-lg bg-surface-container text-on-surface font-label-md text-caption-xs hover:bg-surface-container-high transition-colors border border-outline-variant/30"
             type="button"
           >
