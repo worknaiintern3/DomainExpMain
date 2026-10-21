@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-const PRODUCTION_API_URL = 'https://app.domainexp.info/api/v1';
+const PRODUCTION_API_URL = 'https://app.domainexprt.com/api/v1';
 const LOCAL_BACKEND_URL = 'http://192.168.1.39:4000/api/v1';
 
 const getInitialApiUrl = (): string => {

@@ -43,7 +43,7 @@ class PreflightTests(unittest.TestCase):
         if args == ('ss', '-H', '-ltn'):
             return 'LISTEN 0 4096 127.0.0.1:5011 0.0.0.0:*\n'
         if args == ('docker', 'exec', preflight.CENTRAL, 'nginx', '-T'):
-            return '# configuration file ' + preflight.TARGET + ':\n' + (DEPLOY / 'nginx/app.domainexp.info.conf').read_text()
+            return '# configuration file ' + preflight.TARGET + ':\n' + (DEPLOY / 'nginx/app.domainexprt.com.conf').read_text()
         raise AssertionError('Unexpected or mutating command: ' + repr(args))
 
     def check(self):
@@ -102,13 +102,13 @@ class EnvironmentTests(unittest.TestCase):
     def setUp(self):
         self.env = read_env(DEPLOY / '.env.example')
         self.env.update({
-            'RUN_MIGRATIONS': 'true', 'CORS_ORIGINS': 'https://app.domainexp.info',
+            'RUN_MIGRATIONS': 'true', 'CORS_ORIGINS': 'https://app.domainexprt.com',
             'DATABASE_URL': 'postgresql://api:password@domainexp_app_postgres:5432/domainpulse',
             'MIGRATION_DATABASE_URL': 'postgresql://owner:password@domainexp_app_postgres:5432/domainpulse',
             'JWT_ACCESS_TOKEN_SECRET': base64.urlsafe_b64encode(bytes(range(32))).decode().rstrip('='),
             'PROVIDER_CREDENTIAL_ENCRYPTION_KEY_V1': base64.b64encode(bytes(range(32, 64))).decode(),
             'GOOGLE_OAUTH_CLIENT_ID': 'configured-client', 'GOOGLE_OAUTH_CLIENT_SECRET': 'configured-secret',
-            'GOOGLE_OAUTH_REDIRECT_URI': 'https://app.domainexp.info/auth/google/callback',
+            'GOOGLE_OAUTH_REDIRECT_URI': 'https://app.domainexprt.com/auth/google/callback',
         })
 
     def test_valid_production_environment(self):

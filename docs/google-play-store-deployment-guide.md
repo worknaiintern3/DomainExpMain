@@ -70,9 +70,9 @@ Take control of your cloud portfolio. Download DomainPulse today and never let a
 - **Category**: Productivity / Tools / Business
 - **Tags**: Developer Tools, Cloud Computing, System Utilities, Monitoring, Domain Name
 - **Developer Email**: `support@domainpulse.io` (or your company email)
-- **Privacy Policy URL**: `https://app.domainexp.info/privacy` (Served directly from live backend, or host `docs/privacy-policy.html`)
-- **Live Backend Server**: `https://app.domainexp.info` (API base: `https://app.domainexp.info/api/v1`)
-- **Health Check Endpoint**: `https://app.domainexp.info/health` (Status: Healthy `{"status":"ok"}`)
+- **Privacy Policy URL**: `https://app.domainexprt.com/privacy` (Served directly from live backend, or host `docs/privacy-policy.html`)
+- **Live Backend Server**: `https://app.domainexprt.com` (API base: `https://app.domainexprt.com/api/v1`)
+- **Health Check Endpoint**: `https://app.domainexprt.com/health` (Status: Healthy `{"status":"ok"}`)
 
 ---
 

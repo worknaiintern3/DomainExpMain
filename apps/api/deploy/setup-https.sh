@@ -35,7 +35,7 @@ if [[ ! -s "$cert_dir/live/$DOMAIN/fullchain.pem" ]]; then
 server {
     listen 80;
     listen [::]:80;
-    server_name app.domainexp.info;
+    server_name app.domainexprt.com;
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
         default_type text/plain;

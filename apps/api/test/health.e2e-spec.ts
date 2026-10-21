@@ -26,7 +26,7 @@ describe('DomainPulse API foundation', () => {
     ).toString('base64'));
     vi.stubEnv('GOOGLE_OAUTH_CLIENT_ID', 'health-test-client');
     vi.stubEnv('GOOGLE_OAUTH_CLIENT_SECRET', 'health-test-secret');
-    vi.stubEnv('GOOGLE_OAUTH_REDIRECT_URI', 'https://app.domainexp.info/auth/google/callback');
+    vi.stubEnv('GOOGLE_OAUTH_REDIRECT_URI', 'https://app.domainexprt.com/auth/google/callback');
     process.env.DATABASE_URL =
       'postgresql://phase2_user:phase2_secret@127.0.0.1:1/domainpulse_test';
     process.env.DATABASE_CONNECTION_TIMEOUT_MS = '100';

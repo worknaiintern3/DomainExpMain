@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.domainexp.info/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://app.domainexprt.com/api/v1"
       }
     },
     "preview-lan": {
@@ -31,7 +31,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.domainexp.info/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://app.domainexprt.com/api/v1"
       }
     }
   },

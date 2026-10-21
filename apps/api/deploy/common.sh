@@ -3,7 +3,7 @@ set -Eeuo pipefail
 DEPLOY_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(git -C "$DEPLOY_DIR" rev-parse --show-toplevel)"
 export DEPLOY_DIR REPO_DIR
-export DOMAIN=app.domainexp.info
+export DOMAIN=app.domainexprt.com
 export CENTRAL_NGINX=gymproplus-nginx-1
 export CONTAINER=domainexp_app_backend
 cd "$REPO_DIR"

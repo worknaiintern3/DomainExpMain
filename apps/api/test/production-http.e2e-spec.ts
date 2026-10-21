@@ -15,7 +15,7 @@ describe('production HTTP deployment', () => {
       NODE_ENV: 'production',
       LOG_LEVEL: 'silent',
       API_TRUST_PROXY_HOPS: '1',
-      CORS_ORIGINS: 'https://app.domainexp.info',
+      CORS_ORIGINS: 'https://app.domainexprt.com',
       RATE_LIMIT_MAX: '2',
       DATABASE_URL: 'postgresql://test:test@127.0.0.1:1/domainpulse_test',
       DATABASE_CONNECTION_TIMEOUT_MS: '100',
@@ -25,7 +25,7 @@ describe('production HTTP deployment', () => {
       PROVIDER_CREDENTIAL_ENCRYPTION_KEY_V1: randomBytes(32).toString('base64'),
       GOOGLE_OAUTH_CLIENT_ID: 'test-client',
       GOOGLE_OAUTH_CLIENT_SECRET: 'test-secret',
-      GOOGLE_OAUTH_REDIRECT_URI: 'https://app.domainexp.info/auth/google/callback',
+      GOOGLE_OAUTH_REDIRECT_URI: 'https://app.domainexprt.com/auth/google/callback',
     };
     for (const [key, value] of Object.entries(environment)) vi.stubEnv(key, value);
     app = await createApplication();
@@ -43,13 +43,13 @@ describe('production HTTP deployment', () => {
     const allowed = await app!.inject({
       method: 'OPTIONS', url: '/api/v1/auth/login',
       headers: {
-        origin: 'https://app.domainexp.info',
+        origin: 'https://app.domainexprt.com',
         'access-control-request-method': 'POST',
         'access-control-request-headers': 'authorization,content-type,x-workspace-id',
       },
     });
     expect(allowed.statusCode).toBe(204);
-    expect(allowed.headers['access-control-allow-origin']).toBe('https://app.domainexp.info');
+    expect(allowed.headers['access-control-allow-origin']).toBe('https://app.domainexprt.com');
     const denied = await app!.inject({
       method: 'GET', url: '/health', headers: { origin: 'https://untrusted.example' },
     });

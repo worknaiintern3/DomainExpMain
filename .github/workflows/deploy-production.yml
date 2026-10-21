@@ -52,7 +52,7 @@ jobs:
           ssh -i ~/.ssh/domainexp_key -p "$VPS_PORT" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             "$VPS_USER@$VPS_HOST" \
-            "mkdir -p '$DEPLOY_PATH/apps/api/deploy' && cat > '$DEPLOY_PATH/apps/api/deploy/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/apps/api/.env'" <<< "$PROD_ENV_FILE"
+            "umask 077; mkdir -p '$DEPLOY_PATH/apps/api/deploy' && cat > '$DEPLOY_PATH/apps/api/deploy/.env' && sed -i -E '/^(CORS_ORIGINS|GOOGLE_OAUTH_REDIRECT_URI|JWT_ACCESS_TOKEN_ISSUER)=/s|app[.]domainexp[.]info|app.domainexprt.com|g' '$DEPLOY_PATH/apps/api/deploy/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/apps/api/.env'" <<< "$PROD_ENV_FILE"
 
       - name: Deploy exact pushed revision and verify HTTPS
         run: |
