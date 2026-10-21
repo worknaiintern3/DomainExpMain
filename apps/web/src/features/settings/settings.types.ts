@@ -1,3 +1,10 @@
+import type {
+  DiscoverySettingsPayload,
+  LandingPage,
+  PortfolioSettingsPayload,
+} from '@/api/settings';
+import type { DateFormatPattern } from '@/lib/format';
+
 export type SettingsCategory =
   | 'general'
   | 'portfolio'
@@ -11,77 +18,25 @@ export type SettingsCategory =
 export type SaveState = 'saved' | 'unsaved' | 'saving' | 'error';
 
 export interface GeneralSettings {
-  workspaceDisplayName: string;
+  /** Saved to `users.display_name`; shown in the sidebar. */
+  displayName: string;
+  /** Saved to `workspaces.name`; shown in the sidebar and headers. */
   workspaceName: string;
-  defaultLandingPage: string;
+  defaultLandingPage: LandingPage;
   timezone: string;
-  dateFormat: string;
-  defaultCurrency: string;
-  rowsPerPage: number;
+  dateFormat: DateFormatPattern;
+  rowsPerPage: 20 | 50 | 100;
 }
 
-export interface PortfolioSettings {
-  automaticMetadataRefresh: 'on-start' | 'manual';
-  domainMetadataSources: {
-    rdap: boolean;
-    dns: boolean;
-    ssl: boolean;
-  };
-  relationshipDisplayMode: 'mapped' | 'all';
-  defaultInfrastructureView: 'inventory' | 'compact';
-  defaultAutoRenewAssumption: 'on' | 'off' | 'unknown';
-  criticalThresholdDays: number;
-  warningThresholdDays: number;
-  healthyThresholdDays: number;
-  defaultCategoryTag: string;
-  autoFetchMetadataOnCreation: boolean;
-}
+export type PortfolioSettings = PortfolioSettingsPayload;
 
-export interface DomainDiscoverySettings {
-  defaultCheckedTlds: string[];
-  defaultDiscoveryMode: 'reference-preview' | 'compact';
-  savedSearchHistory: boolean;
-  defaultRegistrarComparison: 'best-value' | 'renewal-first' | 'lowest-initial';
-  domainAvailabilitySource: 'reference-dataset';
-  preferredSuggestionStyle: 'brandable' | 'short' | 'modern' | 'tech';
-  smartNameVariations: boolean;
-  availabilityCheckMode: 'selected' | 'all';
-  defaultSearchSort: 'availability' | 'price' | 'tld' | 'match';
-}
-
-export interface AlertsNotificationSettings {
-  criticalThreshold: string;
-  warningThreshold: string;
-  healthyThreshold: string;
-  reminderIntervals: {
-    thirtyDays: boolean;
-    fifteenDays: boolean;
-    sevenDays: boolean;
-    threeDays: boolean;
-    oneDay: boolean;
-  };
-  sslReminderIntervals: {
-    thirtyDays: boolean;
-    fourteenDays: boolean;
-    sevenDays: boolean;
-  };
-  autoRenewDiscrepancyAlert: boolean;
-  dnsResolutionCheck: boolean;
-  channels: {
-    inAppDashboard: boolean;
-    browserPush: boolean;
-    email: boolean;
-    whatsapp: boolean;
-  };
-}
+export type DomainDiscoverySettings = DiscoverySettingsPayload;
 
 export interface PricingCurrencySettings {
   defaultCurrency: string;
-  pricingMode: 'reference-dataset';
+  pricingMode: 'live-registrar-apis';
   defaultPricingHorizon: '1-year' | '3-years' | '5-years';
   defaultComparisonSort: 'best-value' | 'lowest-renewal' | 'lowest-first-year';
-  includeWhoisPrivacy: boolean;
-  includeDnssec: boolean;
   renewalMarkupThreshold: number;
   showRegistrationPriceColumn: boolean;
   showRenewalPriceColumn: boolean;
@@ -103,18 +58,12 @@ export interface WorkspaceDataSummary {
   storage: string;
   domainDataSources: string;
   pricingMode: string;
-  monitoringState: string;
-  totalDomainsCount: number;
-  totalServersCount: number;
-  totalWebsitesCount: number;
-  totalAccountsCount: number;
 }
 
 export interface DomainPulseSettings {
   general: GeneralSettings;
   portfolio: PortfolioSettings;
   domainDiscovery: DomainDiscoverySettings;
-  alerts: AlertsNotificationSettings;
   pricing: PricingCurrencySettings;
   appearance: AppearanceSettings;
 }

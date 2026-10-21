@@ -42,9 +42,10 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
                     : 'bg-surface-container-low border-outline-variant/30 hover:bg-surface-container'
                 }`}
               >
-                <div className="h-16 rounded-lg bg-surface flex items-center justify-center p-2 border border-outline-variant/30">
-                  <div className="w-full h-full rounded bg-surface-container-lowest shadow-micro flex items-center px-2">
-                    <span className="w-4 h-2 rounded-sm bg-primary"></span>
+                {/* Preview swatches use fixed colours so each option always shows what it will look like, whatever theme is active. */}
+                <div className="h-16 rounded-lg bg-[#f8f9fc] flex items-center justify-center p-2 border border-[#e2e8f0]">
+                  <div className="w-full h-full rounded bg-white shadow-micro flex items-center px-2">
+                    <span className="w-4 h-2 rounded-sm bg-[#3525cd]"></span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -70,9 +71,9 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
                     : 'bg-surface-container-low border-outline-variant/30 hover:bg-surface-container'
                 }`}
               >
-                <div className="h-16 rounded-lg bg-inverse-surface flex items-center justify-center p-2 border border-outline-variant/30">
-                  <div className="w-full h-full rounded bg-inverse-surface/80 flex items-center px-2">
-                    <span className="w-4 h-2 rounded-sm bg-primary-fixed-dim"></span>
+                <div className="h-16 rounded-lg bg-[#0b1120] flex items-center justify-center p-2 border border-[#243049]">
+                  <div className="w-full h-full rounded bg-[#1e293b] flex items-center px-2">
+                    <span className="w-4 h-2 rounded-sm bg-[#a9a5ff]"></span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -98,9 +99,9 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
                     : 'bg-surface-container-low border-outline-variant/30 hover:bg-surface-container'
                 }`}
               >
-                <div className="h-16 rounded-lg bg-gradient-to-r from-surface to-inverse-surface flex items-center justify-center p-2 border border-outline-variant/30">
-                  <div className="w-full h-full rounded bg-surface-container-high/30 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[18px] text-on-surface">
+                <div className="h-16 rounded-lg bg-gradient-to-r from-[#f8f9fc] to-[#0b1120] flex items-center justify-center p-2 border border-[#475569]/40">
+                  <div className="w-full h-full rounded bg-[#64748b]/20 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[18px] text-[#94a3b8]">
                       sync
                     </span>
                   </div>
@@ -189,7 +190,7 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
                 ))}
               </div>
               <span className="font-caption-xs text-caption-xs text-secondary">
-                Navigation rail state across workspaces.
+                Remember keeps your last rail toggle on this device.
               </span>
             </div>
           </div>

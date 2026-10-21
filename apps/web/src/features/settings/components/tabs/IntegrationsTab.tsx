@@ -8,13 +8,44 @@ import {
   listProviderAccounts,
   listProviderConnections,
   listProviderConnectionSyncRuns,
+  listProviderResourceCapabilities,
   replaceProviderConnectionCredential,
   triggerProviderConnectionSync,
   validateProviderConnection,
   type ProviderConnectionAuthType,
   type ProviderConnectionResponse,
+  type ProviderResourceCapabilityCollection,
+  type ProviderResourceSummaryMap,
   type ProviderSyncRunResponse,
 } from '@/api/provider-connections';
+
+import { formatDateTime } from '@/lib/format';
+const RESOURCE_SUMMARY_LABELS = [
+  ['DOMAIN', 'Domains'],
+  ['SERVER', 'Servers'],
+  ['CLOUD_RESOURCE', 'Cloud resources'],
+] as const;
+
+function SyncResourceSummary({ summary }: { summary: ProviderResourceSummaryMap | undefined }) {
+  if (!summary) return null;
+  const rows = RESOURCE_SUMMARY_LABELS.filter(([key]) => summary[key] !== undefined);
+  if (rows.length === 0) return null;
+  return (
+    <ul className="font-body-sm text-body-sm text-secondary flex flex-col gap-1" data-testid="sync-resource-summary">
+      {rows.map(([key, label]) => {
+        const item = summary[key];
+        if (!item) return null;
+        return (
+          <li key={key}>
+            <span className="text-on-surface font-semibold">{label}:</span>{' '}
+            {item.created} created / {item.updated} updated / {item.unchanged} unchanged / {item.missing} missing
+            {item.status !== 'SUCCESS' ? ` (${item.status === 'FAILED' ? 'failed' : 'partial'})` : ''}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 const SYNC_POLL_INTERVAL_MS = 3_000;
 const SYNC_POLL_TIMEOUT_MS = 60_000;
@@ -39,7 +70,7 @@ function safeErrorMessage(error: unknown, fallback: string): string {
 function formatTimestamp(value: string | null): string {
   if (!value) return 'Never';
   try {
-    return new Date(value).toLocaleString();
+    return formatDateTime(value);
   } catch {
     return 'Unknown';
   }
@@ -296,7 +327,10 @@ function namecheapFieldsFilled(fields: NamecheapFields): boolean {
   return Object.values(fields).every((value) => value.trim().length > 0);
 }
 
-const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }) => {
+const ProviderConnectionCard: React.FC<{
+  config: ProviderConfig;
+  resources?: ProviderResourceCapabilityCollection['items'][number]['resources'];
+}> = ({ config, resources }) => {
   const [loading, setLoading] = useState(true);
   const [connection, setConnection] = useState<ProviderConnectionResponse | null>(null);
   const [latestRun, setLatestRun] = useState<ProviderSyncRunResponse | null>(null);
@@ -314,8 +348,9 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
     'idle' | 'connecting' | 'validating' | 'rotating' | 'disconnecting'
   >('idle');
 
-  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const mountedRef = useRef(true);
+  const [primarySyncing, setPrimarySyncing] = useState(false);
 
   const [extraConnections, setExtraConnections] = useState<ProviderConnectionResponse[]>([]);
   const [showAddAccountForm, setShowAddAccountForm] = useState(false);
@@ -325,6 +360,7 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
   const [extraSyncing, setExtraSyncing] = useState<Record<string, boolean>>({});
   const [extraValidating, setExtraValidating] = useState<Record<string, boolean>>({});
   const [extraDisconnecting, setExtraDisconnecting] = useState<Record<string, boolean>>({});
+  const [extraRotating, setExtraRotating] = useState<Record<string, boolean>>({});
   const [addAccountError, setAddAccountError] = useState<string | null>(null);
 
   const clearCredentialInputs = useCallback(() => {
@@ -350,6 +386,7 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
     const matches = items.filter((c) => c.providerType === config.providerKey);
     const active = matches.filter((c) => c.connectionStatus === 'CONNECTED');
     if (signal?.aborted) return;
+    setLoadError(null);
     if (active.length > 0) {
       setConnection(active[0] ?? null);
       setExtraConnections(active.slice(1));
@@ -360,6 +397,7 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
       setConnection(matches[0] ?? null);
       setExtraConnections([]);
       setLatestRun(null);
+      setPrimarySyncing(false);
     }
   }, [config.providerKey]);
 
@@ -378,37 +416,70 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
     return () => {
       mountedRef.current = false;
       controller.abort();
-      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      for (const timeout of pollTimeoutsRef.current.values()) clearTimeout(timeout);
+      pollTimeoutsRef.current.clear();
     };
   }, [load]);
 
-  const isSyncing = latestRun?.status === 'QUEUED' || latestRun?.status === 'RUNNING';
+  const isSyncing = primarySyncing;
 
-  const pollUntilSettled = useCallback((connectionId: string, deadline: number) => {
-    if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-    pollTimeoutRef.current = setTimeout(() => {
+  const pollUntilSettled = useCallback((connectionId: string, runId: string, deadline: number, primary: boolean) => {
+    const previous = pollTimeoutsRef.current.get(connectionId);
+    if (previous) clearTimeout(previous);
+    const timeout = setTimeout(() => {
+      pollTimeoutsRef.current.delete(connectionId);
       void (async () => {
         try {
-          const { items: runs } = await listProviderConnectionSyncRuns(connectionId, 1);
+          const { items: runs } = await listProviderConnectionSyncRuns(connectionId, 10);
           if (!mountedRef.current) return;
-          const run = runs[0] ?? null;
-          setLatestRun(run);
-          const stillRunning = run?.status === 'QUEUED' || run?.status === 'RUNNING';
-          if (stillRunning && Date.now() < deadline) {
-            pollUntilSettled(connectionId, deadline);
-          } else {
-            const { items } = await listProviderConnections();
-            if (!mountedRef.current) return;
-            setConnection(items.find((c) => c.id === connectionId) ?? null);
+          const run = runs.find((item) => item.id === runId) ?? null;
+          if ((!run || run.status === 'QUEUED' || run.status === 'RUNNING') && Date.now() < deadline) {
+            pollUntilSettled(connectionId, runId, deadline, primary);
+            return;
           }
-        } catch {
-          // Transient polling failure: the next manual refresh (reopening
-          // Settings) will pick up the true state. Never surface this as a
-          // hard error for a background poll.
+          const timedOut = !run || run.status === 'QUEUED' || run.status === 'RUNNING';
+          if (timedOut || run.status === 'FAILED' || run.status === 'PARTIAL') {
+            const message = timedOut
+              ? 'Sync is still running. Refresh this tab to check its result.'
+              : run.status === 'PARTIAL'
+                ? 'Sync completed with some items missing. Check your inventory.'
+                : 'Sync failed. Check the provider connection and try again.';
+            if (primary) setActionError(message);
+            else setExtraActionError((prev) => ({ ...prev, [connectionId]: message }));
+          }
+          if (primary) {
+            setLatestRun(timedOut ? null : run);
+            setPrimarySyncing(false);
+          } else {
+            setExtraSyncing((prev) => ({ ...prev, [connectionId]: false }));
+          }
+          const { items } = await listProviderConnections();
+          if (!mountedRef.current) return;
+          const updated = items.find((item) => item.id === connectionId);
+          if (primary) setConnection(updated ?? null);
+          else if (updated) setExtraConnections((prev) => prev.map((item) => item.id === connectionId ? updated : item));
+        } catch (error) {
+          if (!mountedRef.current) return;
+          const message = safeErrorMessage(error, 'Could not check the sync result. Refresh this tab to try again.');
+          if (primary) {
+            setPrimarySyncing(false);
+            setActionError(message);
+          } else {
+            setExtraSyncing((prev) => ({ ...prev, [connectionId]: false }));
+            setExtraActionError((prev) => ({ ...prev, [connectionId]: message }));
+          }
         }
       })();
     }, SYNC_POLL_INTERVAL_MS);
+    pollTimeoutsRef.current.set(connectionId, timeout);
   }, []);
+
+  useEffect(() => {
+    if (!connection || !latestRun || (latestRun.status !== 'QUEUED' && latestRun.status !== 'RUNNING')) return;
+    if (pollTimeoutsRef.current.has(connection.id)) return;
+    setPrimarySyncing(true);
+    pollUntilSettled(connection.id, latestRun.id, Date.now() + SYNC_POLL_TIMEOUT_MS, true);
+  }, [connection, latestRun, pollUntilSettled]);
 
   async function resolveProviderAccountId(): Promise<string> {
     const { items } = await listProviderAccounts();
@@ -429,8 +500,9 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
     setActionState('connecting');
     try {
       let providerAccountId: string;
-      if (customLabel && customLabel.trim().length > 0) {
-        const created = await createProviderAccount({ label: customLabel.trim(), providerKey: config.providerKey });
+      if (isAdditional) {
+        const label = customLabel?.trim() || `${config.displayName} account ${extraConnections.length + 2}`;
+        const created = await createProviderAccount({ label, providerKey: config.providerKey });
         providerAccountId = created.id;
       } else {
         providerAccountId = await resolveProviderAccountId();
@@ -497,6 +569,7 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
       setActionState('rotating');
     } else {
       setExtraActionError((prev) => ({ ...prev, [id]: null }));
+      setExtraRotating((prev) => ({ ...prev, [id]: true }));
     }
     try {
       const updated = await replaceProviderConnectionCredential(id, credential);
@@ -507,13 +580,14 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
         setExtraConnections((prev) => prev.map((c) => (c.id === id ? updated : c)));
         setRotatingExtraId(null);
       }
+      clearCredentialInputs();
     } catch (error) {
       const errorMsg = safeErrorMessage(error, 'Could not replace the credential.');
       if (isPrimary) setActionError(errorMsg);
       else setExtraActionError((prev) => ({ ...prev, [id]: errorMsg }));
     } finally {
-      clearCredentialInputs();
       if (isPrimary) setActionState('idle');
+      else setExtraRotating((prev) => ({ ...prev, [id]: false }));
     }
   }
 
@@ -523,47 +597,22 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
     const isPrimary = !targetId || targetId === connection?.id;
     if (isPrimary) {
       setActionError(null);
+      setPrimarySyncing(true);
     } else {
       setExtraActionError((prev) => ({ ...prev, [id]: null }));
       setExtraSyncing((prev) => ({ ...prev, [id]: true }));
     }
     try {
       const idempotencyKey = crypto.randomUUID();
-      await triggerProviderConnectionSync(id, idempotencyKey);
-      const { items: runs } = await listProviderConnectionSyncRuns(id, 1);
+      const queued = await triggerProviderConnectionSync(id, idempotencyKey);
       if (isPrimary) {
-        setLatestRun(runs[0] ?? null);
-        pollUntilSettled(id, Date.now() + SYNC_POLL_TIMEOUT_MS);
-      } else {
-        const deadline = Date.now() + SYNC_POLL_TIMEOUT_MS;
-        const pollExtra = (attemptDeadline: number) => {
-          setTimeout(() => {
-            void (async () => {
-              try {
-                const { items: latestRuns } = await listProviderConnectionSyncRuns(id, 1);
-                const run = latestRuns[0] ?? null;
-                const stillRunning = run?.status === 'QUEUED' || run?.status === 'RUNNING';
-                if (stillRunning && Date.now() < attemptDeadline) {
-                  pollExtra(attemptDeadline);
-                } else {
-                  setExtraSyncing((prev) => ({ ...prev, [id]: false }));
-                  const { items: allConns } = await listProviderConnections();
-                  const updatedExtra = allConns.find((c) => c.id === id);
-                  if (updatedExtra) {
-                    setExtraConnections((prev) => prev.map((c) => (c.id === id ? updatedExtra : c)));
-                  }
-                }
-              } catch {
-                setExtraSyncing((prev) => ({ ...prev, [id]: false }));
-              }
-            })();
-          }, SYNC_POLL_INTERVAL_MS);
-        };
-        pollExtra(deadline);
+        setLatestRun(null);
       }
+      pollUntilSettled(id, queued.id, Date.now() + SYNC_POLL_TIMEOUT_MS, isPrimary);
     } catch (error) {
       const errorMsg = safeErrorMessage(error, 'Could not queue a sync.');
       if (isPrimary) {
+        setPrimarySyncing(false);
         setActionError(errorMsg);
       } else {
         setExtraActionError((prev) => ({ ...prev, [id]: errorMsg }));
@@ -585,13 +634,12 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
     }
     try {
       await disconnectProviderConnection(id);
-      if (isPrimary) {
-        const { items } = await listProviderConnections();
-        setConnection(items.find((c) => c.id === id) ?? null);
-        setLatestRun(null);
-      } else {
-        setExtraConnections((prev) => prev.filter((c) => c.id !== id));
-      }
+      const timeout = pollTimeoutsRef.current.get(id);
+      if (timeout) clearTimeout(timeout);
+      pollTimeoutsRef.current.delete(id);
+      if (isPrimary) setPrimarySyncing(false);
+      else setExtraSyncing((prev) => ({ ...prev, [id]: false }));
+      await load();
     } catch (error) {
       const errorMsg = safeErrorMessage(error, 'Could not disconnect.');
       if (isPrimary) setActionError(errorMsg);
@@ -700,14 +748,34 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
           </span>
         )}
       </div>
+      {resources && resources.length > 0 && (
+        <p className="mt-1 font-caption-xs text-caption-xs text-secondary break-words" data-testid={`${config.providerKey}-auto-syncs`}>
+          Auto-syncs: {resources.map((resource) => resource.label).join(' + ')}
+        </p>
+      )}
 
       {loading && <p className="font-body-sm text-body-sm text-secondary mt-unit-md">Loading…</p>}
       {!loading && loadError && (
-        <p className="font-body-sm text-body-sm text-error mt-unit-md" role="alert">{loadError}</p>
+        <div className="mt-unit-md">
+          <p className="font-body-sm text-body-sm text-error" role="alert">{loadError}</p>
+          <button
+            className="mt-unit-sm h-9 px-unit-md rounded-lg border border-outline-variant/60 text-on-surface"
+            onClick={() => {
+              setLoading(true);
+              void load().catch((error: unknown) => {
+                setLoadError(safeErrorMessage(error, 'Failed to load this integration.'));
+              }).finally(() => setLoading(false));
+            }}
+            type="button"
+          >
+            Try again
+          </button>
+        </div>
       )}
 
       {!loading && !loadError && (!connection || connection.connectionStatus === 'DISCONNECTED') && (
         <div className="mt-unit-md">
+          {actionError && <p className="mb-unit-sm font-body-sm text-body-sm text-error" role="alert">{actionError}</p>}
           {!showConnectForm ? (
             <button
               className="h-9 px-unit-lg rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-tertiary transition-colors shadow-micro cursor-pointer font-medium"
@@ -751,11 +819,9 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
 
       {!loading && !loadError && connection && connection.connectionStatus === 'CONNECTED' && (
         <div className="mt-unit-md flex flex-col gap-unit-sm">
-          {extraConnections.length > 0 && (
-            <div className="text-caption-xs font-semibold text-primary uppercase tracking-wider">
-              {connection.providerAccountLabel || `${config.displayName} (Primary)`}
-            </div>
-          )}
+          <div className="text-caption-xs font-semibold text-primary uppercase tracking-wider">
+            {connection.providerAccountLabel || config.displayName}
+          </div>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-unit-md gap-y-1 font-body-sm text-body-sm">
             <div className="flex justify-between sm:block">
               <dt className="text-secondary">Credential</dt>
@@ -796,6 +862,8 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
           {actionError && (
             <p className="font-body-sm text-body-sm text-error" role="alert">{actionError}</p>
           )}
+
+          {!isSyncing && <SyncResourceSummary summary={latestRun?.resourceSummary} />}
 
           {!showRotateForm && (
             <div className="flex flex-wrap gap-unit-sm mt-unit-2xs">
@@ -961,10 +1029,10 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
                   <div className="flex gap-unit-sm">
                     <button
                       className="h-8 px-unit-md rounded-lg bg-primary text-on-primary text-[12px] font-medium hover:bg-tertiary transition-colors shadow-micro cursor-pointer disabled:opacity-50"
-                      disabled={actionState === 'rotating' || !credentialReady}
+                      disabled={extraRotating[extra.id] || !credentialReady}
                       type="submit"
                     >
-                      Save replacement
+                      {extraRotating[extra.id] ? 'Replacing…' : 'Save replacement'}
                     </button>
                     <button
                       className="h-8 px-unit-md rounded-lg bg-surface-container-lowest text-on-surface border border-outline-variant/60 hover:bg-surface-container-low shadow-micro text-[12px] cursor-pointer"
@@ -1052,23 +1120,75 @@ const ProviderConnectionCard: React.FC<{ config: ProviderConfig }> = ({ config }
   );
 };
 
-export const IntegrationsTab: React.FC = () => (
-  <section className="flex flex-col gap-unit-lg">
-    <div className="rounded-xl bg-surface-container-lowest p-unit-lg shadow-micro border border-outline-variant/30">
-      <div className="flex flex-col pb-unit-md border-b border-surface-container-low">
-        <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-          Integrations
-        </h3>
-        <p className="font-body-sm text-body-sm text-secondary mt-unit-2xs">
-          Connect external providers to discover and keep domain inventory in sync.
-        </p>
+export const IntegrationsTab: React.FC = () => {
+  // Same capability source the sync engine runs from (served by the API);
+  // a failed or missing entry simply shows no note rather than guessing.
+  const [capabilities, setCapabilities] = useState<ProviderResourceCapabilityCollection['items']>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    listProviderResourceCapabilities(controller.signal)
+      .then((response) => {
+        if (!controller.signal.aborted) setCapabilities(response.items);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  return (
+    <section className="flex flex-col gap-unit-lg">
+      <div className="rounded-xl bg-surface-container-lowest p-unit-lg shadow-micro border border-outline-variant/30">
+        <div className="flex flex-col pb-unit-md border-b border-surface-container-low">
+          <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
+            Integrations
+          </h3>
+          <p className="font-body-sm text-body-sm text-secondary mt-unit-2xs">
+            Connect external providers to discover and keep domain inventory in sync.
+          </p>
+        </div>
+
+        <div className="mt-unit-md flex flex-col gap-unit-md">
+          {PROVIDER_CONFIGS.map((config) => (
+            <ProviderConnectionCard
+              config={config}
+              key={config.providerKey}
+              resources={capabilities.find((entry) => entry.providerKey === config.providerKey)?.resources}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="mt-unit-md flex flex-col gap-unit-md">
-        {PROVIDER_CONFIGS.map((config) => (
-          <ProviderConnectionCard config={config} key={config.providerKey} />
-        ))}
-      </div>
-    </div>
-  </section>
-);
+      {/* Google Play Console lives on its own page — this entry only links there. */}
+      <section
+        aria-labelledby="google-play-integration-heading"
+        className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-unit-lg shadow-micro"
+      >
+        <div className="flex flex-col gap-unit-md sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-unit-md">
+            <span className="material-symbols-outlined shrink-0 text-[24px] text-primary">
+              play_store
+            </span>
+            <div className="min-w-0">
+              <h3
+                className="font-headline-sm text-headline-sm font-semibold text-on-surface"
+                id="google-play-integration-heading"
+              >
+                Google Play Console
+              </h3>
+              <p className="mt-unit-2xs font-body-sm text-body-sm text-secondary">
+                Connect a Google Play developer account to list your published Android apps
+                next to the rest of your inventory.
+              </p>
+            </div>
+          </div>
+          <a
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 self-start rounded-lg bg-primary-container px-3.5 text-label-md font-medium text-on-primary shadow-sm transition-colors hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 sm:self-auto"
+            href="/google-play"
+          >
+            Manage connection
+            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </a>
+        </div>
+      </section>
+    </section>
+  );
+};

@@ -5,9 +5,7 @@ import { ApiError } from '@/api/client';
 import { archiveInventory, getInventory, updateInventory } from '@/api/inventory';
 import { getDomainMetadata, refreshDomainMetadata } from '@/api/metadata';
 import { getImmediateRelationships } from '@/api/read-models';
-import type { Domain, DomainMetadataResponse } from '@/api/types';
-import { lookupWhois } from '@/api/whois';
-import type { NormalizedWhoisData } from '@/api/whois.types';
+import type { Domain, DomainMetadataResponse, DomainMetadataSource } from '@/api/types';
 import { Button } from '@/components/common/Button';
 import { EntityAssociations } from '@/components/integration/EntityAssociations';
 import {
@@ -15,26 +13,60 @@ import {
   ResourceFormModal,
   StatePanel,
 } from '@/components/integration/InventoryWorkspace';
-import { WhoisDetailsModal } from '@/components/whois/WhoisDetailsModal';
 import { domainConfiguration } from '@/features/integration/resource-configs';
 import { DomainMetadataSection } from '@/features/domain-details/components/DomainMetadataSection';
+import { DomainLiveLookupSection } from '@/features/domain-details/components/DomainLiveLookupSection';
+import {
+  resolveDomainExpiresAt,
+  resolveDomainRegisteredAt,
+  resolveDomainRegistrarLabel,
+} from '@/features/domain-details/domainRegistrationSummary';
 import { DomainMonitoringSection } from '@/features/monitoring/components/DomainMonitoringSection';
 import { useProviderLabels } from '@/features/provider-accounts/useProviderLabels';
 
-const formatDate = (value: string | null, includeTime = false) => value
-  ? new Date(value).toLocaleString(undefined, includeTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'long' })
-  : 'Unknown';
+import { formatDate as formatDateOnly, formatDateTime } from '@/lib/format';
+import { expiryTier } from '@/lib/expiry';
+import { usePreferences } from '@/preferences/PreferencesContext';
+const formatDate = (value: string | null, includeTime = false) =>
+  includeTime ? formatDateTime(value, 'Unknown') : formatDateOnly(value, 'Unknown');
 
 function expiryDetail(value: string | null) {
   if (!value) return { label: 'Expiry not recorded', tone: 'text-secondary' };
   const days = Math.ceil((new Date(value).getTime() - Date.now()) / 86_400_000);
   if (days < 0) return { label: `Expired ${Math.abs(days)} days ago`, tone: 'text-error' };
   if (days === 0) return { label: 'Expires today', tone: 'text-error' };
-  return { label: `${days} days remaining`, tone: days <= 30 ? 'text-amber-700' : 'text-on-surface' };
+  return { label: `${days} days remaining`, tone: expiryTier(days) !== 'healthy' ? 'text-amber-700' : 'text-on-surface' };
 }
+
+const POLL_INTERVAL_MS = 2500;
+const POLL_MAX_DURATION_MS = 30_000;
+
+function isTerminalSource(value: { lastAttemptStatus: string } | null): boolean {
+  return value !== null && ['SUCCESS', 'PARTIAL', 'FAILED'].includes(value.lastAttemptStatus);
+}
+
+function isMetadataTerminal(response: DomainMetadataResponse | null, sources?: readonly DomainMetadataSource[]): boolean {
+  if (!response) return false;
+  const all: readonly DomainMetadataSource[] = ['rdap', 'dns', 'tls', 'http', 'infra'];
+  const wanted = sources && sources.length > 0 ? sources : all;
+  return wanted.every((source) => {
+    if (source === 'rdap') return isTerminalSource(response.rdap);
+    if (source === 'dns') return isTerminalSource(response.dns);
+    if (source === 'tls') return isTerminalSource(response.tls);
+    if (source === 'http') return isTerminalSource(response.http);
+    return isTerminalSource(response.infra);
+  });
+}
+
+const STALE_METADATA_MS = 24 * 60 * 60 * 1000;
+const SOURCE_KEYS: readonly DomainMetadataSource[] = ['rdap', 'dns', 'tls', 'http', 'infra'];
 
 export const DomainDetailPage: React.FC = () => {
   const { domainId = '' } = useParams<{ domainId: string }>();
+  const { portfolio, status: preferencesStatus } = usePreferences();
+  // Only the sources enabled in Portfolio settings are refreshed by "Refresh metadata" and by auto-refresh.
+  const enabledSources = SOURCE_KEYS.filter((source) => portfolio.metadataSources[source]);
+  const autoRefreshedRef = useRef<string | null>(null);
   const [domain, setDomain] = useState<Domain | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,27 +80,9 @@ export const DomainDetailPage: React.FC = () => {
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
   const [refreshingMetadata, setRefreshingMetadata] = useState(false);
-
-  // Live WHOIS state
-  const [whoisModalOpen, setWhoisModalOpen] = useState(false);
-  const [whoisData, setWhoisData] = useState<NormalizedWhoisData | null>(null);
-  const [whoisLoading, setWhoisLoading] = useState(false);
-  const [whoisError, setWhoisError] = useState<string | null>(null);
-
-  const handleOpenWhois = async () => {
-    if (!domain) return;
-    setWhoisModalOpen(true);
-    setWhoisLoading(true);
-    setWhoisError(null);
-    try {
-      const res = await lookupWhois(domain.domainName, domain.id);
-      setWhoisData(res);
-    } catch (err) {
-      setWhoisError(err instanceof Error ? err.message : 'Failed to lookup WHOIS details');
-    } finally {
-      setWhoisLoading(false);
-    }
-  };
+  const [refreshingSource, setRefreshingSource] = useState<DomainMetadataSource | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollDeadlineRef = useRef(0);
 
   useEffect(() => {
     const generation = ++generationRef.current;
@@ -91,15 +105,54 @@ export const DomainDetailPage: React.FC = () => {
     };
   }, [domainId]);
 
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const pollMetadata = useCallback((sources?: readonly DomainMetadataSource[]) => {
+    // Bounded polling: ~2.5s interval, ~30s max. Reads only (GET), never
+    // enqueues new runs, so auto-refresh cannot trigger duplicates.
+    stopPolling();
+    pollDeadlineRef.current = Date.now() + POLL_MAX_DURATION_MS;
+    pollTimerRef.current = setInterval(() => {
+      if (Date.now() > pollDeadlineRef.current) {
+        stopPolling();
+        return;
+      }
+      void getDomainMetadata(domainId).then((result) => {
+        setMetadata(result);
+        if (isMetadataTerminal(result, sources)) {
+          stopPolling();
+          setRefreshingMetadata(false);
+          setRefreshingSource(null);
+        }
+      }).catch(() => {
+        // Keep polling on transient read failures until the deadline.
+      });
+    }, POLL_INTERVAL_MS);
+  }, [domainId, stopPolling]);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
   const loadMetadata = useCallback((signal?: AbortSignal) => {
     const generation = ++metadataGenerationRef.current;
+    stopPolling();
     setMetadata(null);
     setMetadataLoading(true);
     setMetadataError(null);
     setMetadataNotice(null);
     return getDomainMetadata(domainId, signal)
       .then((result) => {
-        if (generation === metadataGenerationRef.current) setMetadata(result);
+        if (generation !== metadataGenerationRef.current) return;
+        setMetadata(result);
+        // Auto-refresh after creation: if enrichment was just queued, the
+        // stored snapshots are still pending — poll until terminal or timeout.
+        if (!isMetadataTerminal(result)) {
+          pollMetadata(undefined);
+        }
       })
       .catch((requestError: unknown) => {
         if (signal?.aborted || generation !== metadataGenerationRef.current) return;
@@ -108,7 +161,7 @@ export const DomainDetailPage: React.FC = () => {
       .finally(() => {
         if (generation === metadataGenerationRef.current) setMetadataLoading(false);
       });
-  }, [domainId]);
+  }, [domainId, pollMetadata, stopPolling]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,8 +169,9 @@ export const DomainDetailPage: React.FC = () => {
     return () => {
       controller.abort();
       metadataGenerationRef.current += 1;
+      stopPolling();
     };
-  }, [loadMetadata]);
+  }, [loadMetadata, stopPolling]);
 
   const providerLabels = useProviderLabels([
     domain?.registrarProviderAccountId,
@@ -128,7 +182,13 @@ export const DomainDetailPage: React.FC = () => {
     context: 'Immediate relationship',
     load: (signal: AbortSignal) => getImmediateRelationships('DOMAIN', domainId, signal),
   }], [domainId]);
-  const expiry = expiryDetail(domain?.expiresAt ?? null);
+  // Prefer the directly stored domains-table value; fall back to the latest
+  // RDAP lookup (already fetched into `metadata` for this page) so enriched
+  // domains show real data instead of "Unknown" before anyone edits the record.
+  const rdap = metadata?.rdap ?? null;
+  const effectiveExpiresAt = resolveDomainExpiresAt(domain, rdap);
+  const effectiveRegisteredAt = resolveDomainRegisteredAt(domain, rdap);
+  const expiry = expiryDetail(effectiveExpiresAt);
 
   const changeState = async () => {
     if (!domain || changingState) return;
@@ -148,25 +208,56 @@ export const DomainDetailPage: React.FC = () => {
     }
   };
 
-  const refreshMetadata = async () => {
-    if (refreshingMetadata || !metadata?.canRefresh) return;
-    setRefreshingMetadata(true);
+  const runRefresh = async (sources?: readonly DomainMetadataSource[]) => {
+    if (refreshingMetadata || refreshingSource || !metadata?.canRefresh) return;
+    const single = sources && sources.length === 1 ? sources[0] ?? null : null;
+    if (single) setRefreshingSource(single);
+    else setRefreshingMetadata(true);
     setMetadataError(null);
     setMetadataNotice(null);
     try {
-      const response = await refreshDomainMetadata(domainId);
+      // Async refresh: enqueue a monitoring/enrichment run and return fast
+      // (202). Then poll GET /metadata until the requested sources settle.
+      const response = await refreshDomainMetadata(domainId, sources);
       setMetadata(response.metadata);
-      const incomplete = Object.entries(response.results)
-        .filter(([, result]) => result.status !== 'SUCCESS')
-        .map(([source, result]) => `${source.toUpperCase()}: ${result.errorCode?.split('_').join(' ').toLowerCase() ?? result.status.toLowerCase()}`);
-      setMetadataNotice(incomplete.length > 0
-        ? `Refresh completed with source issues. ${incomplete.join('; ')}.`
-        : 'Metadata refresh completed.');
+      setMetadataNotice(`Refresh queued (run ${response.run.id.slice(0, 8)}). Updating results automatically…`);
+      pollMetadata(response.requestedSources);
     } catch (requestError) {
       setMetadataError(requestError instanceof Error ? requestError.message : 'Metadata could not be refreshed.');
-    } finally {
       setRefreshingMetadata(false);
+      setRefreshingSource(null);
+      stopPolling();
     }
+  };
+
+  const refreshMetadata = async () => {
+    await runRefresh(enabledSources.length === SOURCE_KEYS.length ? undefined : enabledSources);
+  };
+
+  // "Refresh on open": once per visit, refresh stale or never-fetched metadata
+  // for the enabled sources. Manual-only users never trigger this.
+  useEffect(() => {
+    if (
+      preferencesStatus !== 'ready' ||
+      portfolio.automaticMetadataRefresh !== 'on-open' ||
+      !metadata?.canRefresh ||
+      metadataLoading ||
+      autoRefreshedRef.current === domainId
+    ) {
+      return;
+    }
+    autoRefreshedRef.current = domainId;
+    const timestamps = enabledSources.map((source) => {
+      const value = metadata[source];
+      return value?.retrievedAt ? new Date(value.retrievedAt).getTime() : 0;
+    });
+    const stale = timestamps.length > 0 && timestamps.some((t) => Date.now() - t > STALE_METADATA_MS);
+    if (stale) void refreshMetadata();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metadata, metadataLoading, preferencesStatus, portfolio.automaticMetadataRefresh, domainId]);
+
+  const refreshSource = (source: DomainMetadataSource) => {
+    void runRefresh([source]);
   };
 
   if (loading) return <StatePanel icon="progress_activity" message="Loading domain…" spinning />;
@@ -178,9 +269,13 @@ export const DomainDetailPage: React.FC = () => {
     />
   );
 
-  const registrar = domain.registrarProviderAccountId
-    ? providerLabels.get(domain.registrarProviderAccountId) ?? 'Resolving provider…'
-    : 'Unknown';
+  const registrar = resolveDomainRegistrarLabel(
+    domain,
+    domain.registrarProviderAccountId
+      ? providerLabels.get(domain.registrarProviderAccountId)
+      : undefined,
+    rdap,
+  );
   const dnsProvider = domain.dnsProviderAccountId
     ? providerLabels.get(domain.dnsProviderAccountId) ?? 'Resolving provider…'
     : 'Unknown';
@@ -193,22 +288,16 @@ export const DomainDetailPage: React.FC = () => {
           <div className="mt-unit-sm flex flex-wrap items-center gap-unit-sm"><h1 className="break-all font-label-mono text-headline-lg font-semibold tracking-tight text-on-surface">{domain.domainName}</h1><InventoryState state={domain.inventoryState} /></div>
           <p className="mt-unit-xs text-body-sm text-secondary">Stored domain identity, registration metadata, and immediate workspace relationships.</p>
         </div>
-        <div className="flex shrink-0 gap-unit-sm">
-          <Button variant="outline" iconLeading="travel_explore" onClick={() => void handleOpenWhois()}>
-            Live WHOIS
-          </Button>
-          <Button iconLeading="edit" onClick={() => setEditing(true)}>Edit metadata</Button>
-          <Button variant={domain.inventoryState === 'TRACKED' ? 'destructive' : 'outline'} disabled={changingState} onClick={() => void changeState()}>{changingState ? 'Updating…' : domain.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}</Button>
-        </div>
+        <div className="flex shrink-0 gap-unit-sm"><Button iconLeading="edit" onClick={() => setEditing(true)}>Edit metadata</Button><Button variant={domain.inventoryState === 'TRACKED' ? 'destructive' : 'outline'} disabled={changingState} onClick={() => void changeState()}>{changingState ? 'Updating…' : domain.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}</Button></div>
       </header>
 
       {error && <p role="alert" className="rounded-lg border border-error/20 bg-error-container/20 p-unit-sm text-body-sm text-error">{error}</p>}
 
       <section className="grid grid-cols-1 overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-container-lowest shadow-sm sm:grid-cols-2 xl:grid-cols-4" aria-label="Domain highlights">
         {[
-          ['event', 'Expiry', formatDate(domain.expiresAt), expiry.label, expiry.tone],
+          ['event', 'Expiry', formatDate(effectiveExpiresAt), expiry.label, expiry.tone],
           ['autorenew', 'Auto-renew', domain.autoRenew === null ? 'Unknown' : domain.autoRenew ? 'Enabled' : 'Disabled', 'Stored preference', 'text-on-surface'],
-          ['badge', 'Registrar', registrar, domain.registrarProviderAccountId ? 'Provider account' : 'Not mapped', 'text-on-surface'],
+          ['badge', 'Registrar', registrar, domain.registrarProviderAccountId ? 'Provider account' : rdap?.registrarName ? 'RDAP retrieved' : 'Not mapped', 'text-on-surface'],
           ['history', 'Last updated', formatDate(domain.updatedAt, true), domain.provenance.split('_').join(' '), 'text-on-surface'],
         ].map(([icon, label, value, supporting, tone]) => (
           <div key={String(label)} className="border-b border-outline-variant/25 p-unit-md last:border-b-0 sm:border-r sm:[&:nth-child(even)]:border-r-0 xl:border-b-0 xl:[&:nth-child(even)]:border-r xl:last:border-r-0">
@@ -228,62 +317,27 @@ export const DomainDetailPage: React.FC = () => {
             metadata={metadata}
             notice={metadataNotice}
             onRefresh={() => void refreshMetadata()}
+            onRefreshSource={(source) => refreshSource(source)}
             onRetry={() => void loadMetadata()}
             refreshing={refreshingMetadata}
+            refreshingSource={refreshingSource}
           />
+
+          <DomainLiveLookupSection domainId={domainId} domainName={domain.domainName} />
 
           <DomainMonitoringSection domainId={domainId} inventoryState={domain.inventoryState} />
 
           <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-unit-lg shadow-sm">
-            <div className="mb-unit-md flex items-center justify-between">
-              <div className="flex items-center gap-unit-sm">
-                <span className="material-symbols-outlined flex size-9 items-center justify-center rounded-lg bg-primary/10 text-[20px] text-primary">assignment</span>
-                <div>
-                  <h2 className="text-headline-sm font-semibold">Registration metadata</h2>
-                  <p className="text-caption-xs text-secondary">Direct values stored on this domain record</p>
-                </div>
-              </div>
-              <Button size="sm" variant="ghost" iconLeading="edit" onClick={() => setEditing(true)}>Edit</Button>
-            </div>
+            <div className="mb-unit-md flex items-center gap-unit-sm"><span className="material-symbols-outlined flex size-9 items-center justify-center rounded-lg bg-primary/10 text-[20px] text-primary">assignment</span><div><h2 className="text-headline-sm font-semibold">Registration metadata</h2><p className="text-caption-xs text-secondary">Stored domain record values, falling back to the latest RDAP lookup when unset</p></div></div>
             <dl className="grid grid-cols-1 gap-unit-sm md:grid-cols-2">
-              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
-                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Domain name</dt>
-                <dd className="mt-1 break-words font-label-mono text-body-sm font-semibold text-on-surface">{domain.domainName}</dd>
-              </div>
-              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
-                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Expires at (ISO)</dt>
-                <dd className="mt-1 text-body-sm font-semibold text-on-surface">{formatDate(domain.expiresAt)}</dd>
-                <dd className="mt-0.5 font-label-mono text-[11px] text-secondary">{domain.expiresAt || 'Not recorded'}</dd>
-              </div>
-              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
-                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Auto-renew</dt>
-                <dd className="mt-1 flex items-center gap-2">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-caption-xs font-semibold ${
-                    domain.autoRenew === true ? 'bg-success/15 text-success' : domain.autoRenew === false ? 'bg-amber-500/15 text-amber-600' : 'bg-surface-container text-secondary'
-                  }`}>
-                    {domain.autoRenew === null ? 'Not recorded' : domain.autoRenew ? 'Enabled' : 'Disabled'}
-                  </span>
-                </dd>
-              </div>
-              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
-                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Registrar account ID</dt>
-                <dd className="mt-1 font-label-mono text-body-sm font-semibold text-on-surface break-all">
-                  {domain.registrarProviderAccountId || 'Not recorded'}
-                </dd>
-                {registrar !== 'Unknown' && <dd className="mt-0.5 text-caption-xs text-secondary">{registrar}</dd>}
-              </div>
-              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
-                <dt className="text-caption-xs uppercase tracking-wider text-secondary">DNS provider account ID</dt>
-                <dd className="mt-1 font-label-mono text-body-sm font-semibold text-on-surface break-all">
-                  {domain.dnsProviderAccountId || 'Not recorded'}
-                </dd>
-                {dnsProvider !== 'Unknown' && <dd className="mt-0.5 text-caption-xs text-secondary">{dnsProvider}</dd>}
-              </div>
-              <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
-                <dt className="text-caption-xs uppercase tracking-wider text-secondary">Registered at (ISO)</dt>
-                <dd className="mt-1 text-body-sm font-semibold text-on-surface">{formatDate(domain.registeredAt)}</dd>
-                <dd className="mt-0.5 font-label-mono text-[11px] text-secondary">{domain.registeredAt || 'Not recorded'}</dd>
-              </div>
+              {[
+                ['Domain name', domain.domainName],
+                ['Registered at', formatDate(effectiveRegisteredAt)],
+                ['Expires at', formatDate(effectiveExpiresAt)],
+                ['Auto-renew', domain.autoRenew === null ? 'Unknown' : domain.autoRenew ? 'Enabled' : 'Disabled'],
+                ['Registrar account', registrar],
+                ['DNS provider account', dnsProvider],
+              ].map(([label, value]) => <div key={label} className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm"><dt className="text-caption-xs uppercase tracking-wider text-secondary">{label}</dt><dd className="mt-1 break-words text-body-sm font-semibold text-on-surface">{value}</dd></div>)}
             </dl>
           </section>
         </div>
@@ -299,15 +353,6 @@ export const DomainDetailPage: React.FC = () => {
       </div>
 
       {editing && <ResourceFormModal config={config} record={domain} onClose={() => setEditing(false)} onSaved={setDomain} />}
-
-      <WhoisDetailsModal
-        isOpen={whoisModalOpen}
-        onClose={() => setWhoisModalOpen(false)}
-        data={whoisData}
-        loading={whoisLoading}
-        error={whoisError}
-        onRefresh={() => void handleOpenWhois()}
-      />
     </div>
   );
 };

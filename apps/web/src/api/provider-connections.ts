@@ -1,4 +1,5 @@
-import { apiRequest } from './client';
+import { ApiError, apiRequest } from './client';
+import { backendProviderResourceCapabilities } from './provider-resource-capabilities';
 
 export type ProviderConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
 export type ProviderConnectionValidationStatus = 'PENDING' | 'VALID' | 'INVALID';
@@ -38,6 +39,19 @@ export type ProviderConnectionResponse = {
 
 export type ProviderConnectionCollection = { items: ProviderConnectionResponse[] };
 
+export type ProviderResourceSummary = {
+  created: number;
+  errorCode: string | null;
+  missing: number;
+  status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
+  unchanged: number;
+  updated: number;
+};
+
+export type ProviderResourceSummaryMap = Partial<
+  Record<'CLOUD_RESOURCE' | 'DOMAIN' | 'SERVER', ProviderResourceSummary>
+>;
+
 export type ProviderSyncRunResponse = {
   attemptNo: number;
   createdAt: string;
@@ -50,6 +64,7 @@ export type ProviderSyncRunResponse = {
   itemsMissing: number;
   itemsUnchanged: number;
   itemsUpdated: number;
+  resourceSummary?: ProviderResourceSummaryMap;
   startedAt: string | null;
   status: 'QUEUED' | 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED';
   trigger: 'INITIAL' | 'MANUAL' | 'SCHEDULED' | 'RETRY';
@@ -61,6 +76,19 @@ export type ProviderAccountResponse = {
   label: string;
   providerKey: string;
 };
+
+export type ProviderResourceCapabilityCollection = {
+  items: { providerKey: string; resources: { capability: 'CLOUD_RESOURCE' | 'DOMAIN' | 'SERVER'; label: string }[] }[];
+};
+
+export async function listProviderResourceCapabilities(signal?: AbortSignal): Promise<ProviderResourceCapabilityCollection> {
+  try {
+    return await apiRequest('/provider-connections/capabilities', { signal });
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    return backendProviderResourceCapabilities();
+  }
+}
 
 export function listProviderConnections(signal?: AbortSignal): Promise<ProviderConnectionCollection> {
   return apiRequest('/provider-connections', { signal });

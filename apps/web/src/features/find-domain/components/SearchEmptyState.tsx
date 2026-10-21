@@ -14,7 +14,7 @@ export const SearchEmptyState: React.FC<SearchEmptyStateProps> = ({ onSelectProm
         Start a Domain Availability Search
       </h3>
       <p className="font-body-md text-body-md text-secondary max-w-md mb-unit-lg">
-        Type a domain keyword, brand name, or full FQDN above to perform multi-TLD availability checks and reference pricing comparisons.
+        Type a domain keyword, brand name, or full domain above to run live multi-provider availability checks.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-unit-xs">
         <button

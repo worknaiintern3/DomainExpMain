@@ -1,0 +1,175 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0b1c30;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: #ffffff;
+  --color-card-foreground: #0b1c30;
+  --color-muted: #eef2f9;
+  --color-muted-foreground: #475569;
+  --color-border: #e2e8f0;
+
+  --color-primary: #4f46e5;
+  --color-on-primary: #ffffff;
+  --color-primary-hover: #3525cd;
+  --color-primary-ink: #1e1b4b;
+  --color-secondary: #0b1c30;
+  --color-accent-cta: #ea580c;
+  --color-ring: #4f46e5;
+
+  --color-success: #059669;
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-success-text: #065f46;
+  --color-warning: #d97706;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-warning-text: #92400e;
+  --color-critical: #dc2626;
+  --color-critical-bg: #fef2f2;
+  --color-critical-border: #fecaca;
+  --color-critical-text: #991b1b;
+
+  --color-dark-bg: #0b1120;
+  --color-dark-surface: #121a2e;
+  --color-dark-border: #243152;
+  --color-dark-primary: #7b76fb;
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-jakarta);
+  --font-mono: var(--font-jetbrains-mono);
+
+  --shadow-micro: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.07);
+  --shadow-pop: 0 20px 40px -20px rgba(79, 70, 229, 0.25);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #e2dfff;
+  color: #0f0069;
+}
+
+/* Visible keyboard focus everywhere. Never remove without replacement. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Tabular numbers for prices, counts, dates. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" on, "zero" on;
+}
+
+/* Hero entrance: fade + 12px rise, once. Transform/opacity only. */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-enter {
+  animation: hero-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scroll reveal: opacity + 12px rise, once. Transform/opacity only. */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* One-time health-bar fill. scaleX keeps it transform-only. */
+.bar-grow {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.is-visible .bar-grow {
+  transform: scaleX(1);
+}
+
+/* FAQ accordion: animated rows + chevron, 200ms. */
+.faq-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.2s ease;
+}
+
+.faq-panel[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.faq-inner {
+  overflow: hidden;
+}
+
+.faq-chevron {
+  transition: transform 0.2s ease;
+}
+
+.faq-chevron[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+/* Mobile nav sheet: subtle fade + 4px rise, once. */
+@keyframes sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sheet-enter {
+  animation: sheet-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Remove tap delay on touch devices. No visual change. */
+a,
+button {
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

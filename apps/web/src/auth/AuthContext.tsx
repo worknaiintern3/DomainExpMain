@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 
 import { ApiError, apiRequest, configureApiAuthentication } from '@/api/client';
+import { deleteWebPushSubscription } from '@/api/web-push';
 import type {
   GoogleLinkResult,
   GoogleOAuthStartResponse,
@@ -20,6 +21,7 @@ import type {
 
 const REFRESH_TOKEN_STORAGE_KEY = 'domainpulse.refresh-token';
 const GOOGLE_OAUTH_INTENT_STORAGE_KEY = 'domainpulse.google-oauth-intent';
+const GOOGLE_REMEMBER_ME_STORAGE_KEY = 'domainpulse.google-remember-me';
 
 type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
 
@@ -64,6 +66,13 @@ function writeGoogleOAuthIntent(intent: GoogleOAuthIntent): void {
 interface LoginInput {
   email: string;
   password: string;
+  rememberMe?: boolean;
+}
+
+export interface DeleteAccountInput {
+  confirmEmail: string;
+  /** Required by the server only when the account has a password. */
+  password?: string;
 }
 
 interface RegisterInput extends LoginInput {
@@ -74,6 +83,7 @@ interface AuthContextValue {
   addPassword(password: string): Promise<LoginMethodsStatus>;
   completeGoogleLink(code: string, state: string): Promise<GoogleLinkResult>;
   completeGoogleLogin(code: string, state: string): Promise<void>;
+  deleteAccount(input: DeleteAccountInput): Promise<void>;
   error: string | null;
   getLoginMethods(): Promise<LoginMethodsStatus>;
   login(input: LoginInput): Promise<void>;
@@ -81,7 +91,7 @@ interface AuthContextValue {
   register(input: RegisterInput): Promise<void>;
   sessionScopeKey: string | null;
   startGoogleLink(): Promise<void>;
-  startGoogleLogin(): Promise<void>;
+  startGoogleLogin(rememberMe?: boolean): Promise<void>;
   status: AuthStatus;
   unlinkGoogle(): Promise<LoginMethodsStatus>;
   user: PublicUser | null;
@@ -89,25 +99,65 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readRefreshToken(): string | null {
+function readRefreshToken(): { token: string; persistent: boolean } | null {
   try {
-    return sessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+    const token = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+    if (token) return { token, persistent: true };
+  } catch {
+    // Continue with a tab-scoped session if persistent storage is blocked.
+  }
+  try {
+    const token = sessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+    return token ? { token, persistent: false } : null;
   } catch {
     return null;
   }
 }
 
-function writeRefreshToken(token: string | null): void {
+function clearStoredRefreshTokens(): void {
+  for (const storageName of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      window[storageName].removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    } catch {
+      // A blocked store cannot restore a session.
+    }
+  }
+}
+
+function writeRefreshToken(token: string, persistent: boolean): void {
+  clearStoredRefreshTokens();
   try {
-    if (token === null) sessionStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-    else sessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
+    (persistent ? localStorage : sessionStorage).setItem(REFRESH_TOKEN_STORAGE_KEY, token);
   } catch {
-    // A blocked session store produces a non-restorable in-memory session.
+    // If persistent storage is blocked, keep the session for this tab.
+    if (persistent) {
+      try {
+        sessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
+      } catch {
+        // The access token still works until this page closes.
+      }
+    }
+  }
+}
+
+function readAndClearGoogleRememberMe(): boolean {
+  try {
+    const remembered = sessionStorage.getItem(GOOGLE_REMEMBER_ME_STORAGE_KEY) === 'true';
+    sessionStorage.removeItem(GOOGLE_REMEMBER_ME_STORAGE_KEY);
+    return remembered;
+  } catch {
+    return false;
   }
 }
 
 function messageFor(error: unknown): string {
   return error instanceof ApiError ? error.detail : 'The request could not be completed.';
+}
+
+async function currentBrowserPushSubscription(): Promise<PushSubscription | null> {
+  if (!('serviceWorker' in navigator)) return null;
+  const registration = await navigator.serviceWorker.getRegistration('/');
+  return await registration?.pushManager.getSubscription() ?? null;
 }
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
@@ -116,14 +166,20 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const accessTokenRef = useRef<string | null>(null);
+  const rememberMeRef = useRef(readRefreshToken()?.persistent ?? false);
   const generationRef = useRef(0);
   const refreshFlightRef = useRef<Promise<string | null> | null>(null);
 
   const clearSession = useCallback(() => {
-    generationRef.current += 1;
+    const generation = ++generationRef.current;
+    void currentBrowserPushSubscription().then((subscription) => {
+      if (generation === generationRef.current) return subscription?.unsubscribe();
+      return undefined;
+    }).catch(() => undefined);
     accessTokenRef.current = null;
     refreshFlightRef.current = null;
-    writeRefreshToken(null);
+    clearStoredRefreshTokens();
+    rememberMeRef.current = false;
     setSessionId(null);
     setUser(null);
     setStatus('unauthenticated');
@@ -131,21 +187,22 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
   const acceptTokenPair = useCallback((pair: TokenPair) => {
     accessTokenRef.current = pair.accessToken;
-    writeRefreshToken(pair.refreshToken);
+    writeRefreshToken(pair.refreshToken, rememberMeRef.current);
     setSessionId(pair.session.id);
   }, []);
 
   const refreshAccessToken = useCallback((): Promise<string | null> => {
     if (refreshFlightRef.current) return refreshFlightRef.current;
-    const refreshToken = readRefreshToken();
-    if (!refreshToken) return Promise.resolve(null);
+    const storedToken = readRefreshToken();
+    if (!storedToken) return Promise.resolve(null);
+    rememberMeRef.current = storedToken.persistent;
 
     const generation = generationRef.current;
     const flight = (async () => {
       try {
         const pair = await apiRequest<TokenPair>('/auth/refresh', {
           authenticated: false,
-          body: { refreshToken },
+          body: { refreshToken: storedToken.token },
           method: 'POST',
           retryAuthentication: false,
         });
@@ -197,10 +254,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     void boot();
   }, [clearSession, refreshAccessToken]);
 
-  const beginAuthenticationAttempt = useCallback((): number => {
+  const beginAuthenticationAttempt = useCallback((rememberMe = false): number => {
     const generation = ++generationRef.current;
     accessTokenRef.current = null;
-    writeRefreshToken(null);
+    clearStoredRefreshTokens();
+    rememberMeRef.current = rememberMe;
     setError(null);
     setStatus('booting');
     return generation;
@@ -222,11 +280,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   }, []);
 
   const login = useCallback(async (input: LoginInput) => {
-    const generation = beginAuthenticationAttempt();
+    const generation = beginAuthenticationAttempt(input.rememberMe);
     try {
       const response = await apiRequest<LoginResponse>('/auth/login', {
         authenticated: false,
-        body: input,
+        body: { email: input.email, password: input.password },
         method: 'POST',
         retryAuthentication: false,
       });
@@ -237,21 +295,31 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     }
   }, [applyAuthenticatedResponse, beginAuthenticationAttempt, failAuthenticationAttempt]);
 
-  const startGoogleLogin = useCallback(async () => {
+  const startGoogleLogin = useCallback(async (rememberMe = false) => {
     setError(null);
     writeGoogleOAuthIntent('login');
-    const response = await apiRequest<GoogleOAuthStartResponse>('/auth/google/start', {
-      authenticated: false,
-      body: {},
-      method: 'POST',
-      retryAuthentication: false,
-    });
-    // Full top-level navigation -- Google's consent screen refuses to render in an iframe/fetch.
-    window.location.assign(response.authorizationUrl);
+    try {
+      sessionStorage.setItem(GOOGLE_REMEMBER_ME_STORAGE_KEY, String(rememberMe));
+    } catch {
+      // Google sign-in remains available without persistent storage.
+    }
+    try {
+      const response = await apiRequest<GoogleOAuthStartResponse>('/auth/google/start', {
+        authenticated: false,
+        body: {},
+        method: 'POST',
+        retryAuthentication: false,
+      });
+      // Full top-level navigation -- Google's consent screen refuses to render in an iframe/fetch.
+      window.location.assign(response.authorizationUrl);
+    } catch (startError) {
+      readAndClearGoogleRememberMe();
+      throw startError;
+    }
   }, []);
 
   const completeGoogleLogin = useCallback(async (code: string, state: string) => {
-    const generation = beginAuthenticationAttempt();
+    const generation = beginAuthenticationAttempt(readAndClearGoogleRememberMe());
     try {
       const response = await apiRequest<LoginResponse>('/auth/google/callback', {
         authenticated: false,
@@ -323,6 +391,15 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   const logout = useCallback(async () => {
     const generation = generationRef.current;
     try {
+      try {
+        const subscription = await currentBrowserPushSubscription();
+        if (subscription) {
+          await deleteWebPushSubscription(subscription.endpoint);
+          await subscription.unsubscribe();
+        }
+      } catch {
+        // Logout still proceeds; clearSession revokes the local subscription.
+      }
       await apiRequest<void>('/auth/logout', { method: 'POST' });
     } catch {
       // Local credentials are always cleared, even if server revocation fails.
@@ -331,10 +408,24 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     }
   }, [clearSession]);
 
+  /** Permanently deletes the account server-side, then drops local credentials. Rejects (leaving the session intact) on any failure. */
+  const deleteAccount = useCallback(async (input: DeleteAccountInput) => {
+    await apiRequest<void>('/auth/account/delete', {
+      body: {
+        confirmEmail: input.confirmEmail,
+        ...(input.password ? { password: input.password } : {}),
+      },
+      method: 'POST',
+      retryAuthentication: false,
+    });
+    clearSession();
+  }, [clearSession]);
+
   const value = useMemo<AuthContextValue>(() => ({
     addPassword,
     completeGoogleLink,
     completeGoogleLogin,
+    deleteAccount,
     error,
     getLoginMethods,
     login,
@@ -350,6 +441,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     addPassword,
     completeGoogleLink,
     completeGoogleLogin,
+    deleteAccount,
     error,
     getLoginMethods,
     login,

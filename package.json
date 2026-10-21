@@ -12,11 +12,14 @@
     "dev:web": "npm run dev --workspace=@domainpulse/web",
     "dev:api": "npm run dev --workspace=@domainpulse/api",
     "dev:admin": "npm run dev --workspace=@domainpulse/admin",
+    "dev:landing": "npm run dev --workspace=@domainpulse/landing",
+    "dev:frontend": "node scripts/dev-frontend.mjs",
+    "dev:site": "node scripts/dev-site.mjs",
     "dev:mobile": "npx expo start apps/DomainExpMain",
     "dev:domainexp": "npx expo start apps/DomainExpMain",
     "dev:worker": "npm run dev --workspace=@domainpulse/worker",
-    "build": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database && npm run build --workspace=@domainpulse/api && npm run build --workspace=@domainpulse/worker && npm run build --workspace=@domainpulse/web && npm run build --workspace=@domainpulse/admin",
-    "typecheck": "npm run build --workspace=@domainpulse/contracts && npm run typecheck --workspace=@domainpulse/database && npm run typecheck --workspace=@domainpulse/api && npm run typecheck --workspace=@domainpulse/worker && npm run typecheck --workspace=@domainpulse/web && npm run typecheck --workspace=@domainpulse/admin",
+    "build": "npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/database && npm run build --workspace=@domainpulse/api && npm run build --workspace=@domainpulse/worker && npm run build --workspace=@domainpulse/web && npm run build --workspace=@domainpulse/admin && npm run build --workspace=@domainpulse/landing",
+    "typecheck": "npm run build --workspace=@domainpulse/contracts && npm run typecheck --workspace=@domainpulse/database && npm run typecheck --workspace=@domainpulse/api && npm run typecheck --workspace=@domainpulse/worker && npm run typecheck --workspace=@domainpulse/web && npm run typecheck --workspace=@domainpulse/admin && npm run typecheck --workspace=@domainpulse/landing",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "db:generate": "npm run db:generate --workspace=@domainpulse/database",
@@ -47,5 +50,8 @@
     "vps"
   ],
   "author": "Aman",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
 }

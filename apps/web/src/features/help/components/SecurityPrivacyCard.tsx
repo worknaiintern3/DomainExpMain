@@ -42,6 +42,9 @@ export const SecurityPrivacyCard: React.FC = () => {
           {SECURITY_PRIVACY_DATA.clarification}
         </p>
       </div>
+      <a className="inline-flex w-fit items-center gap-2 text-label-md font-semibold text-primary underline-offset-2 hover:underline" href="https://app.domainexp.info/privacy-policy" rel="noopener noreferrer" target="_blank">
+        Read the privacy policy <span aria-hidden="true" className="material-symbols-outlined text-[17px]">open_in_new</span>
+      </a>
     </section>
   );
 };

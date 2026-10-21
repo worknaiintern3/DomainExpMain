@@ -1,6 +1,7 @@
 import React from 'react';
 import { DomainDetailData } from '../domainDetails.types';
 
+import { expiryTier } from '@/lib/expiry';
 interface DomainKpiStripProps {
   data: DomainDetailData;
 }
@@ -70,7 +71,7 @@ export const DomainKpiStrip: React.FC<DomainKpiStripProps> = ({ data }) => {
             <span
               className={`px-unit-xs py-unit-2xs rounded font-caption-xs text-caption-xs font-semibold ${
                 data.autoRenew
-                  ? 'bg-[#ecfdf5] text-[#065f46]'
+                  ? 'bg-healthy-bg text-healthy-text'
                   : 'bg-error-container/40 text-error'
               }`}
             >
@@ -83,9 +84,9 @@ export const DomainKpiStrip: React.FC<DomainKpiStripProps> = ({ data }) => {
             </span>
             <span
               className={`font-caption-xs text-caption-xs ${
-                data.daysRemaining <= 7
+                expiryTier(data.daysRemaining) === 'critical'
                   ? 'text-error font-bold'
-                  : data.daysRemaining <= 30
+                  : expiryTier(data.daysRemaining) === 'warning'
                   ? 'text-amber-700 font-medium'
                   : 'text-on-surface-variant'
               }`}
@@ -96,9 +97,9 @@ export const DomainKpiStrip: React.FC<DomainKpiStripProps> = ({ data }) => {
           <div className="w-full bg-surface-container rounded-full h-1.5 mt-unit-sm overflow-hidden">
             <div
               className={`h-full rounded-full ${
-                data.daysRemaining <= 7
+                expiryTier(data.daysRemaining) === 'critical'
                   ? 'bg-error'
-                  : data.daysRemaining <= 30
+                  : expiryTier(data.daysRemaining) === 'warning'
                   ? 'bg-amber-500'
                   : 'bg-primary'
               }`}

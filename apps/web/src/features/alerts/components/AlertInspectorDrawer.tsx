@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertItem } from '../alerts.types';
 
+import { expiryTier } from '@/lib/expiry';
 interface AlertInspectorDrawerProps {
   alert: AlertItem | null;
   onSetReminder: (alert: AlertItem) => void;
@@ -150,9 +151,9 @@ export const AlertInspectorDrawer: React.FC<AlertInspectorDrawerProps> = ({
           </span>
           <span
             className={`font-label-mono text-label-mono font-bold mt-0.5 ${
-              alert.daysRemaining <= 7
+              expiryTier(alert.daysRemaining) === 'critical'
                 ? 'text-rose-700'
-                : alert.daysRemaining <= 30
+                : expiryTier(alert.daysRemaining) === 'warning'
                 ? 'text-amber-700'
                 : 'text-on-surface'
             }`}

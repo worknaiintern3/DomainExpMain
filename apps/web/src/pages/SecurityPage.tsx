@@ -169,7 +169,98 @@ export const SecurityPage: React.FC = () => {
           }}
         />
       )}
+
+      <DeleteAccountSection passwordEnabled={methods.password.enabled} />
     </SecurityCard>
+  );
+};
+
+const DeleteAccountSection: React.FC<{ passwordEnabled: boolean }> = ({ passwordEnabled }) => {
+  const auth = useAuth();
+  const [open, setOpen] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const accountEmail = auth.user?.email ?? '';
+  const emailMatches =
+    accountEmail !== '' && confirmEmail.trim().toLowerCase() === accountEmail.trim().toLowerCase();
+  const canSubmit = emailMatches && (!passwordEnabled || password.length > 0) && !submitting;
+
+  const close = () => {
+    setOpen(false);
+    setConfirmEmail('');
+    setPassword('');
+    setFormError(null);
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canSubmit) return;
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      // On success the session is cleared and the app routes back to sign-in.
+      await auth.deleteAccount({
+        confirmEmail,
+        ...(passwordEnabled ? { password } : {}),
+      });
+    } catch (error) {
+      setFormError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Could not delete your account. Please try again.',
+      );
+      setSubmitting(false);
+      setPassword('');
+    }
+  };
+
+  return (
+    <div className="mt-unit-xl pt-unit-lg border-t border-error/30">
+      <h2 className="text-label-md font-semibold text-error">Delete account</h2>
+      <p className="text-caption-xs text-secondary mt-1">
+        Permanently deletes your account, your workspace, and every domain, server, provider
+        connection and monitoring record in it. This cannot be undone.
+      </p>
+      {!open ? (
+        <Button variant="outline" size="md" className="mt-unit-md" onClick={() => setOpen(true)}>
+          Delete account…
+        </Button>
+      ) : (
+        <form
+          className="mt-unit-md flex flex-col gap-unit-sm rounded-lg border border-error/40 p-unit-base"
+          onSubmit={(event) => void submit(event)}
+        >
+          <LabeledInput
+            label={`Type your email (${accountEmail}) to confirm`}
+            type="email"
+            value={confirmEmail}
+            onChange={setConfirmEmail}
+            autoComplete="off"
+          />
+          {passwordEnabled && (
+            <LabeledInput
+              label="Current password"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="current-password"
+            />
+          )}
+          {formError && <p role="alert" className="text-body-sm text-error">{formError}</p>}
+          <div className="flex gap-unit-sm mt-unit-2xs">
+            <Button type="submit" variant="primary" size="md" disabled={!canSubmit}>
+              {submitting ? 'Deleting…' : 'Permanently delete my account'}
+            </Button>
+            <Button type="button" variant="ghost" size="md" onClick={close} disabled={submitting}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 };
 

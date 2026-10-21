@@ -2,6 +2,135 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colour tokens as RGB channels so Tailwind opacity modifiers keep working.
+   Light values mirror the previous hex palette; `.dark` is toggled on <html>
+   by src/lib/theme.ts. */
+:root {
+  color-scheme: light;
+  --c-background: 248 249 252;
+  --c-on-background: 11 28 48;
+  --c-surface: 248 249 252;
+  --c-on-surface: 11 28 48;
+  --c-on-surface-variant: 71 85 105;
+  --c-surface-dim: 226 232 240;
+  --c-surface-bright: 255 255 255;
+  --c-surface-variant: 241 245 249;
+  --c-surface-container-lowest: 255 255 255;
+  --c-surface-container-low: 248 250 252;
+  --c-surface-container: 241 245 249;
+  --c-surface-container-high: 226 232 240;
+  --c-surface-container-highest: 203 213 225;
+  --c-inverse-surface: 15 23 42;
+  --c-inverse-on-surface: 255 255 255;
+  --c-primary: 53 37 205;
+  --c-on-primary: 255 255 255;
+  --c-primary-container: 79 70 229;
+  --c-on-primary-container: 218 215 255;
+  --c-inverse-primary: 195 192 255;
+  --c-primary-fixed: 226 223 255;
+  --c-primary-fixed-dim: 195 192 255;
+  --c-on-primary-fixed: 15 0 105;
+  --c-on-primary-fixed-variant: 51 35 204;
+  --c-secondary: 86 94 116;
+  --c-on-secondary: 255 255 255;
+  --c-secondary-container: 241 245 249;
+  --c-on-secondary-container: 51 65 85;
+  --c-secondary-fixed: 241 245 249;
+  --c-secondary-fixed-dim: 203 213 225;
+  --c-on-secondary-fixed: 15 23 42;
+  --c-on-secondary-fixed-variant: 71 85 105;
+  --c-tertiary: 0 69 152;
+  --c-on-tertiary: 255 255 255;
+  --c-tertiary-container: 224 242 254;
+  --c-on-tertiary-container: 0 92 198;
+  --c-tertiary-fixed: 216 226 255;
+  --c-tertiary-fixed-dim: 173 198 255;
+  --c-on-tertiary-fixed: 0 26 66;
+  --c-on-tertiary-fixed-variant: 0 67 149;
+  --c-error: 186 26 26;
+  --c-on-error: 255 255 255;
+  --c-error-container: 255 218 214;
+  --c-on-error-container: 147 0 10;
+  --c-healthy: 16 185 129;
+  --c-healthy-bg: 236 253 245;
+  --c-healthy-text: 6 95 70;
+  --c-healthy-border: 167 243 208;
+  --c-warning: 245 158 11;
+  --c-warning-bg: 255 251 235;
+  --c-warning-text: 146 64 14;
+  --c-warning-border: 253 230 138;
+  --c-critical: 239 68 68;
+  --c-critical-bg: 254 242 242;
+  --c-critical-text: 153 27 27;
+  --c-critical-border: 254 202 202;
+  --c-outline: 148 163 184;
+  --c-outline-variant: 226 232 240;
+  --c-surface-tint: 53 37 205;
+}
+
+.dark {
+  color-scheme: dark;
+  --c-background: 11 17 32;
+  --c-on-background: 226 232 240;
+  --c-surface: 11 17 32;
+  --c-on-surface: 226 232 240;
+  --c-on-surface-variant: 148 163 184;
+  --c-surface-dim: 8 13 24;
+  --c-surface-bright: 30 41 59;
+  --c-surface-variant: 30 41 59;
+  --c-surface-container-lowest: 18 26 46;
+  --c-surface-container-low: 15 23 41;
+  --c-surface-container: 26 35 56;
+  --c-surface-container-high: 36 48 73;
+  --c-surface-container-highest: 51 65 85;
+  --c-inverse-surface: 30 41 59;
+  --c-inverse-on-surface: 241 245 249;
+  --c-primary: 123 118 251;
+  --c-on-primary: 255 255 255;
+  --c-primary-container: 79 70 229;
+  --c-on-primary-container: 224 224 255;
+  --c-inverse-primary: 195 192 255;
+  --c-primary-fixed: 42 38 112;
+  --c-primary-fixed-dim: 169 165 255;
+  --c-on-primary-fixed: 226 223 255;
+  --c-on-primary-fixed-variant: 195 192 255;
+  --c-secondary: 148 163 184;
+  --c-on-secondary: 15 23 42;
+  --c-secondary-container: 30 41 59;
+  --c-on-secondary-container: 203 213 225;
+  --c-secondary-fixed: 30 41 59;
+  --c-secondary-fixed-dim: 203 213 225;
+  --c-on-secondary-fixed: 226 232 240;
+  --c-on-secondary-fixed-variant: 148 163 184;
+  --c-tertiary: 122 176 255;
+  --c-on-tertiary: 0 19 47;
+  --c-tertiary-container: 12 42 77;
+  --c-on-tertiary-container: 122 176 255;
+  --c-tertiary-fixed: 15 42 82;
+  --c-tertiary-fixed-dim: 173 198 255;
+  --c-on-tertiary-fixed: 216 226 255;
+  --c-on-tertiary-fixed-variant: 173 198 255;
+  --c-error: 229 72 77;
+  --c-on-error: 255 255 255;
+  --c-error-container: 74 22 24;
+  --c-on-error-container: 255 180 171;
+  --c-healthy: 16 185 129;
+  --c-healthy-bg: 12 42 34;
+  --c-healthy-text: 110 231 183;
+  --c-healthy-border: 17 94 69;
+  --c-warning: 245 158 11;
+  --c-warning-bg: 45 34 8;
+  --c-warning-text: 252 211 77;
+  --c-warning-border: 120 86 10;
+  --c-critical: 239 68 68;
+  --c-critical-bg: 51 20 22;
+  --c-critical-text: 252 165 165;
+  --c-critical-border: 127 29 29;
+  --c-outline: 100 116 139;
+  --c-outline-variant: 36 48 73;
+  --c-surface-tint: 123 118 251;
+}
+
 @layer base {
   *, ::before, ::after {
     box-sizing: border-box;
@@ -10,8 +139,8 @@
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #f8f9fc;
-    color: #0b1c30;
+    background-color: rgb(var(--c-background));
+    color: rgb(var(--c-on-surface));
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -54,12 +183,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: rgb(var(--c-surface-container-highest));
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgb(var(--c-outline));
 }
 
 /* Master-detail subtle horizontal tab transition */
@@ -76,4 +205,33 @@
 
 .animate-help-tab-enter {
   animation: helpTabSlideEnter 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Appearance preferences (src/lib/appearance.ts). Compact is the default:
+   rules below only add the opt-in Comfortable / Standard / reduced-motion states. */
+
+/* Comfortable interface density: roomier click targets. */
+html[data-density="comfortable"] button {
+  min-height: 2.5rem;
+}
+
+html[data-density="comfortable"] input,
+html[data-density="comfortable"] select,
+html[data-density="comfortable"] textarea {
+  min-height: 2.75rem;
+}
+
+/* Standard table rows: taller than the compact 44px target. */
+html[data-table-density="standard"] table td {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+
+/* Reduced motion: suppress transitions/animations without removing content. */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }

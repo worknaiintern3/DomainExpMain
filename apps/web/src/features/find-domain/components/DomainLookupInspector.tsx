@@ -1,21 +1,65 @@
 import React, { useState } from 'react';
-import { DomainInspectionDetails } from '../findDomain.types';
 
-interface DomainLookupInspectorProps {
-  details: DomainInspectionDetails;
+import {
+  AVAILABILITY_PROVIDER_LABELS,
+  formatMinorUnits,
+  type DomainAvailabilityResult,
+} from '@/api/domain-search';
+import { describeProviderReason } from '@/features/pricing/pricing.present';
+import type { DomainAvailabilityStatus } from '../findDomain.types';
+
+import { formatTime } from '@/lib/format';
+interface DomainLiveInspectorProps {
+  domain: string;
+  status: DomainAvailabilityStatus;
+  results: DomainAvailabilityResult[];
+  requestError: string | null;
   onToggleWatchlist?: (domain: string) => void;
   isSaved?: boolean;
-  onOpenFullWhois?: () => void;
 }
 
-export const DomainLookupInspector: React.FC<DomainLookupInspectorProps> = ({
-  details,
+function stateBadge(state: DomainAvailabilityResult['state']): string {
+  switch (state) {
+    case 'AVAILABLE':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200/50';
+    case 'PREMIUM':
+      return 'bg-blue-50 text-blue-800 border-blue-200/50';
+    case 'UNAVAILABLE':
+      return 'bg-rose-50 text-rose-700 border-rose-200/50';
+    case 'UNCONFIGURED':
+      return 'bg-surface-container text-secondary border-outline-variant/30';
+    case 'ERROR':
+    default:
+      return 'bg-amber-50 text-amber-800 border-amber-200/50';
+  }
+}
+
+function describeResult(result: DomainAvailabilityResult): string {
+  switch (result.state) {
+    case 'AVAILABLE':
+      return result.definitive ? 'Available · live check' : 'Available';
+    case 'PREMIUM':
+      return 'Available · premium tier';
+    case 'UNAVAILABLE':
+      return describeProviderReason(result.reason) ?? 'Registered';
+    case 'UNCONFIGURED':
+      return 'Not configured';
+    case 'ERROR':
+    default:
+      return result.errorCode ?? 'Check failed';
+  }
+}
+
+export const DomainLookupInspector: React.FC<DomainLiveInspectorProps> = ({
+  domain,
+  status,
+  results,
+  requestError,
   onToggleWatchlist,
   isSaved,
-  onOpenFullWhois,
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
-  const isRegistered = details.status === 'registered';
+  const isAvailable = status === 'available';
 
   return (
     <div className="bg-surface-container-lowest rounded-xl shadow-sm p-unit-md flex flex-col gap-unit-md transition-all border border-outline-variant/30">
@@ -24,25 +68,27 @@ export const DomainLookupInspector: React.FC<DomainLookupInspectorProps> = ({
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-unit-xs flex-wrap">
             <span className="font-headline-sm text-headline-sm text-on-surface font-label-mono truncate">
-              {details.domain}
+              {domain}
             </span>
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-caption-xs font-semibold ${
-                isRegistered
-                  ? 'bg-rose-50 text-rose-700 border border-rose-200/50'
-                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200/50'
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-caption-xs font-semibold border ${
+                isAvailable
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50'
+                  : status === 'unknown'
+                    ? 'bg-amber-50 text-amber-800 border-amber-200/50'
+                    : 'bg-rose-50 text-rose-700 border-rose-200/50'
               }`}
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full mr-1 ${
-                  isRegistered ? 'bg-rose-500' : 'bg-emerald-500'
+                  isAvailable ? 'bg-emerald-500' : status === 'unknown' ? 'bg-amber-500' : 'bg-rose-500'
                 }`}
               ></span>
-              {details.statusBadgeText}
+              {isAvailable ? 'Available' : status === 'unknown' ? 'Unknown' : 'Registered'}
             </span>
           </div>
           <span className="font-caption-xs text-caption-xs text-secondary mt-0.5">
-            Domain Registration &amp; DNS Information (Reference Preview)
+            Live registrar availability · per-provider results
           </span>
         </div>
         <button
@@ -59,103 +105,65 @@ export const DomainLookupInspector: React.FC<DomainLookupInspectorProps> = ({
 
       {!isMinimized && (
         <div className="flex flex-col gap-unit-sm">
-          {/* Metadata Grid */}
-          <div className="rounded-lg bg-surface-container-low p-unit-sm flex flex-col gap-2 font-caption-xs text-caption-xs border border-outline-variant/20">
-            <div className="flex items-center justify-between py-0.5">
-              <span className="text-secondary">Sponsoring Registrar</span>
-              <span className="font-semibold text-on-surface truncate max-w-[200px]">
-                {details.sponsoringRegistrar}
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-0.5">
-              <span className="text-secondary">Registration Date</span>
-              <span className="font-label-mono text-on-surface">
-                {details.registrationDateFormatted || '—'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-0.5">
-              <span className="text-secondary">Expiration Date</span>
-              <span className="font-label-mono font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/40">
-                {details.expirationDateFormatted}
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-0.5">
-              <span className="text-secondary">Last Registry Update</span>
-              <span className="font-label-mono text-on-surface">
-                {details.lastUpdateFormatted || '—'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-0.5">
-              <span className="text-secondary">Authoritative Nameservers</span>
-              <span className="font-label-mono text-on-surface text-right truncate max-w-[180px]">
-                {details.authoritativeNameservers.join(', ')}
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-0.5">
-              <span className="text-secondary">DNSSEC Validation</span>
-              <span className="font-medium text-on-surface flex items-center gap-1">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    details.dnssecStatus === 'signed' ? 'bg-emerald-500' : 'bg-rose-500'
-                  }`}
-                ></span>
-                <span>{details.dnssecValidation}</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-0.5">
-              <span className="text-secondary">WHOIS Privacy</span>
-              <span className="text-on-surface font-medium truncate max-w-[180px]">
-                {details.whoisPrivacy}
-              </span>
-            </div>
-            {details.registryDomainId && (
-              <div className="flex items-center justify-between py-0.5">
-                <span className="text-secondary">Registry Domain ID</span>
-                <span className="font-label-mono text-[10px] text-secondary truncate max-w-[180px]">
-                  {details.registryDomainId}
-                </span>
-              </div>
-            )}
-            {details.icannStatusFlags.length > 0 && (
-              <div className="pt-1 flex flex-col gap-1 border-t border-surface-container">
-                <span className="text-secondary">ICANN Status Flags:</span>
-                <div className="flex flex-wrap gap-1">
-                  {details.icannStatusFlags.map((flag, idx) => (
-                    <span
-                      key={idx}
-                      className="font-label-mono text-[10px] bg-surface-container px-1.5 py-0.5 rounded text-on-surface"
-                    >
-                      {flag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Operational Warning / Notice */}
-          {details.operationalNotice && (
+          {requestError && (
             <div className="p-unit-sm rounded-lg bg-amber-50 text-amber-900 font-caption-xs text-caption-xs flex items-start gap-unit-xs border border-amber-200/50">
               <span className="material-symbols-outlined text-[16px] text-amber-700 shrink-0 mt-0.5">
                 schedule
               </span>
-              <span>{details.operationalNotice}</span>
+              <span>{requestError}</span>
             </div>
           )}
 
+          {/* Per-provider breakdown */}
+          <div className="rounded-lg bg-surface-container-low p-unit-sm flex flex-col gap-2 font-caption-xs text-caption-xs border border-outline-variant/20">
+            {results.map((result) => {
+              const registration = formatMinorUnits(
+                result.registrationPriceMinorUnits,
+                result.currency,
+              );
+              const renewal = formatMinorUnits(result.renewalPriceMinorUnits, result.currency);
+              return (
+                <div key={result.provider} className="flex flex-col gap-1 py-1 border-b border-surface-container last:border-b-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-on-surface">
+                      {AVAILABILITY_PROVIDER_LABELS[result.provider]}
+                    </span>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full font-semibold border ${stateBadge(result.state)}`}
+                    >
+                      {describeResult(result)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-secondary">
+                    <span>
+                      {registration
+                        ? `Reg ${registration}${renewal ? ` · Ren ${renewal}` : ''}`
+                        : 'No pricing returned'}
+                    </span>
+                    <span className="font-label-mono text-[10px]">
+                      {result.definitive ? 'live' : result.state === 'UNCONFIGURED' ? '—' : 'cached'}
+                      {' · '}
+                      {formatTime(result.fetchedAt)}
+                    </span>
+                  </div>
+                  {(result.tier || result.reason) && (
+                    <div className="text-secondary text-[10px] font-label-mono truncate">
+                      {[result.tier, describeProviderReason(result.reason)].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {results.length === 0 && !requestError && (
+              <span className="text-secondary">No provider results for this domain yet.</span>
+            )}
+          </div>
+
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-unit-xs pt-1">
+          <div className="grid grid-cols-1 gap-unit-xs pt-1">
             <button
               type="button"
-              onClick={onOpenFullWhois}
-              className="h-8 px-2 rounded-lg bg-surface-container hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center justify-center gap-1 transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px] text-primary">travel_explore</span>
-              <span>Full WHOIS</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onToggleWatchlist && onToggleWatchlist(details.domain)}
+              onClick={() => onToggleWatchlist && onToggleWatchlist(domain)}
               className={`h-8 px-2 rounded-lg font-label-md text-label-md flex items-center justify-center gap-1 transition-colors shadow-sm cursor-pointer ${
                 isSaved
                   ? 'bg-secondary-container text-primary hover:bg-surface-container'
@@ -168,7 +176,7 @@ export const DomainLookupInspector: React.FC<DomainLookupInspectorProps> = ({
               >
                 {isSaved ? 'bookmark' : 'notifications_active'}
               </span>
-              <span>{isSaved ? 'Saved in List' : isRegistered ? 'Watch Expiry' : 'Save Domain'}</span>
+              <span>{isSaved ? 'Saved in List' : 'Save Domain'}</span>
             </button>
           </div>
         </div>

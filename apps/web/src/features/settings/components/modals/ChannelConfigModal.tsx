@@ -11,11 +11,8 @@ export const ChannelConfigModal: React.FC<ChannelConfigModalProps> = ({
   isOpen,
   channel,
   onClose,
-  onSave,
 }) => {
-  const [value, setValue] = useState(
-    channel === 'email' ? 'aman.developer@example.com' : '+91 98765 43210'
-  );
+  const [value, setValue] = useState('');
 
   if (!isOpen) return null;
 
@@ -56,7 +53,7 @@ export const ChannelConfigModal: React.FC<ChannelConfigModalProps> = ({
             className="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-micro"
           />
           <span className="font-caption-xs text-caption-xs text-secondary">
-            Stored demo preference for notification routing.
+            Coming soon — destination is not saved anywhere yet.
           </span>
         </div>
 
@@ -66,7 +63,7 @@ export const ChannelConfigModal: React.FC<ChannelConfigModalProps> = ({
             info
           </span>
           <p className="font-caption-xs text-caption-xs text-secondary leading-normal">
-            <strong>Configuration Only (Not Connected):</strong> Channel credentials and destination addresses are stored as frontend preferences. External delivery requires a connected SMTP or messaging provider.
+            <strong>Coming soon:</strong> Channel credentials and destination addresses are not connected. External delivery requires a connected SMTP or messaging provider.
           </p>
         </div>
 
@@ -80,13 +77,11 @@ export const ChannelConfigModal: React.FC<ChannelConfigModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => {
-              onSave(value);
-              onClose();
-            }}
-            className="h-9 px-unit-md rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-tertiary transition-colors shadow-micro cursor-pointer font-medium"
+            disabled
+            title="Coming soon"
+            className="h-9 px-unit-md rounded-lg bg-surface-container text-secondary font-label-md text-label-md border border-outline-variant/30 cursor-not-allowed font-medium"
           >
-            Save Channel Config
+            Coming soon
           </button>
         </div>
       </div>

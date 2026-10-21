@@ -4,11 +4,10 @@ import { Link } from 'react-router-dom';
 import {
   archiveInventory,
   createInventory,
-  listInventory,
-  probeApplicationUrl,
+  listAllInventory,
   updateInventory,
-  type ApplicationProbeResult,
 } from '@/api/inventory';
+import { probeApplicationUrl, type ApplicationProbeResult } from '@/api/applicationProbe';
 import type { Application, Domain, ProviderAccount, Server } from '@/api/types';
 import { Button } from '@/components/common/Button';
 import {
@@ -17,9 +16,17 @@ import {
   StatePanel,
 } from '@/components/integration/InventoryWorkspace';
 import { applicationConfiguration } from '@/features/integration/resource-configs';
+import { probeRequestErrorMessage } from '@/features/websites/applicationProbe';
+import {
+  ApplicationProbeDetails,
+  ApplicationProbeInline,
+} from '@/features/websites/components/ApplicationProbeViews';
+import { useApplicationProbe } from '@/features/websites/useApplicationProbe';
 import { useCursorInventory } from '@/hooks/useCursorInventory';
 
+import { expiryTier } from '@/lib/expiry';
 const kindLabel = (kind: Application['kind']) => kind.split('_').join(' ');
+const shortId = (id: string | null) => id ? `${id.slice(0, 8)}…` : 'Not mapped';
 
 function extractHostname(url: string | null): string | null {
   if (!url) return null;
@@ -132,7 +139,16 @@ function AppBrandIcon({ app, hostname, size = 'md' }: { app: Application; hostna
   );
 }
 
-interface ProbeState extends ApplicationProbeResult { loading?: boolean; }
+interface ProbeState {
+  error: string | null;
+  latencyMs: number | null;
+  loading?: boolean;
+  online: boolean;
+  result?: ApplicationProbeResult;
+  ssl: boolean;
+  statusCode: number | null;
+  title: string | null;
+}
 
 interface AppInfraInfo {
   domain: Domain | null;
@@ -242,7 +258,7 @@ export function expiryPresentation(value: string | null | undefined) {
       badgeClass: 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400 font-semibold',
     };
   }
-  if (days <= 30) {
+  if (expiryTier(days) !== 'healthy') {
     return {
       label: `${days}d left (${formattedDate})`,
       formattedDate,
@@ -306,20 +322,6 @@ function ServerBadge({ server }: { server: Server | null }) {
   );
 }
 
-function DomainExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined }) {
-  const exp = expiryPresentation(expiresAt);
-  if (!exp) return null;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] ${exp.badgeClass}`}
-      title={`Domain Expiration: ${exp.formattedDate} (${exp.days} days remaining)`}
-    >
-      <span className="material-symbols-outlined text-[11px]">schedule</span>
-      <span>{exp.label}</span>
-    </span>
-  );
-}
-
 export const WebsitesPage: React.FC = () => {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [search, setSearch] = useState('');
@@ -347,6 +349,7 @@ export const WebsitesPage: React.FC = () => {
   const [probeMap, setProbeMap] = useState<Record<string, ProbeState>>({});
 
   const list = useCursorInventory('applications', includeArchived);
+  const probes = useApplicationProbe();
 
   // Load domains, servers, provider accounts
   useEffect(() => {
@@ -354,29 +357,29 @@ export const WebsitesPage: React.FC = () => {
     const fetchRelations = async () => {
       try {
         const [domainsRes, serversRes, providersRes] = await Promise.all([
-          listInventory('domains', { limit: 200 }),
-          listInventory('servers', { limit: 100 }),
-          listInventory('provider-accounts', { limit: 100 }),
+          listAllInventory('domains'),
+          listAllInventory('servers'),
+          listAllInventory('provider-accounts'),
         ]);
         if (!active) return;
 
         const dById = new Map<string, Domain>();
-        for (const d of domainsRes.items) dById.set(d.id, d);
+        for (const d of domainsRes) dById.set(d.id, d);
         setDomainById(dById);
 
         const sIp = new Map<string, Server>();
         const sName = new Map<string, Server>();
-        for (const s of serversRes.items) {
+        for (const s of serversRes) {
           if (s.primaryIp) sIp.set(s.primaryIp, s);
           if (s.hostname) sIp.set(s.hostname.toLowerCase(), s);
           sName.set(s.name.toLowerCase(), s);
         }
         setServerByIp(sIp);
         setServerByName(sName);
-        setAllServers(serversRes.items);
+        setAllServers(serversRes);
 
         const pById = new Map<string, ProviderAccount>();
-        for (const p of providersRes.items) pById.set(p.id, p);
+        for (const p of providersRes) pById.set(p.id, p);
         setProviderById(pById);
 
       } catch {
@@ -405,11 +408,23 @@ export const WebsitesPage: React.FC = () => {
     }));
     try {
       const result = await probeApplicationUrl(url);
-      setProbeMap((prev) => ({ ...prev, [appId]: { ...result, loading: false } }));
+      setProbeMap((prev) => ({
+        ...prev,
+        [appId]: {
+          error: result.error,
+          latencyMs: result.latencyMs,
+          loading: false,
+          online: result.online,
+          result,
+          ssl: result.ssl.enabled && result.ssl.valid === true,
+          statusCode: result.statusCode,
+          title: result.title,
+        },
+      }));
     } catch (err: unknown) {
       setProbeMap((prev) => ({
         ...prev,
-        [appId]: { error: err instanceof Error ? err.message : 'Connection failed', latencyMs: null, loading: false, online: false, ssl: url.startsWith('https://'), statusCode: null, title: null },
+        [appId]: { error: probeRequestErrorMessage(err), latencyMs: null, loading: false, online: false, ssl: url.startsWith('https://'), statusCode: null, title: null },
       }));
     }
   }, []);
@@ -434,15 +449,15 @@ export const WebsitesPage: React.FC = () => {
     setActionSuccess(null);
     try {
       const [domainsRes, serversRes] = await Promise.all([
-        listInventory('domains', { limit: 200 }),
-        listInventory('servers', { limit: 100 }),
+        listAllInventory('domains'),
+        listAllInventory('servers'),
       ]);
       const existingNames = new Set(list.items.map((a) => a.name.toLowerCase()));
       const existingUrls = new Set(list.items.map((a) => a.primaryUrl?.toLowerCase()).filter(Boolean));
       const existingDomainIds = new Set(list.items.map((a) => a.primaryDomainId).filter(Boolean));
       let importedCount = 0;
 
-      for (const domain of domainsRes.items) {
+      for (const domain of domainsRes) {
         if (existingDomainIds.has(domain.id)) continue;
         const primaryUrl = `https://${domain.domainName}`;
         if (existingUrls.has(primaryUrl.toLowerCase())) continue;
@@ -454,7 +469,7 @@ export const WebsitesPage: React.FC = () => {
         importedCount += 1;
       }
 
-      for (const server of serversRes.items) {
+      for (const server of serversRes) {
         if (!server.primaryIp) continue;
         const serverUrl = `http://${server.primaryIp}`;
         if (existingUrls.has(serverUrl.toLowerCase()) || existingNames.has(server.name.toLowerCase())) continue;
@@ -536,7 +551,6 @@ export const WebsitesPage: React.FC = () => {
   }, [categoryFilter, accountFilter, serverFilter, infraMap, list.items, search]);
 
   const inspected = list.items.find((item) => item.id === inspectedId) ?? null;
-  const inspectedInfra = inspected ? (infraMap.get(inspected.id) ?? null) : null;
 
   const totalCount = list.items.length;
   const onlineCount = list.items.filter((item) => { const p = probeMap[item.id]; return p?.online || (p?.statusCode && p.statusCode >= 200 && p.statusCode < 400); }).length;
@@ -612,8 +626,6 @@ export const WebsitesPage: React.FC = () => {
     const isSelected = inspectedId === app.id;
     const config = KIND_CONFIG[app.kind] ?? KIND_CONFIG.WEBSITE;
     const infra = infraMap.get(app.id);
-    const isOnline = probe?.online || (probe?.statusCode && probe.statusCode >= 200 && probe.statusCode < 400);
-    const isWarning = probe?.statusCode && (probe.statusCode === 401 || probe.statusCode === 403 || probe.statusCode === 404);
 
     return (
       <div
@@ -649,21 +661,8 @@ export const WebsitesPage: React.FC = () => {
                   <span className="material-symbols-outlined text-[13px] animate-spin">progress_activity</span>
                   Pinging…
                 </span>
-              ) : isOnline ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 shadow-sm">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                  </span>
-                  <span>{probe?.statusCode ?? 200} Online</span>
-                  {probe?.latencyMs != null && <span className="text-[10px] font-mono text-emerald-600/80">({probe.latencyMs}ms)</span>}
-                </span>
-              ) : isWarning ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                  <span className="h-2 w-2 rounded-full bg-amber-500" />
-                  <span>{probe?.statusCode} Response</span>
-                  {probe?.latencyMs != null && <span className="text-[10px] font-mono text-amber-600/80">({probe.latencyMs}ms)</span>}
-                </span>
+              ) : probe?.result ? (
+                <ApplicationProbeInline entry={{ result: probe.result, state: 'done' }} />
               ) : probe?.error ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-600 dark:text-rose-400">
                   <span className="h-2 w-2 rounded-full bg-rose-500" />
@@ -724,11 +723,6 @@ export const WebsitesPage: React.FC = () => {
               </Link>
             )}
 
-            {/* Domain Expiry Badge */}
-            {infra?.domain?.expiresAt && (
-              <DomainExpiryBadge expiresAt={infra.domain.expiresAt} />
-            )}
-
             <InventoryState state={app.inventoryState} />
           </div>
         </div>
@@ -744,15 +738,21 @@ export const WebsitesPage: React.FC = () => {
             <span className="text-xs text-secondary">No live endpoint</span>
           )}
           <div className="flex items-center gap-1">
-            <button type="button" disabled={probe?.loading} onClick={() => void probeWebsite(app.id, app.primaryUrl)} className="flex h-7.5 w-7.5 items-center justify-center rounded-lg text-secondary hover:bg-surface-container hover:text-primary transition-colors disabled:opacity-50 cursor-pointer" title="Ping live status now">
-              <span className={`material-symbols-outlined text-[16px] ${probe?.loading ? 'animate-spin' : ''}`}>sync</span>
-            </button>
-            <button type="button" onClick={() => setInspectedId((curr) => (curr === app.id ? null : app.id))} className={`flex h-7.5 items-center gap-1 rounded-lg px-2 text-xs font-medium transition-colors cursor-pointer ${isSelected ? 'bg-primary text-white font-semibold' : 'text-secondary hover:bg-surface-container hover:text-on-surface'}`} title="View details">
+            <Button
+              disabled={!app.primaryUrl || probe?.loading}
+              iconLeading="network_check"
+              onClick={() => void probeWebsite(app.id, app.primaryUrl)}
+              size="sm"
+            >
+              {probe?.loading ? 'Probing…' : probe ? 'Probe again' : 'Probe now'}
+            </Button>
+            <Link to={`/websites/${app.id}`} className="flex h-7.5 items-center gap-1 rounded-lg px-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-container hover:text-primary" title="View application details">
               <span className="material-symbols-outlined text-[15px]">info</span>
-              <span>Inspect</span>
-            </button>
-            <button type="button" onClick={() => setEditing(app)} className="flex h-7.5 w-7.5 items-center justify-center rounded-lg text-secondary hover:bg-surface-container hover:text-on-surface transition-colors cursor-pointer" title="Edit application">
+              <span>Details</span>
+            </Link>
+            <button type="button" onClick={() => setEditing(app)} className="flex h-7.5 items-center gap-1 rounded-lg px-2 text-xs font-medium text-secondary hover:bg-surface-container hover:text-on-surface transition-colors cursor-pointer" title="Edit application">
               <span className="material-symbols-outlined text-[15px]">edit</span>
+              <span>Edit</span>
             </button>
           </div>
         </div>
@@ -1053,23 +1053,6 @@ export const WebsitesPage: React.FC = () => {
             ))}
           </div>
 
-          <label className="flex h-8.5 items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant/40 bg-surface-container-low px-2.5 text-xs text-secondary cursor-pointer">
-            <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} className="rounded text-primary" />
-            <span>Archived</span>
-          </label>
-
-          {/* Cards vs Table */}
-          <div className="flex items-center rounded-xl border border-outline-variant/40 bg-surface-container-low p-0.5">
-            <button type="button" className={`flex h-7.5 items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-all cursor-pointer ${viewMode === 'grid' ? 'bg-surface-container-lowest text-primary shadow-xs font-semibold' : 'text-secondary hover:text-on-surface'}`} onClick={() => setViewMode('grid')}>
-              <span className="material-symbols-outlined text-[15px]">grid_view</span>
-              <span>Cards</span>
-            </button>
-            <button type="button" className={`flex h-7.5 items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-all cursor-pointer ${viewMode === 'table' ? 'bg-surface-container-lowest text-primary shadow-xs font-semibold' : 'text-secondary hover:text-on-surface'}`} onClick={() => setViewMode('table')}>
-              <span className="material-symbols-outlined text-[15px]">table_rows</span>
-              <span>Table</span>
-            </button>
-          </div>
-
           {/* Clear active filters */}
           {(accountFilter !== 'ALL' || serverFilter !== 'ALL' || search || categoryFilter !== 'ALL') && (
             <button type="button" onClick={() => { setAccountFilter('ALL'); setServerFilter('ALL'); setSearch(''); setCategoryFilter('ALL'); }} className="flex items-center gap-1 rounded-xl border border-outline-variant/40 bg-surface-container-low px-2.5 py-1.5 text-xs text-secondary hover:text-on-surface transition-colors cursor-pointer">
@@ -1077,6 +1060,25 @@ export const WebsitesPage: React.FC = () => {
               <span>Clear filters</span>
             </button>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            <label className="flex h-8.5 items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant/40 bg-surface-container-low px-2.5 text-xs text-secondary cursor-pointer">
+              <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} className="rounded text-primary" />
+              <span>Archived</span>
+            </label>
+
+            {/* Cards vs Table */}
+            <div className="flex items-center rounded-xl border border-outline-variant/40 bg-surface-container-low p-0.5">
+              <button type="button" className={`flex h-7.5 items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-all cursor-pointer ${viewMode === 'grid' ? 'bg-surface-container-lowest text-primary shadow-xs font-semibold' : 'text-secondary hover:text-on-surface'}`} onClick={() => setViewMode('grid')}>
+                <span className="material-symbols-outlined text-[15px]">grid_view</span>
+                <span>Cards</span>
+              </button>
+              <button type="button" className={`flex h-7.5 items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-all cursor-pointer ${viewMode === 'table' ? 'bg-surface-container-lowest text-primary shadow-xs font-semibold' : 'text-secondary hover:text-on-surface'}`} onClick={() => setViewMode('table')}>
+                <span className="material-symbols-outlined text-[15px]">table_rows</span>
+                <span>Table</span>
+              </button>
+            </div>
+
+          </div>
         </div>
       </div>
 
@@ -1129,108 +1131,25 @@ export const WebsitesPage: React.FC = () => {
               </div>
             )
           ) : (
-            /* Table View */
+            /* Table View (master layout) */
             <section className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left">
-                  <thead>
-                    <tr className="h-10 border-b border-outline-variant/30 bg-surface-container-low/60 text-[11px] font-semibold uppercase tracking-wider text-secondary">
-                      <th className="px-unit-md">Application</th>
-                      <th className="px-unit-sm">Type</th>
-                      <th className="px-unit-sm">Provider Account</th>
-                      <th className="px-unit-sm">Hosting Server</th>
-                      <th className="px-unit-sm">Domain Expiry</th>
-                      <th className="px-unit-sm">Live Status</th>
-                      <th className="px-unit-sm">Endpoint URL</th>
-                      <th className="px-unit-md text-right">Actions</th>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead><tr className="h-9 border-b border-outline-variant/30 bg-surface-container-low/60 text-caption-xs uppercase tracking-wider text-secondary"><th className="px-unit-md font-semibold">Application</th><th className="px-unit-sm font-semibold">Kind</th><th className="px-unit-sm font-semibold">Primary URL</th><th className="px-unit-sm font-semibold">Mappings</th><th className="px-unit-sm font-semibold">State</th><th className="px-unit-md text-right font-semibold">Actions</th></tr></thead>
+                <tbody className="divide-y divide-outline-variant/25">
+                  {visibleItems.map((application) => (
+                    <tr key={application.id} className={`cursor-pointer transition-colors hover:bg-surface-container-low/70 ${inspectedId === application.id ? 'bg-primary-fixed/30' : ''}`} onClick={() => setInspectedId((current) => current === application.id ? null : application.id)}>
+                      <td className="px-unit-md py-unit-sm"><p className="font-label-md font-semibold text-on-surface">{application.name}</p><p className="mt-0.5 font-label-mono text-[10px] text-secondary">{application.id}</p></td>
+                      <td className="px-unit-sm py-unit-sm text-body-sm text-on-surface">{kindLabel(application.kind)}</td>
+                      <td className="max-w-xs px-unit-sm py-unit-sm"><span className="block truncate font-label-mono text-caption-xs text-secondary">{application.primaryUrl ?? 'Not set'}</span><ApplicationProbeInline entry={probes.entries[application.id]} /></td>
+                      <td className="px-unit-sm py-unit-sm text-caption-xs text-secondary"><span className="block">Project: {shortId(application.projectId)}</span><span className="mt-0.5 block">Domain: {shortId(application.primaryDomainId)}</span></td>
+                      <td className="px-unit-sm py-unit-sm"><InventoryState state={application.inventoryState} /></td>
+                      <td className="px-unit-md py-unit-sm" onClick={(event) => event.stopPropagation()}><div className="flex justify-end gap-1"><Link className="inline-flex h-7 items-center px-2 text-caption-xs font-semibold text-primary" to={`/websites/${application.id}`}>Details</Link><Button size="sm" variant="ghost" disabled={!application.primaryUrl || probes.entries[application.id]?.state === 'loading'} onClick={() => void probes.run(application.id, application.primaryUrl)}>Probe</Button><Button size="sm" variant="ghost" onClick={() => setEditing(application)}>Edit</Button><Button size="sm" variant="ghost" onClick={() => void changeState(application)}>{application.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}</Button></div></td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-outline-variant/20">
-                    {visibleItems.map((application) => {
-                      const probe = probeMap[application.id];
-                      const infra = infraMap.get(application.id);
-                      const isOnline = probe?.online || (probe?.statusCode && probe.statusCode >= 200 && probe.statusCode < 400);
-                      return (
-                        <tr
-                          key={application.id}
-                          className={`cursor-pointer transition-colors hover:bg-surface-container-low/70 ${inspectedId === application.id ? 'bg-primary/5' : ''}`}
-                          onClick={() => setInspectedId((c) => (c === application.id ? null : application.id))}
-                        >
-                          <td className="px-unit-md py-3">
-                            <div className="flex items-center gap-2.5">
-                              <AppBrandIcon app={application} hostname={extractHostname(application.primaryUrl)} size="sm" />
-                              <div className="min-w-0">
-                                <p className="font-semibold text-sm text-on-surface truncate">{application.name}</p>
-                                <p className="font-mono text-[10px] text-secondary">{application.id.slice(0, 8)}…</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-unit-sm py-3 text-xs text-secondary">
-                            <span className="inline-flex rounded-md bg-surface-container px-2 py-0.5 font-medium">{kindLabel(application.kind)}</span>
-                          </td>
-                          <td className="px-unit-sm py-3">
-                            {infra?.providerAccount ? (
-                              <ProviderBadge account={infra.providerAccount} />
-                            ) : (
-                              <span className="text-xs text-secondary/60 italic">Unassigned</span>
-                            )}
-                          </td>
-                          <td className="px-unit-sm py-3">
-                            {infra?.server ? (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-xs font-medium text-on-surface">{infra.server.name}</span>
-                                {infra.server.primaryIp && <span className="text-[10px] font-mono text-secondary">{infra.server.primaryIp}</span>}
-                              </div>
-                            ) : infra?.domain ? (
-                              <span className="text-xs text-sky-600 dark:text-sky-400">🌐 {infra.domain.domainName}</span>
-                            ) : (
-                              <span className="text-xs text-secondary/60 italic">No server</span>
-                            )}
-                          </td>
-                          <td className="px-unit-sm py-3">
-                            {infra?.domain?.expiresAt ? (
-                              <DomainExpiryBadge expiresAt={infra.domain.expiresAt} />
-                            ) : (
-                              <span className="text-xs text-secondary/50">—</span>
-                            )}
-                          </td>
-                          <td className="px-unit-sm py-3">
-                            {probe?.loading ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-secondary"><span className="material-symbols-outlined animate-spin text-[12px]">progress_activity</span>Pinging</span>
-                            ) : isOnline ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600">
-                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                {probe?.statusCode ?? 200} ({probe?.latencyMs ?? 0}ms)
-                              </span>
-                            ) : probe?.error ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-600">
-                                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                                Offline
-                              </span>
-                            ) : (
-                              <span className="text-xs text-secondary">Not checked</span>
-                            )}
-                          </td>
-                          <td className="max-w-xs px-unit-sm py-3">
-                            <span className="block truncate font-mono text-xs text-on-surface">{application.primaryUrl ?? 'Not set'}</span>
-                          </td>
-                          <td className="px-unit-md py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-1.5">
-                              {application.primaryUrl && (
-                                <a href={application.primaryUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-7 items-center gap-1 rounded-lg bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors">Open ↗</a>
-                              )}
-                              <Button size="sm" variant="ghost" onClick={() => setEditing(application)}>Edit</Button>
-                              <Button size="sm" variant="ghost" onClick={() => void changeState(application)}>
-                                {application.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             </section>
           )}
 
@@ -1245,152 +1164,21 @@ export const WebsitesPage: React.FC = () => {
           </footer>
         </div>
 
-        {/* Inspector Drawer */}
-        {inspected && (
-          <aside className="w-full shrink-0 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest shadow-md xl:sticky xl:top-4 xl:w-88 overflow-hidden" aria-label="Application inspector">
-            <div className="h-1.5 bg-gradient-to-r from-primary via-emerald-500 to-sky-500" />
-            <div className="p-unit-lg flex flex-col gap-unit-md">
-              <div className="flex items-start justify-between gap-3 border-b border-outline-variant/20 pb-unit-sm">
-                <div className="flex items-center gap-3 min-w-0">
-                  <AppBrandIcon app={inspected} hostname={extractHostname(inspected.primaryUrl)} size="md" />
-                  <div className="min-w-0">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-secondary">Application Details</span>
-                    <h2 className="mt-0.5 truncate text-base font-bold text-on-surface">{inspected.name}</h2>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" iconLeading="close" aria-label="Close application inspector" onClick={() => setInspectedId(null)} />
-              </div>
-
-              {/* Status badges row */}
-              <div className="flex flex-wrap items-center gap-2">
-                <InventoryState state={inspected.inventoryState} />
-                <span className="rounded-full bg-surface-container px-2.5 py-0.5 text-xs font-semibold text-secondary">{kindLabel(inspected.kind)}</span>
-                {probeMap[inspected.id]?.online && (
-                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600">● {probeMap[inspected.id]?.statusCode} OK</span>
-                )}
-              </div>
-
-              <dl className="space-y-3 text-sm">
-                {/* Live Endpoint */}
-                <div className="rounded-xl bg-surface-container-low p-3">
-                  <dt className="text-[11px] font-semibold uppercase text-secondary">Live Endpoint</dt>
-                  <dd className="mt-1 break-all font-mono text-xs text-on-surface select-all">{inspected.primaryUrl ?? 'Not configured'}</dd>
-                </div>
-
-                {/* Provider Account */}
-                {inspectedInfra?.providerAccount && (
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <dt className="text-[11px] font-semibold uppercase text-secondary mb-1.5">Provider Account</dt>
-                    <dd className="flex flex-col gap-1">
-                      <ProviderBadge account={inspectedInfra.providerAccount} />
-                      <span className="text-[10px] text-secondary font-mono mt-1">Provider: {inspectedInfra.providerAccount.providerKey}</span>
-                    </dd>
-                  </div>
-                )}
-
-                {/* Hosting Server */}
-                {inspectedInfra?.server ? (
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <dt className="text-[11px] font-semibold uppercase text-secondary mb-1.5">Hosting Server</dt>
-                    <dd className="flex flex-col gap-1 text-xs">
-                      <div className="flex items-center gap-1.5 font-semibold text-on-surface">
-                        <span className="material-symbols-outlined text-[14px] text-purple-500">dns</span>
-                        {inspectedInfra.server.name}
-                      </div>
-                      {inspectedInfra.server.primaryIp && <span className="font-mono text-secondary">{inspectedInfra.server.primaryIp}</span>}
-                      {inspectedInfra.server.hostname && inspectedInfra.server.hostname !== inspectedInfra.server.primaryIp && (
-                        <span className="font-mono text-secondary text-[10px]">{inspectedInfra.server.hostname}</span>
-                      )}
-                      {inspectedInfra.server.region && <span className="text-secondary">Region: {inspectedInfra.server.region}</span>}
-                      {inspectedInfra.server.operatingSystem && <span className="text-secondary">OS: {inspectedInfra.server.operatingSystem}</span>}
-                      <Link to="/servers" className="mt-1 text-primary hover:underline text-[10px] font-medium">View server details →</Link>
-                    </dd>
-                  </div>
-                ) : (
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <dt className="text-[11px] font-semibold uppercase text-secondary">Hosting Server</dt>
-                    <dd className="mt-1 text-sm text-secondary italic">No server assigned</dd>
-                  </div>
-                )}
-
-                {/* Domain & Expiry */}
-                {inspectedInfra?.domain && (
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <dt className="text-[11px] font-semibold uppercase text-secondary mb-1.5 flex items-center justify-between">
-                      <span>Domain &amp; Expiration</span>
-                      {inspectedInfra.domain.expiresAt && (
-                        <span className="text-[10px] text-primary font-mono lowercase">whois verified</span>
-                      )}
-                    </dt>
-                    <dd className="flex flex-col gap-2 text-xs">
-                      <div className="flex items-center justify-between gap-1.5 font-semibold text-on-surface">
-                        <div className="flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-[15px] text-sky-500">language</span>
-                          <span>{inspectedInfra.domain.domainName}</span>
-                        </div>
-                        {inspectedInfra.domain.expiresAt && (
-                          <DomainExpiryBadge expiresAt={inspectedInfra.domain.expiresAt} />
-                        )}
-                      </div>
-                      {inspectedInfra.domain.expiresAt && (
-                        <div className="flex items-center justify-between text-xs text-secondary border-t border-outline-variant/20 pt-1.5 mt-0.5">
-                          <span>Expires on:</span>
-                          <span className="font-medium text-on-surface">
-                            {new Date(inspectedInfra.domain.expiresAt).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })}
-                          </span>
-                        </div>
-                      )}
-                      {inspectedInfra.domain.registeredAt && (
-                        <div className="flex items-center justify-between text-[11px] text-secondary">
-                          <span>Registered on:</span>
-                          <span>
-                            {new Date(inspectedInfra.domain.registeredAt).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </span>
-                        </div>
-                      )}
-                      <Link to="/domains" className="mt-1 text-primary hover:underline text-[10px] font-medium">Manage domain in portfolio →</Link>
-                    </dd>
-                  </div>
-                )}
-
-                {/* Page title */}
-                {probeMap[inspected.id]?.title && (
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <dt className="text-[11px] font-semibold uppercase text-secondary">Page Title Detected</dt>
-                    <dd className="mt-1 text-sm italic text-on-surface">&ldquo;{probeMap[inspected.id]?.title}&rdquo;</dd>
-                  </div>
-                )}
-
-                {/* Notes */}
-                {inspected.notes && (
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <dt className="text-[11px] font-semibold uppercase text-secondary">Notes &amp; Details</dt>
-                    <dd className="mt-1 whitespace-pre-wrap text-sm text-on-surface">{inspected.notes}</dd>
-                  </div>
-                )}
+        {/* Inspector (table view, master layout) */}
+        {viewMode === 'table' && inspected && (
+          <aside className="w-full shrink-0 rounded-xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm xl:sticky xl:top-4 xl:w-80" aria-label="Application inspector">
+            <div className="h-1 rounded-t-xl bg-gradient-to-r from-primary via-tertiary to-surface-variant" />
+            <div className="p-unit-lg">
+              <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-caption-xs font-semibold uppercase tracking-wider text-secondary">Selected application</p><h2 className="mt-1 truncate text-headline-sm font-semibold text-on-surface">{inspected.name}</h2></div><Button variant="ghost" size="sm" iconLeading="close" aria-label="Close application inspector" onClick={() => setInspectedId(null)} /></div>
+              <div className="mt-unit-md flex flex-wrap gap-2"><InventoryState state={inspected.inventoryState} /><span className="rounded-full bg-surface-container px-2 py-1 text-[11px] font-semibold text-secondary">{kindLabel(inspected.kind)}</span></div>
+              <dl className="mt-unit-md space-y-unit-sm">
+                <div><dt className="text-caption-xs uppercase text-secondary">Primary URL</dt><dd className="mt-1 break-all text-body-sm text-on-surface">{inspected.primaryUrl ?? 'Not set'}</dd></div>
+                <div><dt className="text-caption-xs uppercase text-secondary">Project record</dt><dd className="mt-1 break-all font-label-mono text-caption-xs text-on-surface">{inspected.projectId ?? 'Not mapped'}</dd></div>
+                <div><dt className="text-caption-xs uppercase text-secondary">Primary domain record</dt><dd className="mt-1 break-all font-label-mono text-caption-xs text-on-surface">{inspected.primaryDomainId ?? 'Not mapped'}</dd></div>
+                <div><dt className="text-caption-xs uppercase text-secondary">Notes</dt><dd className="mt-1 whitespace-pre-wrap text-body-sm text-on-surface">{inspected.notes ?? 'No notes'}</dd></div>
               </dl>
-
-              {/* Inspector Actions */}
-              <div className="flex flex-col gap-2 pt-2">
-                {inspected.primaryUrl && (
-                  <a href={inspected.primaryUrl} target="_blank" rel="noopener noreferrer" className="flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-indigo-600 text-sm font-semibold text-white shadow-sm hover:from-primary/95 hover:to-indigo-500 transition-all cursor-pointer">
-                    <span>Visit Live Site</span>
-                    <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                  </a>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" onClick={() => void probeWebsite(inspected.id, inspected.primaryUrl)}>Re-ping</Button>
-                  <Button onClick={() => setEditing(inspected)}>Edit</Button>
-                </div>
-              </div>
+              <div className="mt-unit-lg grid grid-cols-2 gap-2"><Link className="inline-flex h-9 items-center justify-center rounded-lg bg-primary text-label-md font-medium text-on-primary" to={`/websites/${inspected.id}`}>View details</Link><Button onClick={() => setEditing(inspected)}>Edit</Button></div>
+              <ApplicationProbeDetails entry={probes.entries[inspected.id]} onProbe={() => void probes.run(inspected.id, inspected.primaryUrl)} url={inspected.primaryUrl} />
             </div>
           </aside>
         )}

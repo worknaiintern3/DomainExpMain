@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "project": {
+    "name": "domainpulse",
+    "productType": null,
+    "stack": [
+      "vite"
+    ]
+  },
+  "sources": {
+    "tokens": [],
+    "components": [],
+    "assets": [],
+    "instructions": []
+  },
+  "design": {
+    "colorMode": "unknown",
+    "colors": {},
+    "typography": {},
+    "spacing": {},
+    "radius": {},
+    "shadows": {},
+    "motion": {},
+    "density": "unknown"
+  },
+  "components": {
+    "installed": [],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [],
+    "avoid": []
+  },
+  "decisions": [],
+  "evidence": [
+    {
+      "fact": "project.stack:vite",
+      "source": "package.json"
+    }
+  ],
+  "generatedAt": "2026-10-21T11:15:52.698Z"
+}

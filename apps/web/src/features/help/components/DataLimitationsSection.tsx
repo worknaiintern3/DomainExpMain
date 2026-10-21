@@ -13,7 +13,7 @@ export const DataLimitationsSection: React.FC = () => {
             Data Limitations &amp; Disclosures
           </h3>
           <p className="font-body-sm text-body-sm text-secondary mt-unit-2xs">
-            Review the operational boundaries of our automated portfolio data collection and reference pricing models.
+            Review the operational boundaries of our automated portfolio data collection and pricing retrieved from supported registrar APIs.
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import type { ProblemDetails } from './types';
 
-const API_BASE_PATH = '/api/v1';
+const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+const API_BASE_PATH = (env?.['VITE_API_BASE_URL'] || '/api/v1').replace(/\/+$/, '');
 
 interface AuthBridge {
   getAccessToken(): string | null;

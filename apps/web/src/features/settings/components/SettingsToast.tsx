@@ -31,7 +31,7 @@ export const SettingsToast: React.FC<SettingsToastProps> = ({ toast, onDismiss }
             {toast.message}
           </span>
           <span className="font-caption-xs text-caption-xs text-secondary-fixed-dim truncate">
-            {toast.description || 'Preferences updated in local demo session'}
+            {toast.description || 'Preference action completed.'}
           </span>
         </div>
         <button

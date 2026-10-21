@@ -11,14 +11,14 @@ export const SslCertificateSection: React.FC<SslCertificateSectionProps> = ({ da
       {/* Header */}
       <div className="flex items-center justify-between pb-unit-sm mb-unit-md bg-surface-container-low/40 p-unit-sm rounded-lg border border-outline-variant/20">
         <div className="flex items-center gap-unit-xs">
-          <span className="material-symbols-outlined text-[#10b981] text-[20px]">
+          <span className="material-symbols-outlined text-healthy text-[20px]">
             lock_reset
           </span>
           <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
             SSL / TLS Certificate
           </h2>
         </div>
-        <span className="px-unit-xs py-unit-2xs rounded bg-[#ecfdf5] text-[#065f46] font-caption-xs text-caption-xs font-semibold">
+        <span className="px-unit-xs py-unit-2xs rounded bg-healthy-bg text-healthy-text font-caption-xs text-caption-xs font-semibold">
           SSL Retrieved • Valid
         </span>
       </div>
@@ -45,7 +45,7 @@ export const SslCertificateSection: React.FC<SslCertificateSectionProps> = ({ da
         {/* Status */}
         <div className="flex justify-between items-center p-unit-xs bg-surface-container-low rounded-lg border border-outline-variant/20">
           <span className="font-caption-xs text-caption-xs text-secondary">Status</span>
-          <span className="font-label-mono text-label-mono text-body-sm font-semibold text-[#065f46]">
+          <span className="font-label-mono text-label-mono text-body-sm font-semibold text-healthy-text">
             {data.sslStatusText}
           </span>
         </div>
@@ -62,7 +62,7 @@ export const SslCertificateSection: React.FC<SslCertificateSectionProps> = ({ da
           </div>
           <div className="w-full bg-surface-container rounded-full h-1.5 overflow-hidden my-2">
             <div
-              className="bg-[#10b981] h-full rounded-full"
+              className="bg-healthy h-full rounded-full"
               style={{ width: `${Math.min(100, Math.max(5, data.sslProgressPercentage))}%` }}
             />
           </div>

@@ -1,4 +1,4 @@
-export type DomainAvailabilityStatus = 'available' | 'registered';
+export type DomainAvailabilityStatus = 'available' | 'registered' | 'unknown';
 
 export interface TldAvailabilityItem {
   id: string;
@@ -72,7 +72,7 @@ export interface WatchlistItem {
   registrarNote: string;
 }
 
-export type SearchState = 'results' | 'loading' | 'empty';
+export type SearchState = 'results' | 'loading' | 'empty' | 'error';
 
 export interface FindDomainSummary {
   activeQuery: string;

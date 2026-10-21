@@ -1,74 +1,34 @@
+import type { LandingPage } from '@/api/settings';
 import { DomainPulseSettings, WorkspaceDataSummary } from './settings.types';
 
 export const DEFAULT_SETTINGS: DomainPulseSettings = {
   general: {
-    workspaceDisplayName: 'Aman Developer',
-    workspaceName: 'Portfolio Workspace',
-    defaultLandingPage: 'Overview',
+    displayName: '',
+    workspaceName: 'Personal workspace',
+    defaultLandingPage: '/overview',
     timezone: 'Asia/Kolkata',
     dateFormat: 'DD MMM YYYY',
-    defaultCurrency: 'INR',
     rowsPerPage: 20,
   },
   portfolio: {
-    automaticMetadataRefresh: 'on-start',
-    domainMetadataSources: {
-      rdap: true,
-      dns: true,
-      ssl: true,
-    },
-    relationshipDisplayMode: 'mapped',
-    defaultInfrastructureView: 'inventory',
-    defaultAutoRenewAssumption: 'off',
-    criticalThresholdDays: 7,
-    warningThresholdDays: 30,
-    healthyThresholdDays: 30,
-    defaultCategoryTag: 'Core Portfolio',
     autoFetchMetadataOnCreation: true,
+    automaticMetadataRefresh: 'on-open',
+    criticalThresholdDays: 7,
+    defaultAutoRenew: 'unknown',
+    metadataSources: { dns: true, http: true, infra: true, rdap: true, tls: true },
+    warningThresholdDays: 30,
   },
   domainDiscovery: {
-    defaultCheckedTlds: ['.com', '.in', '.co.in', '.ai', '.io', '.dev', '.app', '.tech'],
-    defaultDiscoveryMode: 'reference-preview',
-    savedSearchHistory: true,
-    defaultRegistrarComparison: 'best-value',
-    domainAvailabilitySource: 'reference-dataset',
-    preferredSuggestionStyle: 'brandable',
-    smartNameVariations: true,
     availabilityCheckMode: 'selected',
+    defaultCheckedTlds: ['.com', '.in', '.co.in', '.ai', '.io', '.dev', '.app', '.tech'],
     defaultSearchSort: 'availability',
-  },
-  alerts: {
-    criticalThreshold: '≤ 7 days',
-    warningThreshold: '8–30 days',
-    healthyThreshold: '> 30 days',
-    reminderIntervals: {
-      thirtyDays: true,
-      fifteenDays: true,
-      sevenDays: true,
-      threeDays: true,
-      oneDay: true,
-    },
-    sslReminderIntervals: {
-      thirtyDays: true,
-      fourteenDays: true,
-      sevenDays: true,
-    },
-    autoRenewDiscrepancyAlert: true,
-    dnsResolutionCheck: true,
-    channels: {
-      inAppDashboard: true,
-      browserPush: false,
-      email: false,
-      whatsapp: false,
-    },
+    savedSearchHistory: true,
   },
   pricing: {
     defaultCurrency: 'INR',
-    pricingMode: 'reference-dataset',
+    pricingMode: 'live-registrar-apis',
     defaultPricingHorizon: '5-years',
     defaultComparisonSort: 'best-value',
-    includeWhoisPrivacy: true,
-    includeDnssec: true,
     renewalMarkupThreshold: 50,
     showRegistrationPriceColumn: true,
     showRenewalPriceColumn: true,
@@ -89,12 +49,7 @@ export const DEFAULT_SETTINGS: DomainPulseSettings = {
 export const WORKSPACE_SUMMARY_DATA: WorkspaceDataSummary = {
   storage: 'Portfolio Workspace',
   domainDataSources: 'RDAP / DNS / SSL',
-  pricingMode: 'Reference Dataset',
-  monitoringState: 'Not Connected',
-  totalDomainsCount: 42,
-  totalServersCount: 6,
-  totalWebsitesCount: 18,
-  totalAccountsCount: 5,
+  pricingMode: 'Live Registrar APIs',
 };
 
 export const TIMEZONE_OPTIONS = [
@@ -122,16 +77,22 @@ export const CURRENCY_OPTIONS = [
   { code: 'GBP', symbol: '£', name: 'British Pound', label: 'GBP (£) - British Pound' },
 ];
 
-export const LANDING_PAGE_OPTIONS = [
-  { value: 'Overview', label: 'Overview' },
-  { value: 'My Domains', label: 'My Domains' },
-  { value: 'VPS & Servers', label: 'VPS & Servers' },
-  { value: 'Websites & Apps', label: 'Websites & Apps' },
-  { value: 'Accounts & Emails', label: 'Accounts & Emails' },
-  { value: 'Find Domain', label: 'Find Domain' },
-  { value: 'Price Comparison', label: 'Price Comparison' },
-  { value: 'Alerts & Monitoring', label: 'Alerts & Monitoring' },
-  { value: 'Infrastructure Map', label: 'Infrastructure Map' },
+export const LANDING_PAGE_OPTIONS: ReadonlyArray<{ value: LandingPage; label: string }> = [
+  { value: '/overview', label: 'Overview' },
+  { value: '/domains', label: 'My Domains' },
+  { value: '/servers', label: 'VPS & Servers' },
+  { value: '/websites', label: 'Websites & Apps' },
+  { value: '/projects', label: 'Projects' },
+  { value: '/cloud-resources', label: 'Cloud Resources' },
+  { value: '/accounts', label: 'Accounts & Emails' },
+  { value: '/find-domain', label: 'Find Domain' },
+  { value: '/pricing', label: 'Price Comparison' },
+  { value: '/alerts', label: 'Alerts & Monitoring' },
+  { value: '/activities', label: 'Recent Activity' },
+  { value: '/notifications', label: 'Notifications' },
+  { value: '/infrastructure-map', label: 'Infrastructure Map' },
+  { value: '/google-play', label: 'Google Play Console' },
+  { value: '/play-store', label: 'Play Store Search' },
 ];
 
 export const AVAILABLE_TLDS = [

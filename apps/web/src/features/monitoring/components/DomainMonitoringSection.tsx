@@ -11,10 +11,9 @@ import {
 } from '@/api/monitoring';
 import { Button } from '@/components/common/Button';
 
+import { formatDateTime } from '@/lib/format';
 function formatDate(value: string | null): string {
-  if (!value) return 'Not scheduled';
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? 'Not scheduled' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return formatDateTime(value, 'Not scheduled');
 }
 
 function humanStatus(value: string | null): string {
