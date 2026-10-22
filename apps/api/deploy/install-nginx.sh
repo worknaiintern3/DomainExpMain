@@ -7,12 +7,12 @@ bash "$DEPLOY_DIR/preflight.sh"
 verify_local
 python3 - <<'PY'
 import socket
-addresses = {item[4][0] for item in socket.getaddrinfo('app.domainexp.info', 443, socket.AF_INET)}
+addresses = {item[4][0] for item in socket.getaddrinfo('app.domainexprt.com', 443, socket.AF_INET)}
 if addresses != {'200.234.45.233'}:
     raise SystemExit('DNS must point directly to 200.234.45.233 before first SSL/Nginx installation')
 PY
-docker exec "$CENTRAL_NGINX" test -s /etc/letsencrypt/live/app.domainexp.info/fullchain.pem
-docker exec "$CENTRAL_NGINX" test -s /etc/letsencrypt/live/app.domainexp.info/privkey.pem
+docker exec "$CENTRAL_NGINX" test -s /etc/letsencrypt/live/app.domainexprt.com/fullchain.pem
+docker exec "$CENTRAL_NGINX" test -s /etc/letsencrypt/live/app.domainexprt.com/privkey.pem
 # Resolve the existing bind/volume mount; never replace a whole config directory.
 config_dir="$(docker inspect "$CENTRAL_NGINX" | python3 -c '
 import json,sys
@@ -24,7 +24,7 @@ for m in sorted(mounts,key=lambda m:len(m["Destination"]),reverse=True):
 else: raise SystemExit("Central Nginx needs an existing persistent directory mount for conf.d; no container recreation is allowed")
 ')"
 [[ -d "$config_dir" && -w "$config_dir" ]] || { echo 'Run installation as a user allowed to write the central config mount.' >&2; exit 1; }
-target="$config_dir/app.domainexp.info.conf"
+target="$config_dir/app.domainexprt.com.conf"
 [[ ! -L "$target" ]] || { echo 'Refusing to overwrite a symlinked domain config.' >&2; exit 1; }
 backup=''
 if [[ -f "$target" ]]; then
@@ -47,9 +47,9 @@ restore() {
   exit "$status"
 }
 trap restore ERR
-install -m 644 "$DEPLOY_DIR/nginx/app.domainexp.info.conf" "$target"
+install -m 644 "$DEPLOY_DIR/nginx/app.domainexprt.com.conf" "$target"
 docker exec "$CENTRAL_NGINX" nginx -t
 docker exec "$CENTRAL_NGINX" nginx -s reload
 trap - ERR
 verify_public
-echo 'Installed only app.domainexp.info; central Nginx was tested and gracefully reloaded.'
+echo 'Installed only app.domainexprt.com; central Nginx was tested and gracefully reloaded.'

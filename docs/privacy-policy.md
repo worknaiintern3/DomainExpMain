@@ -13,7 +13,7 @@
 
 Welcome to **DomainPulse** ("we," "our," or "us"). DomainPulse is a multi-cloud infrastructure, domain monitoring, and application telemetry platform developed to help developers, IT administrators, and digital teams monitor domain names, SSL certificates, cloud servers, and mobile applications from a single interface.
 
-This Privacy Policy explains how we collect, use, disclose, protect, and handle your information when you use our mobile application (**DomainPulse**, package name `com.domainpulse.mobile`) and related backend services hosted at `https://app.domainexp.info` (collectively, the "Service").
+This Privacy Policy explains how we collect, use, disclose, protect, and handle your information when you use our mobile application (**DomainPulse**, package name `com.domainpulse.mobile`) and related backend services hosted at `https://app.domainexprt.com` (collectively, the "Service").
 
 By accessing or using DomainPulse, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with any part of this policy, please do not use the Service.
 
@@ -70,7 +70,7 @@ DomainPulse strictly complies with the **Google API Services User Data Policy**,
 
 We implement industry-standard administrative, physical, and technical security controls to safeguard your data:
 
-* **Encryption in Transit:** All communication between the DomainPulse mobile app, backend servers (`https://app.domainexp.info`), and external APIs is encrypted using **TLS 1.3 / HTTPS**. Plaintext HTTP connections are rejected.
+* **Encryption in Transit:** All communication between the DomainPulse mobile app, backend servers (`https://app.domainexprt.com`), and external APIs is encrypted using **TLS 1.3 / HTTPS**. Plaintext HTTP connections are rejected.
 * **Encryption at Rest:** Sensitive provider API tokens, Google OAuth refresh tokens, and credentials are encrypted at rest using **AES-256-GCM** encryption before being stored in the database.
 * **Tenant Isolation:** Database records and mobile caches are keyed to authenticated workspace and user IDs. Users can only query and view resources belonging to their own verified account.
 * **Password Hashing:** Passwords are never stored in plaintext and are hashed using modern cryptographic algorithms with unique salt.
@@ -132,7 +132,7 @@ If you have questions, comments, or concerns regarding this Privacy Policy or ou
 
 * **Email:** [support@domainpulse.io](mailto:support@domainpulse.io)
 * **Alternate Contact:** [admin@domainexp.info](mailto:admin@domainexp.info)
-* **Service URL:** `https://app.domainexp.info`
+* **Service URL:** `https://app.domainexprt.com`
 * **Application:** DomainPulse (`com.domainpulse.mobile`)
 
 ---

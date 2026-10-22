@@ -160,7 +160,7 @@ const PRIVACY_HTML = `<!DOCTYPE html>
       Welcome to <strong>DomainPulse</strong> ("we," "our," or "us"). DomainPulse is a multi-cloud infrastructure, domain monitoring, and application telemetry platform developed to help developers, IT administrators, and digital teams monitor domain names, SSL certificates, cloud servers, and mobile applications from a single unified interface.
     </p>
     <p>
-      This Privacy Policy explains how we collect, use, disclose, protect, and handle your information when you use our mobile application (<strong>DomainPulse</strong>, package name <code>com.domainpulse.mobile</code>) and related backend services hosted at <code>https://app.domainexp.info</code> (collectively, the "Service").
+      This Privacy Policy explains how we collect, use, disclose, protect, and handle your information when you use our mobile application (<strong>DomainPulse</strong>, package name <code>com.domainpulse.mobile</code>) and related backend services hosted at <code>https://app.domainexprt.com</code> (collectively, the "Service").
     </p>
     <p>
       By accessing or using DomainPulse, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with any part of this policy, please do not use the Service.
@@ -206,7 +206,7 @@ const PRIVACY_HTML = `<!DOCTYPE html>
     <h2>5. Data Security and Encryption</h2>
     <p>We implement rigorous security controls to ensure your confidential credentials and telemetry remain protected:</p>
     <ul>
-      <li><strong>Encryption in Transit:</strong> All data transmitted between the mobile application, our backend servers (<code>https://app.domainexp.info</code>), and external APIs is strictly encrypted using <strong>TLS 1.3 / HTTPS</strong>.</li>
+      <li><strong>Encryption in Transit:</strong> All data transmitted between the mobile application, our backend servers (<code>https://app.domainexprt.com</code>), and external APIs is strictly encrypted using <strong>TLS 1.3 / HTTPS</strong>.</li>
       <li><strong>Encryption at Rest:</strong> Cloud provider API tokens, Google OAuth refresh tokens, and secrets are encrypted using <strong>AES-256-GCM</strong> encryption before storage.</li>
       <li><strong>Tenant Isolation:</strong> Database records are strictly bound to authenticated workspace IDs; customer data is fully isolated and inaccessible to other users.</li>
       <li><strong>Password Security:</strong> Passwords are hashed using salted cryptographic algorithms and never stored in plaintext.</li>
@@ -240,12 +240,12 @@ const PRIVACY_HTML = `<!DOCTYPE html>
     <ul>
       <li><strong>Primary Email:</strong> <a href="mailto:support@domainpulse.io">support@domainpulse.io</a></li>
       <li><strong>Alternate Email:</strong> <a href="mailto:admin@domainexp.info">admin@domainexp.info</a></li>
-      <li><strong>Service Host:</strong> <code>https://app.domainexp.info</code></li>
+      <li><strong>Service Host:</strong> <code>https://app.domainexprt.com</code></li>
       <li><strong>Application:</strong> DomainPulse (<code>com.domainpulse.mobile</code>)</li>
     </ul>
 
     <div class="footer">
-      &copy; 2026 DomainPulse. All rights reserved. &bull; <a href="https://app.domainexp.info/health">System Status</a>
+      &copy; 2026 DomainPulse. All rights reserved. &bull; <a href="https://app.domainexprt.com/health">System Status</a>
     </div>
   </div>
 </body>
