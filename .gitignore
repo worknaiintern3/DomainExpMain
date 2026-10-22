@@ -17,6 +17,7 @@ out/
 *.env.*
 !.env.example
 !apps/web/.env.production
+!apps/web/.env.development
 !apps/landing/.env.production
 
 # Vite & build caches
