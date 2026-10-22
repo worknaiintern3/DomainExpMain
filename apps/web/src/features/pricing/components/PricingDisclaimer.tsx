@@ -11,19 +11,19 @@ export const PricingDisclaimer: React.FC = () => {
         <span className="material-symbols-outlined text-primary text-[20px] shrink-0">
           info
         </span>
-        <p className="font-body-sm text-body-sm text-on-surface-variant truncate">
-          <strong className="font-label-md text-on-surface">Reference Data:</strong>{' '}
-          Pricing shown in this workspace is stored/reference data unless a future provider integration supplies current rates. Registrar pricing, taxes, promotions and renewal terms may change. Verify final pricing directly with the provider.
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          <strong className="font-label-md text-on-surface">Availability estimate:</strong>{' '}
+          The current backend checks domain availability via WHOIS/DNS,
+          but <strong className="text-amber-700">does not provide live registrar prices</strong>. An available result may use a DNS fallback and is not a purchase guarantee.
+          Confirm availability and the final price directly with a registrar before purchasing.
         </p>
       </div>
       <div className="flex items-center gap-unit-md shrink-0 ml-unit-base">
-        <span className="font-caption-xs text-caption-xs text-secondary whitespace-nowrap hidden sm:inline">
-          Reference Dataset: Benchmark Prototype Data • Currency: INR (₹)
-        </span>
         <button
           onClick={() => setIsDismissed(true)}
           className="text-on-surface-variant hover:text-on-surface flex items-center justify-center p-unit-2xs rounded hover:bg-surface-container transition-colors cursor-pointer"
           title="Dismiss notice"
+          aria-label="Dismiss notice"
           type="button"
         >
           <span className="material-symbols-outlined text-[16px]">close</span>

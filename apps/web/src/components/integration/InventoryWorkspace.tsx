@@ -1,16 +1,18 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { archiveInventory, createInventory, updateInventory } from '@/api/inventory';
-import type { InventoryMetadata, InventoryResource, InventoryResourceMap } from '@/api/types';
+import { archiveInventory, createInventory, listInventory, updateInventory } from '@/api/inventory';
+import type { CursorPage, EmailAccount, InventoryMetadata, InventoryResource, InventoryResourceMap } from '@/api/types';
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useCursorInventory } from '@/hooks/useCursorInventory';
 
+import { formatDateTime } from '@/lib/format';
+import { usePreferences } from '@/preferences/PreferencesContext';
 export interface ResourceField {
   create?: boolean;
   helpText?: string;
-  input?: 'text' | 'textarea' | 'select' | 'date';
+  input?: 'text' | 'textarea' | 'select' | 'email-account-select';
   key: string;
   label: string;
   list?: boolean;
@@ -22,7 +24,7 @@ export interface ResourceField {
   required?: boolean;
   render?(value: unknown, record: InventoryMetadata & Record<string, unknown>): React.ReactNode;
   trimOnBlur?: boolean;
-  validate?(value: string, allValues?: Record<string, string>): string | null;
+  validate?(value: string): string | null;
   valueType?: 'boolean' | 'string';
 }
 
@@ -40,16 +42,29 @@ function displayValue(field: ResourceField, record: InventoryMetadata & Record<s
   if (field.render) return field.render(value, record);
   if (value === null || value === undefined || value === '') return <span className="text-outline">Unknown</span>;
   if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
-  if (field.key.endsWith('At') && typeof value === 'string') return new Date(value).toLocaleString();
+  if (field.key.endsWith('At') && typeof value === 'string') return formatDateTime(value);
   return String(value).split('_').join(' ');
 }
 
-function initialForm(fields: ResourceField[], record?: InventoryMetadata & Record<string, unknown>) {
+function initialForm(
+  fields: ResourceField[],
+  record?: InventoryMetadata & Record<string, unknown>,
+  createDefaults: Record<string, string> = {},
+) {
   return Object.fromEntries(fields.filter((field) => field.create !== false).map((field) => {
     const value = record?.[field.key];
-    if (field.input === 'date' && typeof value === 'string' && value) {
-      const datePart = value.includes('T') ? value.split('T')[0] : value.slice(0, 10);
-      return [field.key, datePart];
+    const createDefault = createDefaults[field.key];
+    if (!record && createDefault !== undefined && (value === null || value === undefined)) {
+      return [field.key, createDefault];
+    }
+    if (
+      !record &&
+      (value === null || value === undefined) &&
+      field.input === 'select' &&
+      field.required &&
+      !field.nullable
+    ) {
+      return [field.key, field.options?.[0]?.value ?? ''];
     }
     return [field.key, value === null || value === undefined ? '' : String(value)];
   }));
@@ -58,42 +73,94 @@ function initialForm(fields: ResourceField[], record?: InventoryMetadata & Recor
 function toValue(field: ResourceField, value: string): unknown {
   if (field.valueType === 'boolean') return value === '' ? null : value === 'true';
   const clean = value.trim();
-  if (clean === '' && field.nullable) return null;
-  if (field.input === 'date' && clean) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
-      return `${clean}T00:00:00.000Z`;
-    }
-    try {
-      const parsed = new Date(clean);
-      if (!isNaN(parsed.getTime())) return parsed.toISOString();
-    } catch {
-      // Fallback
-    }
-  }
   return clean === '' && field.nullable ? null : clean;
 }
+
+const EmailAccountSelect: React.FC<{
+  onChange(value: string): void;
+  value: string;
+}> = ({ onChange, value }) => {
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const byId = new Map<string, EmailAccount>();
+        let cursor: string | null = null;
+        do {
+          const page: CursorPage<EmailAccount> = await listInventory('email-accounts', {
+            ...(cursor ? { cursor } : {}),
+            includeArchived: true,
+            limit: 100,
+            signal: controller.signal,
+          });
+          for (const account of page.items) byId.set(account.id, account);
+          cursor = page.nextCursor;
+        } while (cursor && !controller.signal.aborted);
+        if (!controller.signal.aborted) setAccounts([...byId.values()]);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setLoadError(error instanceof Error ? error.message : 'Email accounts could not be loaded.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, []);
+
+  const available = accounts.filter((account) => account.inventoryState === 'TRACKED' || account.id === value);
+  const hasCurrent = available.some((account) => account.id === value);
+  return (
+    <>
+      <select
+        className="h-10 rounded-lg border border-outline-variant px-3"
+        disabled={loading || loadError !== null}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">{!loading && !loadError && available.length === 0 ? 'No email accounts available' : 'Not recorded'}</option>
+        {value && !hasCurrent && <option value={value}>Current email account</option>}
+        {available.map((account) => (
+          <option key={account.id} value={account.id}>
+            {account.label ? `${account.label} — ${account.email}` : account.email}
+            {account.inventoryState === 'ARCHIVED' ? ' (archived)' : ''}
+          </option>
+        ))}
+      </select>
+      {loadError && <span className="text-caption-xs font-normal text-error">{loadError}</span>}
+    </>
+  );
+};
 
 export const ResourceFormModal = <R extends InventoryResource>({
   config,
   onClose,
   onSaved,
   record,
-  initialValues,
 }: {
   config: ResourceConfiguration<R>;
   onClose(): void;
   onSaved(record: InventoryResourceMap[R]): void;
   record?: InventoryResourceMap[R];
-  initialValues?: Partial<InventoryResourceMap[R]>;
 }) => {
   const editableFields = config.fields.filter((field) => field.create !== false);
-  const isExisting = Boolean(record?.id && typeof record.id === 'string' && record.id.trim() !== '');
-  const [form, setForm] = useState<Record<string, string>>(() =>
-    initialForm(
-      editableFields,
-      (record || initialValues) as unknown as InventoryMetadata & Record<string, unknown>,
-    ),
-  );
+  const { portfolio, status: preferencesStatus } = usePreferences();
+  // New domains start with the auto-renew default from Portfolio settings ("unknown" leaves it blank).
+  const createDefaults: Record<string, string> =
+    config.resource === 'domains' && portfolio.defaultAutoRenew !== 'unknown'
+      ? { autoRenew: portfolio.defaultAutoRenew === 'on' ? 'true' : 'false' }
+      : {};
+  const [form, setForm] = useState<Record<string, string>>(() => initialForm(editableFields, record as unknown as InventoryMetadata & Record<string, unknown>, createDefaults));
+  const [autoRenewEdited, setAutoRenewEdited] = useState(false);
+  useEffect(() => {
+    if (record || config.resource !== 'domains' || preferencesStatus !== 'ready' || autoRenewEdited) return;
+    setForm((current) => ({ ...current, autoRenew: portfolio.defaultAutoRenew === 'unknown' ? '' : String(portfolio.defaultAutoRenew === 'on') }));
+  }, [autoRenewEdited, config.resource, portfolio.defaultAutoRenew, preferencesStatus, record]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,28 +168,28 @@ export const ResourceFormModal = <R extends InventoryResource>({
     event.preventDefault();
     const input: Record<string, unknown> = {};
     for (const field of editableFields) {
-      const validationError = field.validate?.(form[field.key] ?? '', form);
+      const validationError = field.validate?.(form[field.key] ?? '');
       if (validationError) {
         setError(`${field.label}: ${validationError}`);
         return;
       }
       const parsed = toValue(field, form[field.key] ?? '');
-      if (!isExisting) {
+      if (!record) {
         if (parsed !== '' && (parsed !== null || field.nullable)) input[field.key] = parsed;
       } else {
         const original = (record as unknown as InventoryMetadata & Record<string, unknown>)[field.key];
         if (!Object.is(parsed, original)) input[field.key] = parsed;
       }
     }
-    if (isExisting && Object.keys(input).length === 0) {
+    if (record && Object.keys(input).length === 0) {
       onClose();
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      const saved = isExisting
-        ? await updateInventory(config.resource, record!.id, input)
+      const saved = record
+        ? await updateInventory(config.resource, record.id, input)
         : await createInventory(config.resource, input);
       onSaved(saved);
       onClose();
@@ -137,84 +204,22 @@ export const ResourceFormModal = <R extends InventoryResource>({
     <div className="fixed inset-0 z-[70] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4" role="presentation">
       <section className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-xl p-6" role="dialog" aria-modal="true" aria-labelledby="resource-form-title">
         <div className="flex items-center justify-between mb-5">
-          <h2 id="resource-form-title" className="text-headline-sm font-semibold">{isExisting ? `Edit ${config.singular}` : `Add ${config.singular}`}</h2>
+          <h2 id="resource-form-title" className="text-headline-sm font-semibold">{record ? `Edit ${config.singular}` : `Add ${config.singular}`}</h2>
           <Button variant="ghost" onClick={onClose} aria-label="Close dialog" iconLeading="close" />
         </div>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={submit}>
           {editableFields.map((field) => (
             <label key={field.key} className={`flex flex-col gap-1.5 text-label-md font-medium ${field.input === 'textarea' ? 'md:col-span-2' : ''}`}>
-              {field.label}
+              {field.label}{field.nullable && <span className="text-caption-xs text-secondary">Optional; blank clears</span>}
               {field.input === 'textarea' ? (
                 <textarea className="min-h-24 rounded-lg border border-outline-variant p-3" maxLength={field.maxLength} value={form[field.key] ?? ''} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} />
+              ) : field.input === 'email-account-select' ? (
+                <EmailAccountSelect value={form[field.key] ?? ''} onChange={(value) => { setError(null); setForm((current) => ({ ...current, [field.key]: value })); }} />
               ) : field.input === 'select' ? (
-                <select className="h-10 rounded-lg border border-outline-variant px-3" required={field.required} value={form[field.key] ?? ''} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}>
+                <select className="h-10 rounded-lg border border-outline-variant px-3" required={field.required} value={form[field.key] ?? ''} onChange={(event) => { if (field.key === 'autoRenew') setAutoRenewEdited(true); setForm((current) => ({ ...current, [field.key]: event.target.value })); }}>
                   {field.nullable && <option value="">Not recorded</option>}
                   {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-              ) : field.input === 'date' ? (
-                <div className="flex flex-col gap-1">
-                  <div className="relative flex items-center">
-                    <input
-                      type="date"
-                      className="h-10 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
-                      required={field.required}
-                      value={form[field.key] ?? ''}
-                      onChange={(event) => {
-                        setError(null);
-                        setForm((current) => ({ ...current, [field.key]: event.target.value }));
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <button
-                      type="button"
-                      className="px-2 py-0.5 text-[11px] rounded bg-surface-container hover:bg-surface-container-high text-primary font-medium transition-colors border border-outline-variant/30"
-                      onClick={() => {
-                        const d = new Date();
-                        d.setFullYear(d.getFullYear() + 1);
-                        setError(null);
-                        setForm((curr) => ({ ...curr, [field.key]: d.toISOString().slice(0, 10) }));
-                      }}
-                    >
-                      +1 Year
-                    </button>
-                    <button
-                      type="button"
-                      className="px-2 py-0.5 text-[11px] rounded bg-surface-container hover:bg-surface-container-high text-primary font-medium transition-colors border border-outline-variant/30"
-                      onClick={() => {
-                        const d = new Date();
-                        d.setFullYear(d.getFullYear() + 2);
-                        setError(null);
-                        setForm((curr) => ({ ...curr, [field.key]: d.toISOString().slice(0, 10) }));
-                      }}
-                    >
-                      +2 Years
-                    </button>
-                    <button
-                      type="button"
-                      className="px-2 py-0.5 text-[11px] rounded bg-surface-container hover:bg-surface-container-high text-secondary font-medium transition-colors border border-outline-variant/30"
-                      onClick={() => {
-                        const d = new Date();
-                        setError(null);
-                        setForm((curr) => ({ ...curr, [field.key]: d.toISOString().slice(0, 10) }));
-                      }}
-                    >
-                      Today
-                    </button>
-                    {form[field.key] && (
-                      <button
-                        type="button"
-                        className="px-2 py-0.5 text-[11px] rounded hover:bg-error-container/20 text-error font-medium transition-colors ml-auto border border-error/20"
-                        onClick={() => {
-                          setError(null);
-                          setForm((curr) => ({ ...curr, [field.key]: '' }));
-                        }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
               ) : (
                 <input className="h-10 rounded-lg border border-outline-variant px-3 font-body-sm" maxLength={field.maxLength} pattern={field.pattern} placeholder={field.placeholder} required={field.required} title={field.helpText} value={form[field.key] ?? ''} onBlur={field.trimOnBlur ? (event) => setForm((current) => ({ ...current, [field.key]: event.target.value.trim() })) : undefined} onChange={(event) => { setError(null); setForm((current) => ({ ...current, [field.key]: event.target.value })); }} />
               )}

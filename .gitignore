@@ -16,11 +16,15 @@ out/
 .env.production.local
 *.env.*
 !.env.example
+!apps/web/.env.production
+!apps/web/.env.development
+!apps/landing/.env.production
 
 # Vite & build caches
 .vite/
 .turbo/
 .cache/
+.npm-cache/
 .eslintcache
 *.tsbuildinfo
 
@@ -50,5 +54,6 @@ Thumbs.db
 .serena/
 apps/DomainExp/
 backups/
+artifacts/
 *.dump
 scratch/

@@ -4,6 +4,7 @@ import {
   ApiError,
   apiRequest,
   configureApiAuthentication,
+  setApiCacheSession,
   setExplicitWorkspaceId,
 } from './client';
 
@@ -16,13 +17,64 @@ function jsonResponse(body: unknown, status = 200, contentType = 'application/js
 
 afterEach(() => {
   configureApiAuthentication(null);
+  setApiCacheSession(null);
   setExplicitWorkspaceId(null);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe('apiRequest', () => {
-  it('uses the fixed API prefix and sends auth, workspace, JSON, and AbortSignal', async () => {
+  it('caches inventory reads per session and clears them after writes and workspace changes', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ items: [{ id: 'first' }] }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }))
+      .mockResolvedValueOnce(jsonResponse({ items: [{ id: 'second' }] }))
+      .mockResolvedValueOnce(jsonResponse({ items: [{ id: 'third' }] }))
+      .mockResolvedValueOnce(jsonResponse({ items: [{ id: 'fourth' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    configureApiAuthentication({
+      getAccessToken: () => 'access-token',
+      onAuthenticationFailure: vi.fn(),
+      refreshAccessToken: vi.fn(),
+    });
+    setApiCacheSession('session-1');
+
+    expect(await apiRequest('/domains?limit=50')).toEqual({ items: [{ id: 'first' }] });
+    expect(await apiRequest('/domains?limit=50')).toEqual({ items: [{ id: 'first' }] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await apiRequest('/domains', { body: { domainName: 'new.example' }, method: 'POST' });
+    expect(await apiRequest('/domains?limit=50')).toEqual({ items: [{ id: 'second' }] });
+    setExplicitWorkspaceId('workspace-2');
+    expect(await apiRequest('/domains?limit=50')).toEqual({ items: [{ id: 'third' }] });
+    setApiCacheSession('session-2');
+    expect(await apiRequest('/domains?limit=50')).toEqual({ items: [{ id: 'fourth' }] });
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('bypasses inventory cache on manual reload and expires entries after 20 seconds', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ items: [1] }))
+      .mockResolvedValueOnce(jsonResponse({ items: [2] }))
+      .mockResolvedValueOnce(jsonResponse({ items: [3] }));
+    vi.stubGlobal('fetch', fetchMock);
+    configureApiAuthentication({
+      getAccessToken: () => 'access-token',
+      onAuthenticationFailure: vi.fn(),
+      refreshAccessToken: vi.fn(),
+    });
+    setApiCacheSession('session-1');
+
+    await apiRequest('/servers?limit=50');
+    expect(await apiRequest('/servers?limit=50', { cache: 'no-store' })).toEqual({ items: [2] });
+    expect(await apiRequest('/servers?limit=50')).toEqual({ items: [2] });
+    now.mockReturnValue(21_001);
+    expect(await apiRequest('/servers?limit=50')).toEqual({ items: [3] });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses the configured API prefix and sends auth, workspace, JSON, and AbortSignal', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 'domain-1' }));
     vi.stubGlobal('fetch', fetchMock);
     configureApiAuthentication({
@@ -42,7 +94,8 @@ describe('apiRequest', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe('/api/v1/domains');
+    const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+    expect(url).toBe(`${(env?.['VITE_API_BASE_URL'] || '/api/v1').replace(/\/+$/, '')}/domains`);
     expect(headers.get('Authorization')).toBe('Bearer access-token');
     expect(headers.get('X-Workspace-Id')).toBe('workspace-1');
     expect(headers.get('Content-Type')).toBe('application/json');

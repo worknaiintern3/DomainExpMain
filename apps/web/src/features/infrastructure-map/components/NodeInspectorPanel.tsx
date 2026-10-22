@@ -203,7 +203,7 @@ export const NodeInspectorPanel: React.FC<NodeInspectorPanelProps> = ({
               className="p-unit-sm rounded-lg bg-surface-container-low flex items-center justify-between border border-outline-variant/20"
             >
               <div className="flex items-center gap-unit-sm min-w-0">
-                <div className="w-7 h-7 rounded bg-[#e0e7ff] text-[#4f46e5] flex items-center justify-center shrink-0">
+                <div className="w-7 h-7 rounded bg-primary-fixed text-primary-container flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-[16px]">account_tree</span>
                 </div>
                 <div className="flex flex-col min-w-0">
@@ -228,7 +228,7 @@ export const NodeInspectorPanel: React.FC<NodeInspectorPanelProps> = ({
         ) : node.metadata.upstreamNodeLabel ? (
           <div className="p-unit-sm rounded-lg bg-surface-container-low flex items-center justify-between border border-outline-variant/20">
             <div className="flex items-center gap-unit-sm min-w-0">
-              <div className="w-7 h-7 rounded bg-[#e0e7ff] text-[#4f46e5] flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded bg-primary-fixed text-primary-container flex items-center justify-center shrink-0">
                 <span className="material-symbols-outlined text-[16px]">account_tree</span>
               </div>
               <div className="flex flex-col min-w-0">
@@ -275,7 +275,7 @@ export const NodeInspectorPanel: React.FC<NodeInspectorPanelProps> = ({
                 className="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors flex items-center justify-between border border-outline-variant/20"
               >
                 <div className="flex items-center gap-unit-xs min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-[#10b981] shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-healthy shrink-0" />
                   <div className="flex flex-col min-w-0">
                     <span className="font-body-sm text-body-sm font-semibold text-on-surface truncate">
                       {item.title}

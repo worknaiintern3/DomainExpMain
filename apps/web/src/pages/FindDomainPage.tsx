@@ -1,12 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { lookupWhois } from '@/api/whois';
-import type { NormalizedWhoisData } from '@/api/whois.types';
-import { WhoisDetailsModal } from '@/components/whois/WhoisDetailsModal';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FindDomainHeader,
   DomainSearchHero,
   TldAvailabilityResults,
-  DomainSuggestionSection,
   RegistrarPriceCards,
   DomainLookupInspector,
   WatchlistSection,
@@ -16,111 +12,274 @@ import {
   TldAvailabilityItem,
   WatchlistItem,
   SUPPORTED_TLDS,
-  INITIAL_WATCHLIST,
-  searchDomains,
-  getRegistrarQuotesForDomain,
-  getDomainInspectionDetails,
+  FindDomainSummary,
 } from '@/features/find-domain';
+import {
+  AVAILABILITY_PROVIDER_LABELS,
+  formatMinorUnits,
+  searchDomainAvailabilityAcrossTlds,
+  type DomainAvailabilityResult,
+} from '@/api/domain-search';
+import { ApiError } from '@/api/client';
+import { addRecentSearch, clearRecentSearches, readRecentSearches } from '@/lib/recentSearches';
+import { usePreferences } from '@/preferences/PreferencesContext';
+
+interface LiveRow {
+  item: TldAvailabilityItem;
+  results: DomainAvailabilityResult[];
+  requestError: string | null;
+}
+
+function expandSearchDomains(input: string, tlds: string[]): string[] {
+  const trimmed = input.trim().toLowerCase().replace(/\.$/u, '');
+  if (trimmed.length === 0) return [];
+  if (trimmed.includes('.')) return [trimmed];
+  const keyword = trimmed.replace(/[^a-z0-9-]/gu, '');
+  if (keyword.length === 0) return [];
+  return tlds.map((tld) => `${keyword}${tld}`);
+}
+
+function tldOf(domain: string): string {
+  const dot = domain.indexOf('.');
+  return dot >= 0 ? domain.slice(dot) : '';
+}
+
+function aggregateStatus(results: DomainAvailabilityResult[]): DomainAvailabilityStatus {
+  const states = new Set(results.map((result) => result.state));
+  if (states.has('AVAILABLE') || states.has('PREMIUM')) return 'available';
+  if (states.has('UNAVAILABLE')) return 'registered';
+  return 'unknown';
+}
+
+function statusLabel(status: DomainAvailabilityStatus, premium: boolean): string {
+  if (status === 'available') return premium ? 'Available · Premium' : 'Possibly available';
+  if (status === 'registered') return 'Likely registered';
+  return 'Unknown';
+}
+
+function pricedResult(results: DomainAvailabilityResult[]): DomainAvailabilityResult | undefined {
+  const ordered = [...results].sort((a, b) => {
+    const rank = (state: DomainAvailabilityResult['state']): number =>
+      state === 'AVAILABLE' ? 0 : state === 'PREMIUM' ? 1 : 2;
+    return rank(a.state) - rank(b.state);
+  });
+  return ordered.find(
+    (result) =>
+      (result.state === 'AVAILABLE' || result.state === 'PREMIUM') &&
+      result.registrationPriceMinorUnits !== null,
+  );
+}
+
+type SearchSort = 'availability' | 'price' | 'tld' | 'match';
+
+const AVAILABILITY_RANK: Record<DomainAvailabilityStatus, number> = {
+  available: 0,
+  registered: 1,
+  unknown: 2,
+};
+
+/** Orders results by the user's default sort. Prices are never converted between currencies, so mixed-currency pairs keep availability order. */
+function sortRows(rows: LiveRow[], sort: SearchSort): LiveRow[] {
+  if (sort === 'match') return rows;
+  const byAvailability = (a: LiveRow, b: LiveRow) =>
+    AVAILABILITY_RANK[a.item.status] - AVAILABILITY_RANK[b.item.status];
+  const copy = [...rows];
+  if (sort === 'tld') return copy.sort((a, b) => a.item.tld.localeCompare(b.item.tld));
+  if (sort === 'availability') return copy.sort(byAvailability);
+
+  return copy.sort((a, b) => {
+    const priceA = pricedResult(a.results);
+    const priceB = pricedResult(b.results);
+    if (!priceA && !priceB) return byAvailability(a, b);
+    if (!priceA) return 1;
+    if (!priceB) return -1;
+    if (priceA.currency !== priceB.currency) return byAvailability(a, b);
+    return (priceA.registrationPriceMinorUnits ?? 0) - (priceB.registrationPriceMinorUnits ?? 0);
+  });
+}
+
+function buildRow(
+  domain: string,
+  results: DomainAvailabilityResult[],
+  requestError: string | null,
+  isSaved: boolean,
+): LiveRow {
+  const status = requestError ? 'unknown' : aggregateStatus(results);
+  const priced = requestError ? undefined : pricedResult(results);
+  const source = priced ? AVAILABILITY_PROVIDER_LABELS[priced.provider] : undefined;
+  const firstYear = priced
+    ? formatMinorUnits(priced.registrationPriceMinorUnits, priced.currency)
+    : null;
+  const renewal = priced
+    ? formatMinorUnits(priced.renewalPriceMinorUnits, priced.currency)
+    : null;
+  const premium = results.some((result) => result.premium);
+  const partial = results.some((result) => result.state === 'ERROR');
+  return {
+    item: {
+      bestRegistrar: source,
+      bestRegistrarBadge: premium ? '(Premium)' : partial ? '(Partial)' : undefined,
+      domain,
+      firstYearPriceFormatted: firstYear ?? undefined,
+      id: `live-${domain}`,
+      isSaved,
+      renewalPriceFormatted: renewal ?? undefined,
+      status,
+      statusLabel: requestError ? 'Check failed' : statusLabel(status, premium),
+      tld: tldOf(domain),
+      topPickTag: premium ? 'Premium' : undefined,
+    },
+    requestError,
+    results,
+  };
+}
 
 export const FindDomainPage: React.FC = () => {
-  const [query, setQuery] = useState('worknai');
+  const [query, setQuery] = useState('');
+  const { discovery, status: preferencesStatus } = usePreferences();
   const [selectedTlds, setSelectedTlds] = useState<string[]>(SUPPORTED_TLDS);
-  const [searchState, setSearchState] = useState<SearchState>('results');
-  const [selectedInspectionDomain, setSelectedInspectionDomain] = useState('worknai.com');
-  const [selectedInspectionStatus, setSelectedInspectionStatus] = useState<DomainAvailabilityStatus>(
-    'registered'
-  );
-  const [selectedCompareDomain, setSelectedCompareDomain] = useState('worknai.in');
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => readRecentSearches());
+  const defaultsAppliedRef = useRef(false);
 
-  // Live WHOIS from WhoisFreaks state
-  const [liveWhoisData, setLiveWhoisData] = useState<NormalizedWhoisData | null>(null);
-  const [liveWhoisLoading, setLiveWhoisLoading] = useState(false);
-  const [isWhoisModalOpen, setIsWhoisModalOpen] = useState(false);
-
+  // Start from the user's saved default TLDs once their settings have loaded.
   useEffect(() => {
-    if (!selectedInspectionDomain) return;
-    let active = true;
-    setLiveWhoisLoading(true);
-    lookupWhois(selectedInspectionDomain)
-      .then((data) => {
-        if (active) setLiveWhoisData(data);
-      })
-      .catch(() => {
-        if (active) setLiveWhoisData(null);
-      })
-      .finally(() => {
-        if (active) setLiveWhoisLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [selectedInspectionDomain]);
+    if (preferencesStatus !== 'ready' || defaultsAppliedRef.current) return;
+    defaultsAppliedRef.current = true;
+    const wanted = discovery.defaultCheckedTlds.filter((tld) => SUPPORTED_TLDS.includes(tld));
+    if (wanted.length > 0) setSelectedTlds(wanted);
+  }, [preferencesStatus, discovery.defaultCheckedTlds]);
+  const [searchState, setSearchState] = useState<SearchState>('empty');
+  const [rows, setRows] = useState<LiveRow[]>([]);
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Derived set of saved domain names
   const savedSet = useMemo(() => new Set(watchlist.map((w) => w.domain)), [watchlist]);
 
-  // Derived search data
-  const { items, summary, suggestions } = useMemo(
-    () => searchDomains(query, selectedTlds, savedSet),
-    [query, selectedTlds, savedSet]
+  const items = useMemo(
+    () => sortRows(rows, discovery.defaultSearchSort).map((row) => ({ ...row.item, isSaved: savedSet.has(row.item.domain) })),
+    [rows, savedSet],
   );
 
-  // Derived inspection with live WhoisFreaks data overlay
-  const inspectionDetails = useMemo(() => {
-    const base = getDomainInspectionDetails(selectedInspectionDomain, selectedInspectionStatus);
-    if (!liveWhoisData) return base;
-
+  const summary = useMemo<FindDomainSummary>(() => {
+    const availableCount = rows.filter((row) => row.item.status === 'available').length;
+    const registeredCount = rows.filter((row) => row.item.status === 'registered').length;
+    const priced = rows.flatMap((row) =>
+      row.results
+        .filter(
+          (result) =>
+            (result.state === 'AVAILABLE' || result.state === 'PREMIUM') &&
+            result.registrationPriceMinorUnits !== null &&
+            result.currency !== null,
+        )
+        .map((result) => ({ domain: row.item.domain, result })),
+    );
+    const usdPriced = priced.filter((entry) => entry.result.currency === 'USD');
+    const pool = usdPriced.length > 0 ? usdPriced : priced;
+    const lowest =
+      pool.length > 0
+        ? pool.reduce((min, curr) =>
+            (curr.result.registrationPriceMinorUnits ?? Number.MAX_SAFE_INTEGER) <
+            (min.result.registrationPriceMinorUnits ?? Number.MAX_SAFE_INTEGER)
+              ? curr
+              : min,
+          )
+        : null;
+    const lowestFormatted =
+      lowest && lowest.result.registrationPriceMinorUnits !== null && lowest.result.currency
+        ? formatMinorUnits(lowest.result.registrationPriceMinorUnits, lowest.result.currency)
+        : null;
     return {
-      ...base,
-      domain: liveWhoisData.domainName,
-      status: (liveWhoisData.isRegistered ? 'registered' : 'available') as DomainAvailabilityStatus,
-      statusBadgeText: liveWhoisData.isRegistered ? 'Registered • Live WHOIS' : 'Available • Live WHOIS',
-      sponsoringRegistrar: liveWhoisData.registrar.name || base.sponsoringRegistrar,
-      registrationDateFormatted: liveWhoisData.registeredAt
-        ? new Date(liveWhoisData.registeredAt).toLocaleDateString()
-        : base.registrationDateFormatted,
-      expirationDateFormatted: liveWhoisData.expiresAt
-        ? new Date(liveWhoisData.expiresAt).toLocaleDateString()
-        : base.expirationDateFormatted,
-      expirationDaysRemaining: liveWhoisData.daysRemaining ?? base.expirationDaysRemaining,
-      lastUpdateFormatted: liveWhoisData.updatedDate
-        ? new Date(liveWhoisData.updatedDate).toLocaleDateString()
-        : base.lastUpdateFormatted,
-      authoritativeNameservers:
-        liveWhoisData.nameservers.length > 0 ? liveWhoisData.nameservers : base.authoritativeNameservers,
-      icannStatusFlags:
-        liveWhoisData.statuses.length > 0 ? liveWhoisData.statuses : base.icannStatusFlags,
-      operationalNotice: liveWhoisData.isRegistered
-        ? 'Live verified registration via WhoisFreaks API and stored in workspace database.'
-        : 'Domain is currently available for registration according to live WHOIS query.',
+      activeQuery: query,
+      availableCount,
+      extensionsCheckedCount: rows.length,
+      lowestRegDetails:
+        lowest && lowestFormatted
+          ? `(${lowest.domain} ${AVAILABILITY_PROVIDER_LABELS[lowest.result.provider]})`
+          : '',
+      lowestRegPriceFormatted: lowestFormatted ? `${lowestFormatted}/yr` : '—',
+      registeredCount,
     };
-  }, [selectedInspectionDomain, selectedInspectionStatus, liveWhoisData]);
+  }, [rows, query]);
 
-  const registrarQuotes = useMemo(
-    () => getRegistrarQuotesForDomain(selectedCompareDomain),
-    [selectedCompareDomain]
-  );
+  const selectedRow = selectedDomain ? rows.find((row) => row.item.domain === selectedDomain) ?? null : null;
+  const inspectorDomain = selectedRow?.item.domain ?? rows[0]?.item.domain ?? '';
+  const inspectorResults = selectedRow?.results ?? rows[0]?.results ?? [];
+  const inspectorError = selectedRow?.requestError ?? (rows[0]?.requestError ?? null);
+  const inspectorStatus = selectedRow?.item.status ?? rows[0]?.item.status ?? 'unknown';
+  const inspectorAvailable = inspectorStatus === 'available';
 
-  const handleSearch = (newQuery: string) => {
-    const trimmed = newQuery.trim();
-    setQuery(trimmed);
-    if (!trimmed) {
+  const allUnconfigured =
+    rows.length > 0 &&
+    rows.every((row) => row.results.length > 0 && row.results.every((r) => r.state === 'UNCONFIGURED'));
+  const partialFailures = rows.filter((row) =>
+    row.results.some((result) => result.state === 'ERROR'),
+  ).length;
+
+  const handleSearch = async (newQuery: string) => {
+    const tlds = discovery.availabilityCheckMode === 'all' ? SUPPORTED_TLDS : selectedTlds;
+    const domains = expandSearchDomains(newQuery, tlds);
+    setQuery(newQuery.trim());
+    if (domains.length > 0 && discovery.savedSearchHistory) {
+      setRecentSearches(addRecentSearch(newQuery));
+    }
+    if (domains.length === 0) {
+      abortRef.current?.abort();
+      setRows([]);
+      setSelectedDomain(null);
+      setSearchError(null);
       setSearchState('empty');
       return;
     }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setSearchState('loading');
-    setTimeout(() => {
+    setSearchError(null);
+
+    let nextRows: LiveRow[];
+    try {
+      const firstDomain = domains[0] as string;
+      const base = firstDomain.slice(0, firstDomain.indexOf('.'));
+      const results = await searchDomainAvailabilityAcrossTlds(
+        base,
+        domains.map(tldOf),
+        controller.signal,
+      );
+      if (controller.signal.aborted || requestIdRef.current !== requestId) return;
+      const byDomain = new Map(results.map((result) => [result.domain, result]));
+      nextRows = domains.map((domain) => {
+        const result = byDomain.get(domain);
+        return buildRow(domain, result?.results ?? [], result ? null : 'No availability result was returned.', savedSet.has(domain));
+      });
+    } catch (error) {
+      if (controller.signal.aborted || requestIdRef.current !== requestId) return;
+      const reason = error instanceof ApiError
+        ? error.status === 404
+          ? 'Domain availability is not available on this backend.'
+          : error.detail
+        : 'The availability check could not be completed.';
+      nextRows = domains.map((domain) => buildRow(domain, [], reason, savedSet.has(domain)));
+    }
+
+    setRows(nextRows);
+    setSelectedDomain(nextRows[0]?.item.domain ?? null);
+    if (nextRows.length > 0 && nextRows.every((row) => row.requestError)) {
+      setSearchError(nextRows[0]?.requestError ?? 'The availability check could not be completed.');
+      setSearchState('error');
+    } else {
       setSearchState('results');
-      setSelectedInspectionDomain(`${trimmed}.com`);
-      setSelectedInspectionStatus('registered');
-      setSelectedCompareDomain(`${trimmed}.in`);
-    }, 300);
+    }
   };
 
   const handleToggleTld = (tld: string) => {
     setSelectedTlds((prev) =>
-      prev.includes(tld) ? prev.filter((t) => t !== tld) : [...prev, tld]
+      prev.includes(tld) ? prev.filter((t) => t !== tld) : [...prev, tld],
     );
   };
 
@@ -132,56 +291,52 @@ export const FindDomainPage: React.FC = () => {
     }
   };
 
-  const handleSelectDomain = (domain: string, status: DomainAvailabilityStatus) => {
-    setSelectedInspectionDomain(domain);
-    setSelectedInspectionStatus(status);
-    if (status === 'available') {
-      setSelectedCompareDomain(domain);
-    }
+  const handleSelectDomain = (domain: string) => {
+    setSelectedDomain(domain);
+  };
+
+  const watchlistPriceFor = (domain: string): { price: string; registrar: string; status: DomainAvailabilityStatus } => {
+    const row = rows.find((candidate) => candidate.item.domain === domain);
+    const priced = row ? pricedResult(row.results) : undefined;
+    const formatted = priced
+      ? formatMinorUnits(priced.registrationPriceMinorUnits, priced.currency)
+      : null;
+    return {
+      price: formatted ? `${formatted}/yr` : 'Price unavailable',
+      registrar: priced ? AVAILABILITY_PROVIDER_LABELS[priced.provider] : 'Live check',
+      status: row?.item.status ?? 'unknown',
+    };
   };
 
   const handleToggleWatchlist = (
-    item: TldAvailabilityItem | { domain: string; priceFormatted: string; registrarHint?: string }
+    item: TldAvailabilityItem | { domain: string; priceFormatted: string; registrarHint?: string },
   ) => {
     if (savedSet.has(item.domain)) {
       setWatchlist((prev) => prev.filter((w) => w.domain !== item.domain));
-    } else {
-      let price = '₹799/yr';
-      let registrar = 'Preferred Registrar';
-
-      if ('firstYearPriceFormatted' in item && item.firstYearPriceFormatted) {
-        price = `${item.firstYearPriceFormatted}/yr`;
-      } else if ('priceFormatted' in item) {
-        price = item.priceFormatted;
-      }
-
-      if ('bestRegistrar' in item && item.bestRegistrar) {
-        registrar = item.bestRegistrar;
-      } else if ('registrarHint' in item && item.registrarHint) {
-        registrar = item.registrarHint;
-      }
-
-      const newItem: WatchlistItem = {
-        id: `watch-${Date.now()}-${item.domain}`,
-        domain: item.domain,
-        status: 'status' in item ? item.status : 'available',
-        priceFormatted: price,
-        registrarNote: registrar,
-      };
-      setWatchlist((prev) => [newItem, ...prev]);
+      return;
     }
+    const live = watchlistPriceFor(item.domain);
+    const newItem: WatchlistItem = {
+      domain: item.domain,
+      id: `watch-${Date.now()}-${item.domain}`,
+      priceFormatted: live.price,
+      registrarNote: live.registrar,
+      status: live.status,
+    };
+    setWatchlist((prev) => [newItem, ...prev]);
   };
 
   const handleToggleWatchlistFromInspector = (domain: string) => {
     if (savedSet.has(domain)) {
       setWatchlist((prev) => prev.filter((w) => w.domain !== domain));
     } else {
+      const live = watchlistPriceFor(domain);
       const newItem: WatchlistItem = {
-        id: `watch-${Date.now()}-${domain}`,
         domain,
-        status: selectedInspectionStatus,
-        priceFormatted: selectedInspectionStatus === 'available' ? '₹799/yr' : 'Monitored Expiry',
-        registrarNote: inspectionDetails.sponsoringRegistrar,
+        id: `watch-${Date.now()}-${domain}`,
+        priceFormatted: live.price,
+        registrarNote: live.registrar,
+        status: live.status,
       };
       setWatchlist((prev) => [newItem, ...prev]);
     }
@@ -206,17 +361,8 @@ export const FindDomainPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-unit-md w-full pb-unit-2xl">
-      <aside className="rounded-lg border border-primary/25 bg-primary/5 px-unit-base py-unit-sm text-body-sm text-on-surface" role="note">
-        <strong>Future capability · demonstration data only.</strong>{' '}
-        Domain availability, registrar quotes, inspections, suggestions, and the watchlist on this screen are not connected to live provider services.
-      </aside>
-      {/* Header with Title, State Switcher and Watchlist Button */}
-      <FindDomainHeader
-        searchState={searchState}
-        onStateChange={setSearchState}
-        watchlistCount={watchlist.length}
-        onOpenWatchlist={handleScrollToWatchlist}
-      />
+      {/* Header with Title and Watchlist Button */}
+      <FindDomainHeader watchlistCount={watchlist.length} onOpenWatchlist={handleScrollToWatchlist} />
 
       {/* Primary Search Hero with TLD filters & metrics */}
       <DomainSearchHero
@@ -230,45 +376,97 @@ export const FindDomainPage: React.FC = () => {
         showSummary={searchState === 'results'}
       />
 
+      {discovery.savedSearchHistory && recentSearches.length > 0 && (
+        <div className="flex flex-wrap items-center gap-unit-xs" aria-label="Recent searches">
+          <span className="text-caption-xs font-semibold uppercase tracking-wider text-secondary">Recent</span>
+          {recentSearches.map((term) => (
+            <button
+              key={term}
+              type="button"
+              onClick={() => {
+                setQuery(term);
+                void handleSearch(term);
+              }}
+              className="rounded-full border border-outline-variant/50 bg-surface-container-lowest px-3 py-1 text-label-md text-on-surface hover:bg-surface-container-low"
+            >
+              {term}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              clearRecentSearches();
+              setRecentSearches([]);
+            }}
+            className="text-label-md text-secondary underline-offset-2 hover:underline"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {allUnconfigured && searchState === 'results' && (
+        <aside
+          className="rounded-lg border border-amber-200/50 bg-amber-50 px-unit-base py-unit-sm text-body-sm text-amber-900"
+          role="note"
+        >
+          <strong>Live registrar search isn&apos;t configured.</strong> DomainPulse&apos;s registrar
+          lookup service has no provider credentials set up yet, so live availability checks can&apos;t
+          run. You don&apos;t need to connect your own account.
+        </aside>
+      )}
+
+      {partialFailures > 0 && searchState === 'results' && (
+        <aside
+          className="rounded-lg border border-amber-200/50 bg-amber-50 px-unit-base py-unit-sm text-body-sm text-amber-900"
+          role="note"
+        >
+          <strong>Partial results.</strong> {partialFailures} of {rows.length} domains had at
+          least one provider check fail. Successful provider results are unaffected.
+        </aside>
+      )}
+
       {/* Main Content Area depending on SearchState */}
       {searchState === 'results' && (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-unit-lg items-start">
-          {/* Left Column (8 cols): TLD Availability Table & Smart Suggestions */}
+          {/* Left Column (8 cols): TLD Availability Table */}
           <div className="xl:col-span-8 flex flex-col gap-unit-base min-w-0">
             <TldAvailabilityResults
               items={items}
-              selectedDomain={selectedInspectionDomain}
+              selectedDomain={inspectorDomain}
               onSelectDomain={handleSelectDomain}
               onToggleWatchlist={handleToggleWatchlist}
-              onCompareRegistrars={(domain) => setSelectedCompareDomain(domain)}
-            />
-
-            <DomainSuggestionSection
-              query={query}
-              suggestions={suggestions}
-              onSelectDomain={handleSelectDomain}
-              onToggleWatchlist={handleToggleWatchlist}
+              onCompareRegistrars={handleSelectDomain}
             />
           </div>
 
-          {/* Right Column (4 cols): WHOIS/RDAP Inspector, Registrar Price Matrix & Watchlist */}
+          {/* Right Column (4 cols): Provider Breakdown, Registrar Pricing & Watchlist */}
           <div className="xl:col-span-4 flex flex-col gap-unit-base">
-            <DomainLookupInspector
-              details={inspectionDetails}
-              onToggleWatchlist={handleToggleWatchlistFromInspector}
-              isSaved={savedSet.has(selectedInspectionDomain)}
-              onOpenFullWhois={() => setIsWhoisModalOpen(true)}
-            />
+            {inspectorDomain && (
+              <DomainLookupInspector
+                domain={inspectorDomain}
+                status={inspectorStatus}
+                results={inspectorResults}
+                requestError={inspectorError}
+                onToggleWatchlist={handleToggleWatchlistFromInspector}
+                isSaved={savedSet.has(inspectorDomain)}
+              />
+            )}
 
-            <RegistrarPriceCards
-              domain={selectedCompareDomain}
-              isAvailable={true}
-              quotes={registrarQuotes}
-            />
+            {inspectorDomain && (
+              <RegistrarPriceCards
+                domain={inspectorDomain}
+                isAvailable={inspectorAvailable}
+                results={inspectorResults}
+              />
+            )}
 
             <WatchlistSection
               watchlist={watchlist}
-              onInspect={(domain, status) => handleSelectDomain(domain, status)}
+              onInspect={(domain, status) => {
+                setSelectedDomain(domain);
+                void status;
+              }}
               onRemove={handleRemoveWatchlist}
               onClearAll={handleClearWatchlist}
             />
@@ -287,7 +485,7 @@ export const FindDomainPage: React.FC = () => {
             Checking selected domain extensions...
           </h3>
           <p className="font-body-md text-body-md text-secondary max-w-md mb-unit-lg">
-            Evaluating .com, .in, .co.in, .ai, .io and other selected TLDs for query "{query}"
+            Running live availability checks for query &quot;{query}&quot;
           </p>
           <div className="w-full max-w-lg bg-surface-container-low rounded-lg p-unit-md flex flex-col gap-2 font-caption-xs text-caption-xs border border-outline-variant/20">
             <div className="flex items-center justify-between text-secondary">
@@ -300,31 +498,36 @@ export const FindDomainPage: React.FC = () => {
               <div className="bg-primary h-full rounded-full w-4/5 animate-pulse"></div>
             </div>
             <p className="text-center text-outline text-[11px] pt-1">
-              Availability results are rendered using prototype/reference data.
+              The backend checks domain availability; results are estimates until confirmed by a registrar.
             </p>
           </div>
         </div>
       )}
 
       {/* State 3: Empty State */}
-      {searchState === 'empty' && (
-        <SearchEmptyState onSelectPrompt={handleSearch} />
-      )}
+      {searchState === 'empty' && <SearchEmptyState onSelectPrompt={handleSearch} />}
 
-      {/* Full Live WHOIS Modal */}
-      <WhoisDetailsModal
-        isOpen={isWhoisModalOpen}
-        onClose={() => setIsWhoisModalOpen(false)}
-        data={liveWhoisData}
-        loading={liveWhoisLoading}
-        error={null}
-        onRefresh={() => {
-          setLiveWhoisLoading(true);
-          lookupWhois(selectedInspectionDomain)
-            .then(setLiveWhoisData)
-            .finally(() => setLiveWhoisLoading(false));
-        }}
-      />
+      {/* State 4: Error State */}
+      {searchState === 'error' && (
+        <div className="flex flex-col items-center justify-center p-unit-2xl bg-surface-container-lowest rounded-xl shadow-sm text-center border border-outline-variant/30">
+          <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center text-rose-700 mb-unit-md border border-rose-200/50">
+            <span className="material-symbols-outlined text-[32px]">error</span>
+          </div>
+          <h3 className="font-headline-md text-headline-md text-on-surface mb-unit-xs font-semibold">
+            Availability check failed
+          </h3>
+          <p className="font-body-md text-body-md text-secondary max-w-md mb-unit-lg">
+            {searchError ?? 'The availability check could not be completed.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => handleSearch(query)}
+            className="h-9 px-unit-md rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-tertiary transition-colors cursor-pointer"
+          >
+            Retry search
+          </button>
+        </div>
+      )}
     </div>
   );
 };

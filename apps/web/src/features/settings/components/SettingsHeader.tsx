@@ -6,6 +6,7 @@ interface SettingsHeaderProps {
   onSave: () => void;
   onResetDefaults: () => void;
   currencyCode: string;
+  workspaceName: string;
   densityLabel: string;
 }
 
@@ -14,6 +15,7 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({
   onSave,
   onResetDefaults,
   currencyCode,
+  workspaceName,
   densityLabel,
 }) => {
   const renderSavePill = () => {
@@ -66,7 +68,7 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({
       <div className="flex flex-wrap items-center gap-unit-sm">
         <div className="hidden sm:flex items-center gap-unit-xs px-2.5 py-1 rounded-lg bg-surface-container-low text-secondary font-label-mono text-label-mono border border-outline-variant/30">
           <span className="material-symbols-outlined text-[15px] text-tertiary">folder_open</span>
-          <span>Portfolio Workspace</span>
+          <span>{workspaceName}</span>
         </div>
 
         <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-low text-secondary font-label-md text-label-md border border-outline-variant/30">
@@ -78,6 +80,7 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({
         <button
           type="button"
           onClick={onResetDefaults}
+          disabled={saveState === 'saving'}
           className="h-9 px-unit-md inline-flex items-center gap-unit-xs rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors shadow-micro border border-outline-variant/30 cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px] text-secondary">restart_alt</span>

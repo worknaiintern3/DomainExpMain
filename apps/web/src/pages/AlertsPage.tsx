@@ -2,17 +2,18 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/api/client';
 import { acknowledgeAlert, listAlerts, type AlertEventResponse } from '@/api/monitoring';
 import { Button } from '@/components/common/Button';
+import { usePreferences } from '@/preferences/PreferencesContext';
 
+import { formatDateTime } from '@/lib/format';
 function formatDate(value: string | null): string {
-  if (!value) return '—';
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return formatDateTime(value);
 }
 
 type Filters = { status?: string; severity?: string; ruleKey?: string; domainId?: string };
 
 export const AlertsPage: React.FC<{ role?: 'owner' | 'admin' | 'member' }> = ({ role = 'owner' }) => {
   const canWrite = role === 'owner' || role === 'admin';
+  const { rowsPerPage } = usePreferences().general;
   const [alerts, setAlerts] = useState<AlertEventResponse[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +30,7 @@ export const AlertsPage: React.FC<{ role?: 'owner' | 'admin' | 'member' }> = ({ 
     else setLoadingMore(true);
     setError(null);
     try {
-      const page = await listAlerts({ ...filters, cursor: cursor ?? undefined, limit: 20 });
+      const page = await listAlerts({ ...filters, cursor: cursor ?? undefined, limit: rowsPerPage });
       if (generation !== generationRef.current) return;
       if (append) {
         setAlerts((prev) => {
@@ -50,7 +51,7 @@ export const AlertsPage: React.FC<{ role?: 'owner' | 'admin' | 'member' }> = ({ 
         setLoadingMore(false);
       }
     }
-  }, [filters]);
+  }, [filters, rowsPerPage]);
 
   useEffect(() => {
     void load(null, false);

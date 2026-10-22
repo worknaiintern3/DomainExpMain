@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { ApiError, apiRequest } from './client';
 
 export type MonitoringTargetResponse = {
   checkIntervalMinutes: number;
@@ -126,6 +126,25 @@ export function listAlerts(
 
 export function acknowledgeAlert(alertId: string): Promise<{ id: string; status: 'ACKNOWLEDGED'; acknowledgedAt: string; acknowledgedByUserId: string }> {
   return apiRequest(`/alerts/${encodeURIComponent(alertId)}/acknowledge`, { method: 'POST' });
+}
+
+export async function getAlertsSummary(signal?: AbortSignal): Promise<{ open: number }> {
+  try {
+    return await apiRequest('/alerts/summary', { signal });
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+  }
+
+  // The Mongo API has no summary route. Count its paginated OPEN alerts so
+  // the dashboard and data-management view retain an accurate total.
+  let open = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await listAlerts({ cursor, limit: 100, status: 'OPEN' }, signal);
+    open += page.items.length;
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  return { open };
 }
 
 export function listAlertRules(signal?: AbortSignal): Promise<AlertRuleResponse[]> {

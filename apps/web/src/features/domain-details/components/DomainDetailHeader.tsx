@@ -63,7 +63,7 @@ export const DomainDetailHeader: React.FC<DomainDetailHeaderProps> = ({
                   ? 'bg-error-container text-error'
                   : data.status === 'warning'
                   ? 'bg-amber-100 text-amber-800'
-                  : 'bg-[#ecfdf5] text-[#065f46]'
+                  : 'bg-healthy-bg text-healthy-text'
               }`}
             >
               <span
@@ -72,7 +72,7 @@ export const DomainDetailHeader: React.FC<DomainDetailHeaderProps> = ({
                     ? 'bg-error animate-pulse'
                     : data.status === 'warning'
                     ? 'bg-amber-500'
-                    : 'bg-[#10b981]'
+                    : 'bg-healthy'
                 }`}
               />
               {data.statusLabel}

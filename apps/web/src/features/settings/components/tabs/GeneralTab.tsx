@@ -3,7 +3,6 @@ import { GeneralSettings } from '../../settings.types';
 import {
   TIMEZONE_OPTIONS,
   DATE_FORMAT_OPTIONS,
-  CURRENCY_OPTIONS,
   LANDING_PAGE_OPTIONS,
 } from '../../settings.reference';
 
@@ -28,7 +27,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             General Preferences
           </h3>
           <p className="font-body-sm text-body-sm text-secondary mt-unit-2xs">
-            Basic workspace display, localization, and navigation defaults for active sessions.
+            Your name, workspace name, landing page, date and time format, and list size. Saved to your account.
           </p>
         </div>
 
@@ -36,16 +35,16 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
           {/* Workspace Display Name */}
           <div className="flex flex-col gap-1">
             <label className="font-label-md text-label-md text-on-surface font-medium">
-              Workspace Display Name
+              Display Name
             </label>
             <input
               type="text"
-              value={settings.workspaceDisplayName}
-              onChange={(e) => onChange({ workspaceDisplayName: e.target.value })}
+              value={settings.displayName}
+              onChange={(e) => onChange({ displayName: e.target.value })}
               className="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-micro"
             />
             <span className="font-caption-xs text-caption-xs text-secondary">
-              Visible on portfolio headers and generated summaries.
+              Your name, shown in the sidebar.
             </span>
           </div>
 
@@ -61,7 +60,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               className="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-micro"
             />
             <span className="font-caption-xs text-caption-xs text-secondary">
-              Internal portfolio identifier for stored records.
+              Your workspace's name, shown in the sidebar and page headers.
             </span>
           </div>
 
@@ -72,7 +71,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             </label>
             <select
               value={settings.defaultLandingPage}
-              onChange={(e) => onChange({ defaultLandingPage: e.target.value })}
+              onChange={(e) => onChange({ defaultLandingPage: e.target.value as GeneralSettings['defaultLandingPage'] })}
               className="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-micro cursor-pointer"
             >
               {LANDING_PAGE_OPTIONS.map((opt) => (
@@ -82,28 +81,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               ))}
             </select>
             <span className="font-caption-xs text-caption-xs text-secondary">
-              Initial workspace view loaded upon application launch.
-            </span>
-          </div>
-
-          {/* Default Currency */}
-          <div className="flex flex-col gap-1">
-            <label className="font-label-md text-label-md text-on-surface font-medium">
-              Default Currency
-            </label>
-            <select
-              value={settings.defaultCurrency}
-              onChange={(e) => onChange({ defaultCurrency: e.target.value })}
-              className="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-micro cursor-pointer"
-            >
-              {CURRENCY_OPTIONS.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            <span className="font-caption-xs text-caption-xs text-secondary">
-              Primary valuation denomination for portfolio and price checks.
+              Page opened after sign-in and whenever you open the app.
             </span>
           </div>
 
@@ -114,7 +92,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             </label>
             <select
               value={settings.dateFormat}
-              onChange={(e) => onChange({ dateFormat: e.target.value })}
+              onChange={(e) => onChange({ dateFormat: e.target.value as GeneralSettings['dateFormat'] })}
               className="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-micro cursor-pointer"
             >
               {DATE_FORMAT_OPTIONS.map((fmt) => (
@@ -124,7 +102,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               ))}
             </select>
             <span className="font-caption-xs text-caption-xs text-secondary">
-              Applied across expiration monitors and audit histories.
+              Used for every date and time shown in the app.
             </span>
           </div>
 
@@ -145,7 +123,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               ))}
             </select>
             <span className="font-caption-xs text-caption-xs text-secondary">
-              Calculates accurate 24-hour expiration flags and date cutoffs.
+              Dates and times are shown in this timezone.
             </span>
           </div>
 
@@ -159,7 +137,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                 <button
                   key={rows}
                   type="button"
-                  onClick={() => onChange({ rowsPerPage: rows })}
+                  onClick={() => onChange({ rowsPerPage: rows as GeneralSettings['rowsPerPage'] })}
                   className={`py-1.5 text-center font-label-md text-label-md rounded transition-colors cursor-pointer ${
                     settings.rowsPerPage === rows
                       ? 'bg-surface-container-lowest text-primary font-semibold shadow-micro'
@@ -171,7 +149,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               ))}
             </div>
             <span className="font-caption-xs text-caption-xs text-secondary">
-              Table pagination density across all workspace views.
+              Records loaded at a time in inventory lists and alerts.
             </span>
           </div>
         </div>

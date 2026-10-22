@@ -1,10 +1,11 @@
 import React from 'react';
 import { SettingsCategory } from '../settings.types';
-import { WORKSPACE_SUMMARY_DATA } from '../settings.reference';
 
 interface SettingsSidebarNavProps {
   activeCategory: SettingsCategory;
   onSelectCategory: (cat: SettingsCategory) => void;
+  workspaceName: string;
+  accountEmail: string;
 }
 
 const CATEGORIES: Array<{
@@ -26,6 +27,8 @@ const CATEGORIES: Array<{
 export const SettingsSidebarNav: React.FC<SettingsSidebarNavProps> = ({
   activeCategory,
   onSelectCategory,
+  workspaceName,
+  accountEmail,
 }) => {
   return (
     <aside className="w-full lg:w-64 shrink-0 flex flex-col gap-unit-md">
@@ -76,53 +79,31 @@ export const SettingsSidebarNav: React.FC<SettingsSidebarNavProps> = ({
         })}
       </nav>
 
-      {/* Storage & Version Meta Card */}
+      {/* Account card: real values only */}
       <div className="rounded-xl bg-surface-container-low p-unit-md flex flex-col gap-unit-sm shadow-micro border border-outline-variant/30">
-        <div className="flex items-center justify-between">
-          <span className="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold">
-            Storage &amp; Version
-          </span>
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-mono text-[10px]">
-            Demo Build
-          </span>
-        </div>
+        <span className="font-caption-xs text-caption-xs uppercase tracking-wider text-secondary font-semibold">
+          Account
+        </span>
 
         <div className="space-y-unit-xs pt-unit-xs">
           <div className="flex flex-col">
-            <span className="font-caption-xs text-caption-xs text-secondary">Storage</span>
-            <span className="font-label-md text-label-md text-on-surface font-medium">
-              {WORKSPACE_SUMMARY_DATA.storage}
+            <span className="font-caption-xs text-caption-xs text-secondary">Workspace</span>
+            <span className="font-label-md text-label-md text-on-surface font-medium break-words">
+              {workspaceName}
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className="font-caption-xs text-caption-xs text-secondary">Domain Data Sources</span>
-            <span className="font-label-md text-label-md text-on-surface font-medium">
-              {WORKSPACE_SUMMARY_DATA.domainDataSources}
+            <span className="font-caption-xs text-caption-xs text-secondary">Signed in as</span>
+            <span className="font-label-md text-label-md text-on-surface font-medium break-all">
+              {accountEmail}
             </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className="font-caption-xs text-caption-xs text-secondary">Pricing Mode</span>
-            <span className="font-label-md text-label-md text-on-surface font-medium">
-              {WORKSPACE_SUMMARY_DATA.pricingMode}
-            </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className="font-caption-xs text-caption-xs text-secondary">Monitoring State</span>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-              <span className="font-label-md text-label-md text-on-surface font-medium">
-                {WORKSPACE_SUMMARY_DATA.monitoringState}
-              </span>
-            </div>
           </div>
         </div>
 
         <div className="pt-unit-xs mt-unit-2xs border-t border-surface-container-high/60">
           <p className="font-caption-xs text-caption-xs text-outline leading-tight">
-            Preferences stored in local demo session.
+            Saved settings are stored with your account.
           </p>
         </div>
       </div>

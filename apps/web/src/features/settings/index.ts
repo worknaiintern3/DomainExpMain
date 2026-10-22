@@ -1,5 +1,7 @@
 export * from './settings.types';
 export * from './settings.reference';
+export * from './pricing-preferences';
+export * from './data-transfer';
 export * from './components/SettingsHeader';
 export * from './components/SettingsSidebarNav';
 export * from './components/SettingsToast';
@@ -11,6 +13,4 @@ export * from './components/tabs/PricingTab';
 export * from './components/tabs/AppearanceTab';
 export * from './components/tabs/IntegrationsTab';
 export * from './components/tabs/DataManagementTab';
-export * from './components/modals/ResetConfirmModal';
 export * from './components/modals/ImportDataModal';
-export * from './components/modals/ChannelConfigModal';

@@ -44,7 +44,6 @@ export const AccountsPage: React.FC = () => {
     return providers.items.filter((account) => [
       account.label,
       account.providerKey,
-      account.externalAccountId,
       account.notes,
     ].some((value) => value?.toLowerCase().includes(query)));
   }, [providers.items, search]);
@@ -154,7 +153,7 @@ export const AccountsPage: React.FC = () => {
                   <InventoryState state={account.inventoryState} />
                 </div>
                 <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div><dt className="text-caption-xs uppercase text-secondary">External account</dt><dd className="mt-1 break-words text-body-sm">{account.externalAccountId || 'Not set'}</dd></div>
+                  <div><dt className="text-caption-xs uppercase text-secondary">Account ID</dt><dd className="mt-1 break-all font-label-mono text-caption-xs text-secondary">{account.id}</dd></div>
                   <div><dt className="text-caption-xs uppercase text-secondary">Login email</dt><dd className="mt-1 break-words text-body-sm"><LoginEmail id={account.loginEmailAccountId} /></dd></div>
                   {account.notes && <div className="sm:col-span-2"><dt className="text-caption-xs uppercase text-secondary">Notes</dt><dd className="mt-1 line-clamp-2 text-body-sm">{account.notes}</dd></div>}
                 </dl>

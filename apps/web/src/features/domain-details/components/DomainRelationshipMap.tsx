@@ -66,7 +66,7 @@ export const DomainRelationshipMap: React.FC<DomainRelationshipMapProps> = ({ no
                     node.isCenterpiece
                       ? 'text-on-primary bg-on-primary/20'
                       : node.provenance === 'DNS Retrieved'
-                      ? 'text-[#065f46] bg-[#ecfdf5]'
+                      ? 'text-healthy-text bg-healthy-bg'
                       : node.provenance === 'RDAP Retrieved'
                       ? 'text-primary bg-surface-container'
                       : 'text-tertiary bg-surface-container'

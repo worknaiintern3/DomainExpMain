@@ -32,7 +32,7 @@ export const LinkedDomainsSection: React.FC<LinkedDomainsSectionProps> = ({ doma
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[18px]">globe</span>
                   <Link
-                    to={`/domains/${dom.domain}`}
+                    to={`/domains/${dom.id}`}
                     className="font-label-mono text-label-mono font-semibold text-on-surface hover:text-primary transition-colors"
                   >
                     {dom.domain}

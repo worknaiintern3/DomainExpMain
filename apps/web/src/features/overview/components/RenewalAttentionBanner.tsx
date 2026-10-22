@@ -31,7 +31,7 @@ export const RenewalAttentionBanner: React.FC<RenewalAttentionBannerProps> = ({ 
         {data.urgentDomains.map((domainItem) => (
           <Link
             key={domainItem.id}
-            to={`/domains/${domainItem.domain}`}
+            to={`/domains/${domainItem.id}`}
             className="flex items-center gap-unit-xs bg-surface-container-lowest px-unit-sm py-1 rounded-lg shadow-sm hover:ring-1 hover:ring-error transition-all"
           >
             <span className="font-label-mono text-label-mono text-on-surface font-semibold">

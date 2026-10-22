@@ -3,9 +3,35 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from './AuthContext';
 
+/**
+ * Optional marketing-site origin (apps/landing). When set, a signed-out
+ * visitor opening "/" is sent there instead of the login form. Deep links
+ * such as /domains still go to /login.
+ */
+function readLandingUrl(): string {
+  try {
+    const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+    return (env?.['VITE_LANDING_URL'] ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
 export const ProtectedRoute: React.FC = () => {
   const auth = useAuth();
   const location = useLocation();
+  const landingUrl = readLandingUrl();
+  const sendToLanding =
+    auth.status !== 'booting' &&
+    auth.status !== 'authenticated' &&
+    location.pathname === '/' &&
+    landingUrl !== '';
+
+  React.useEffect(() => {
+    if (sendToLanding) window.location.replace(landingUrl);
+  }, [sendToLanding, landingUrl]);
+
+  if (sendToLanding) return null;
 
   if (auth.status === 'booting') {
     return (

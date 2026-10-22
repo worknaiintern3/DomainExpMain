@@ -1,343 +1,358 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ApiError } from '@/api/client';
+import {
+  searchDomainAvailability,
+  type DomainAvailabilityProvider,
+  type DomainSearchResponse,
+} from '@/api/domain-search';
+import {
+  loadPricingPreferences,
+  horizonYearsOf,
+  sortOptionOf,
+  visibleColumnsOf,
+} from '@/features/settings/pricing-preferences';
 import {
   PricingDisclaimer,
   PricingHeader,
   PricingSummaryStrip,
-  TldPricingFilters,
+  PricingSearchBar,
   OwnershipCostBenchmark,
   RegistrarComparisonMatrix,
   PricingInspector,
   TransferSavingsCalculator,
-  HostingPricingMatrix,
-  PricingMode,
-  PricingSortOption,
-  HorizonYears,
-  SavedComparisonItem,
-  RegistrarPricing,
-  SUPPORTED_PRICING_TLDS,
-  INITIAL_SAVED_COMPARISONS,
-  getRegistrarsForTld,
-  calculatePricingSummary,
-  calculateOwnershipCosts,
+  PRICING_TLD_SHORTCUTS,
+  formatFetchedAt,
+  formatRegistrarConfiguration,
+  isDefinitive,
+  pricedCurrencies,
+  providerLabel,
+  sortResults,
+  type HorizonYears,
+  type PricingSearchState,
+  type PricingSortOption,
 } from '@/features/pricing';
+
+const INVALID_DOMAIN_MESSAGE =
+  'Enter a full domain such as example.com, or type a name and pick an extension below.';
+
+/** Trims, lowercases, and drops any scheme, path, or trailing dot the user pasted. */
+function normalizeDomainInput(raw: string): string {
+  const withoutScheme = raw.trim().toLowerCase().replace(/^[a-z][a-z0-9+.-]*:\/\//u, '');
+  const host = withoutScheme.split(/[/?#]/u)[0] ?? '';
+  return host.replace(/\.$/u, '');
+}
+
+function isFullDomain(domain: string): boolean {
+  return /^[^\s.]+(?:\.[^\s.]+)+$/u.test(domain);
+}
+
+function tldShortcutOf(domain: string): string | null {
+  const matches = PRICING_TLD_SHORTCUTS.filter((tld) => domain.endsWith(tld));
+  matches.sort((a, b) => b.length - a.length);
+  return matches[0] ?? null;
+}
 
 export const PricingPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const domainParam = searchParams.get('domain');
 
-  // Derive initial TLD from query parameter if present
-  const initialTld = useMemo(() => {
-    if (!domainParam) return '.com';
-    const trimmed = domainParam.trim().toLowerCase();
-    for (const tld of SUPPORTED_PRICING_TLDS) {
-      if (trimmed.endsWith(tld)) {
-        return tld;
-      }
-    }
-    return '.com';
-  }, [domainParam]);
-
-  const [mode, setMode] = useState<PricingMode>('registrars');
-  const [selectedTld, setSelectedTld] = useState<string>(initialTld);
-  const [sortOption, setSortOption] = useState<PricingSortOption>('best-value');
-  const [filterText, setFilterText] = useState<string>('');
-  const [requirePrivacy, setRequirePrivacy] = useState<boolean>(false);
-  const [requireDnssec, setRequireDnssec] = useState<boolean>(false);
-  const [selectedRegistrarId, setSelectedRegistrarId] = useState<string>('porkbun');
-  const [horizon, setHorizon] = useState<HorizonYears>(5);
-  const [savedComparisons, setSavedComparisons] = useState<SavedComparisonItem[]>(
-    INITIAL_SAVED_COMPARISONS
-  );
-  const [showSavedModal, setShowSavedModal] = useState<boolean>(false);
+  const [domainInput, setDomainInput] = useState<string>(domainParam ?? '');
+  const [activeDomain, setActiveDomain] = useState<string | null>(null);
+  const [searchState, setSearchState] = useState<PricingSearchState>('idle');
+  const [response, setResponse] = useState<DomainSearchResponse | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [pricingPrefs] = useState(loadPricingPreferences);
+  const [sortOption, setSortOption] = useState<PricingSortOption>(() => sortOptionOf(pricingPrefs));
+  const [selectedProvider, setSelectedProvider] = useState<DomainAvailabilityProvider | null>(null);
+  const [horizon, setHorizon] = useState<HorizonYears>(() => horizonYearsOf(pricingPrefs));
+  const visibleColumns = useMemo(() => visibleColumnsOf(pricingPrefs), [pricingPrefs]);
   const [showMethodologyModal, setShowMethodologyModal] = useState<boolean>(false);
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Sync TLD if URL query changes
+  const runSearch = useCallback(async (raw: string) => {
+    const domain = normalizeDomainInput(raw);
+    if (!isFullDomain(domain)) {
+      setValidationMessage(INVALID_DOMAIN_MESSAGE);
+      return;
+    }
+    setValidationMessage(null);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    setActiveDomain(domain);
+    setSearchState('loading');
+    setRequestError(null);
+    setResponse(null);
+    setSelectedProvider(null);
+
+    try {
+      const next = await searchDomainAvailability(domain, controller.signal);
+      if (controller.signal.aborted || requestIdRef.current !== requestId) return;
+      setResponse(next);
+      setSearchState('results');
+    } catch (error) {
+      if (controller.signal.aborted || requestIdRef.current !== requestId) return;
+      setRequestError(
+        error instanceof ApiError
+          ? error.status === 404
+            ? 'Live registrar pricing is not available on this backend.'
+            : error.detail
+          : 'The price comparison could not be completed. Please try again.',
+      );
+      setSearchState('error');
+    }
+  }, []);
+
+  // A domain in the URL (e.g. the "Compare" link on Find Domain) runs immediately.
   useEffect(() => {
     if (domainParam) {
-      const trimmed = domainParam.trim().toLowerCase();
-      for (const tld of SUPPORTED_PRICING_TLDS) {
-        if (trimmed.endsWith(tld)) {
-          setSelectedTld(tld);
-          break;
-        }
-      }
+      setDomainInput(domainParam);
+      void runSearch(domainParam);
     }
-  }, [domainParam]);
+  }, [domainParam, runSearch]);
 
-  // Derived registrars dataset for the selected TLD
-  const baseRegistrars = useMemo(() => getRegistrarsForTld(selectedTld), [selectedTld]);
-
-  // Filtered & Sorted registrars for the table view
-  const filteredRegistrars = useMemo(() => {
-    let result = [...baseRegistrars];
-
-    if (filterText.trim()) {
-      const query = filterText.toLowerCase().trim();
-      result = result.filter(
-        (r) =>
-          r.registrarName.toLowerCase().includes(query) ||
-          (r.icannId && r.icannId.toLowerCase().includes(query)) ||
-          r.tagline.toLowerCase().includes(query)
-      );
-    }
-
-    if (requirePrivacy) {
-      result = result.filter((r) => r.privacyIncluded);
-    }
-
-    if (requireDnssec) {
-      result = result.filter((r) => r.dnssecSupported);
-    }
-
-    // Sort options
-    switch (sortOption) {
-      case 'lowest-first-year':
-        result.sort((a, b) => a.registrationPrice - b.registrationPrice);
-        break;
-      case 'lowest-renewal':
-        result.sort((a, b) => a.renewalPrice - b.renewalPrice);
-        break;
-      case 'lowest-transfer':
-        result.sort((a, b) => a.transferPrice - b.transferPrice);
-        break;
-      case 'lowest-5yr':
-        result.sort((a, b) => {
-          const costA = a.registrationPrice + 4 * a.renewalPrice;
-          const costB = b.registrationPrice + 4 * b.renewalPrice;
-          return costA - costB;
-        });
-        break;
-      case 'best-value':
-      default:
-        result.sort((a, b) => b.score - a.score);
-        break;
-    }
-
-    return result;
-  }, [baseRegistrars, filterText, requirePrivacy, requireDnssec, sortOption]);
-
-  // Derived metrics & benchmarks
-  const summaryMetrics = useMemo(() => calculatePricingSummary(baseRegistrars), [baseRegistrars]);
-
-  const ownershipItems = useMemo(
-    () => calculateOwnershipCosts(baseRegistrars, horizon),
-    [baseRegistrars, horizon]
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+    },
+    [],
   );
 
-  const selectedRegistrar = useMemo(() => {
-    return (
-      baseRegistrars.find((r) => r.id === selectedRegistrarId) ||
-      baseRegistrars[0] ||
-      baseRegistrars[1]
+  const handleSelectTld = (tld: string) => {
+    const base = normalizeDomainInput(domainInput);
+    const keyword = (base.includes('.') ? base.slice(0, base.indexOf('.')) : base).replace(
+      /[^a-z0-9-]/gu,
+      '',
     );
-  }, [baseRegistrars, selectedRegistrarId]);
-
-  const handleSaveToWatchlist = (reg: RegistrarPricing) => {
-    const newItem: SavedComparisonItem = {
-      id: `sc-${Date.now()}`,
-      title: `${selectedTld} ${reg.registrarName} Benchmark`,
-      tld: selectedTld,
-      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      topPick: reg.registrarName,
-      est5YrSavings: `₹${(reg.renewalPrice * 2).toLocaleString('en-IN')}/domain`,
-    };
-    setSavedComparisons((prev) => [newItem, ...prev]);
+    if (keyword.length === 0) {
+      setValidationMessage('Type a domain name first, then pick an extension.');
+      return;
+    }
+    const next = `${keyword}${tld}`;
+    setDomainInput(next);
+    void runSearch(next);
   };
 
-  const handleRemoveSaved = (id: string) => {
-    setSavedComparisons((prev) => prev.filter((s) => s.id !== id));
-  };
+  const results = useMemo(() => response?.results ?? [], [response]);
+  const sortedResults = useMemo(() => sortResults(results, sortOption), [results, sortOption]);
+  const selectedResult =
+    sortedResults.find((result) => result.provider === selectedProvider) ?? sortedResults[0];
+  const currencies = useMemo(() => pricedCurrencies(results), [results]);
+
+  const hasResults = searchState === 'results' && results.length > 0;
+  const availabilityOnly = hasResults && results.every((result) => result.provider === 'whois');
+  const allUnconfigured = hasResults && results.every((r) => r.state === 'UNCONFIGURED');
+  const unconfiguredCount = results.filter((r) => r.state === 'UNCONFIGURED').length;
+  const definitive = results.filter(isDefinitive);
+  const allRegistered =
+    hasResults && definitive.length > 0 && definitive.every((r) => r.state === 'UNAVAILABLE');
+  const failedProviders = results.filter((r) => r.state === 'ERROR' || r.errorCode !== null);
+  const fetchedAt = results[0]?.fetchedAt;
 
   return (
     <div className="flex flex-col gap-unit-md w-full pb-unit-2xl">
-      <aside className="rounded-lg border border-primary/25 bg-primary/5 px-unit-base py-unit-sm text-body-sm text-on-surface" role="note">
-        <strong>Future capability · reference data only.</strong>{' '}
-        This screen is not connected to registrar or hosting-provider pricing APIs. Verify every price with the provider before acting.
-      </aside>
-      {/* 1. TOP REFERENCE DISCLAIMER BANNER */}
+      {/* 1. LIVE PRICING DISCLAIMER */}
       <PricingDisclaimer />
 
-      {/* Domain Context Callout if query param is passed from Find Domain and in Registrars mode */}
-      {mode === 'registrars' && domainParam && (
+      {/* Domain context callout */}
+      {activeDomain && (
         <div className="px-unit-base py-2 rounded-lg bg-secondary-container/40 flex items-center justify-between gap-unit-sm border border-secondary-container">
           <div className="flex items-center gap-unit-xs text-caption-xs font-caption-xs">
             <span className="material-symbols-outlined text-primary text-[18px]">travel_explore</span>
-            <span className="text-secondary">Comparing Multi-Registrar Pricing for:</span>
-            <span className="font-label-mono font-bold text-primary text-body-sm">
-              {domainParam}
-            </span>
-            <span className="px-1.5 py-0.2 rounded bg-secondary-container text-primary font-semibold text-[10px]">
-              {selectedTld} Active
-            </span>
+            <span className="text-secondary">Checking domain availability for:</span>
+            <span className="font-label-mono font-bold text-primary text-body-sm">{activeDomain}</span>
+            {tldShortcutOf(activeDomain) && (
+              <span className="px-1.5 py-0.2 rounded bg-secondary-container text-primary font-semibold text-[10px]">
+                {tldShortcutOf(activeDomain)}
+              </span>
+            )}
           </div>
-          <span className="text-caption-xs text-secondary italic hidden sm:inline">
-            Reference dataset derived from {selectedTld} zone benchmarks
-          </span>
+          {fetchedAt && hasResults && (
+            <span className="text-caption-xs text-secondary italic hidden sm:inline">
+              Fetched at {formatFetchedAt(fetchedAt)}
+            </span>
+          )}
         </div>
       )}
 
       {/* 2. PAGE HEADER & PRIMARY CONTROLS */}
-      <PricingHeader
-        mode={mode}
-        onModeChange={setMode}
-        savedCount={savedComparisons.length}
-        onOpenSaved={() => setShowSavedModal(true)}
-        onOpenMethodology={() => setShowMethodologyModal(true)}
-      />
+      <PricingHeader onOpenMethodology={() => setShowMethodologyModal(true)} />
 
-      {/* 3. VIEW: REGISTRARS MODE (DEFAULT) */}
-      {mode === 'registrars' && (
-        <div className="flex flex-col gap-unit-md">
-          {/* TOOLBAR & TLD SELECTOR */}
-          <TldPricingFilters
-            selectedTld={selectedTld}
-            onSelectTld={setSelectedTld}
-            sortOption={sortOption}
-            onSortChange={setSortOption}
-            filterText={filterText}
-            onFilterTextChange={setFilterText}
-            requirePrivacy={requirePrivacy}
-            onTogglePrivacy={() => setRequirePrivacy(!requirePrivacy)}
-            requireDnssec={requireDnssec}
-            onToggleDnssec={() => setRequireDnssec(!requireDnssec)}
-          />
+      {/* 3. REGISTRAR PRICE COMPARISON */}
+      <div className="flex flex-col gap-unit-md">
+        <PricingSearchBar
+          domainInput={domainInput}
+          onDomainInputChange={(value) => {
+            setDomainInput(value);
+            setValidationMessage(null);
+          }}
+          onSubmit={() => {
+            void runSearch(domainInput);
+          }}
+          isLoading={searchState === 'loading'}
+          activeTld={tldShortcutOf(normalizeDomainInput(domainInput))}
+          onSelectTld={handleSelectTld}
+          sortOption={sortOption}
+          onSortChange={setSortOption}
+          currencies={currencies}
+          validationMessage={validationMessage}
+        />
 
-          {/* COMPACT METRIC SUMMARY STRIP */}
-          <PricingSummaryStrip metrics={summaryMetrics} tld={selectedTld} />
+        {searchState === 'loading' && (
+          <p role="status" className="font-caption-xs text-caption-xs text-secondary">
+            Checking domain availability…
+          </p>
+        )}
 
-          {/* 5-YEAR OWNERSHIP VISUALIZATION & BENCHMARK DUAL CARD */}
-          <OwnershipCostBenchmark
-            items={ownershipItems}
-            horizon={horizon}
-            onHorizonChange={setHorizon}
-            tld={selectedTld}
-          />
-
-          {/* MAIN DATA MATRIX & PROVIDER INSPECTION DRAWER (SPLIT VIEW) */}
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-unit-md items-start">
-            {/* Matrix Table (Left 8 Cols) */}
-            <div className="xl:col-span-8">
-              <RegistrarComparisonMatrix
-                registrars={filteredRegistrars}
-                selectedRegistrarId={selectedRegistrarId}
-                onSelectRegistrar={setSelectedRegistrarId}
-                selectedTld={selectedTld}
-              />
-            </div>
-
-            {/* Provider Details Drawer (Right 4 Cols) */}
-            <div className="xl:col-span-4">
-              <PricingInspector
-                registrar={selectedRegistrar}
-                onSaveToWatchlist={handleSaveToWatchlist}
-              />
-            </div>
-          </div>
-
-          {/* TRANSFER SAVINGS CALCULATOR (BOTTOM GRID) */}
-          <TransferSavingsCalculator registrars={baseRegistrars} tld={selectedTld} />
-        </div>
-      )}
-
-      {/* 4. VIEW: HOSTING PROVIDERS MODE */}
-      {mode === 'hosting' && <HostingPricingMatrix />}
-
-      {/* Saved Comparisons Modal */}
-      {showSavedModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-surface-container-lowest rounded-xl max-w-lg w-full p-unit-lg shadow-xl border border-outline-variant/30 flex flex-col gap-unit-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-unit-xs">
-                <span className="material-symbols-outlined text-primary text-[20px]">bookmark</span>
-                <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-                  Saved Pricing Comparisons ({savedComparisons.length})
-                </h3>
-              </div>
+        {searchState === 'error' && requestError && (
+          <aside
+            role="alert"
+            className="rounded-lg border border-rose-200/60 bg-rose-50 px-unit-base py-unit-sm text-body-sm text-rose-900 flex flex-wrap items-center justify-between gap-unit-sm"
+          >
+            <span>
+              <strong>Price comparison failed.</strong> {requestError}
+            </span>
+            {activeDomain && (
               <button
                 type="button"
-                onClick={() => setShowSavedModal(false)}
-                className="p-1 rounded text-secondary hover:text-on-surface cursor-pointer"
+                onClick={() => {
+                  void runSearch(activeDomain);
+                }}
+                className="h-8 px-unit-sm rounded bg-rose-100 text-rose-900 font-label-md text-label-md hover:bg-rose-200 transition-colors cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                Retry
               </button>
-            </div>
+            )}
+          </aside>
+        )}
 
-            <div className="flex flex-col gap-unit-xs max-h-80 overflow-y-auto">
-              {savedComparisons.length > 0 ? (
-                savedComparisons.map((sc) => (
-                  <div
-                    key={sc.id}
-                    className="p-unit-sm rounded-lg bg-surface-container-low flex items-center justify-between border border-outline-variant/20 hover:bg-surface-container transition-colors"
-                  >
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-label-mono font-bold text-on-surface text-body-sm truncate">
-                          {sc.title}
-                        </span>
-                        <span className="px-1.5 py-0.2 rounded bg-secondary-container text-primary font-caption-xs text-[10px] font-semibold">
-                          {sc.tld}
-                        </span>
-                      </div>
-                      <span className="text-caption-xs text-secondary mt-0.5">
-                        Top Pick: {sc.topPick} • {sc.est5YrSavings} • {sc.date}
-                      </span>
-                    </div>
+        {allUnconfigured && (
+          <aside
+            role="note"
+            className="rounded-lg border border-amber-200/50 bg-amber-50 px-unit-base py-unit-sm text-body-sm text-amber-900"
+          >
+            <strong>Live registrar pricing isn&apos;t configured.</strong> DomainPulse&apos;s
+            registrar lookup service has no provider credentials set up yet, so no prices can be
+            fetched. You don&apos;t need to connect your own account.
+          </aside>
+        )}
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTld(sc.tld);
-                          setShowSavedModal(false);
-                        }}
-                        className="px-2 py-1 rounded bg-surface-container text-primary hover:bg-primary hover:text-on-primary text-caption-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Load TLD
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSaved(sc.id)}
-                        className="p-1 text-secondary hover:text-rose-600 transition-colors cursor-pointer"
-                        title="Delete"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">delete</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="py-6 text-center text-secondary text-body-sm">
-                  No saved comparisons in your list.
-                </div>
-              )}
-            </div>
+        {allRegistered && activeDomain && (
+          <aside
+            role="note"
+            className="rounded-lg border border-rose-200/50 bg-rose-50 px-unit-base py-unit-sm text-body-sm text-rose-900"
+          >
+            <strong>{activeDomain} is already registered.</strong> Registrars only return prices
+            for domains that can be registered right now, so no prices are shown. Try another name
+            or extension.
+          </aside>
+        )}
 
-            <button
-              type="button"
-              onClick={() => setShowSavedModal(false)}
-              className="h-9 rounded-lg bg-surface-container hover:bg-surface-variant text-on-surface font-label-md text-label-md font-semibold transition-colors cursor-pointer"
-            >
-              Close
-            </button>
+        {hasResults && !allUnconfigured && unconfiguredCount > 0 && (
+          <aside
+            role="note"
+            className="rounded-lg border border-outline-variant/40 bg-surface-container-low px-unit-base py-unit-sm text-body-sm text-on-surface-variant"
+          >
+            <strong>{formatRegistrarConfiguration(unconfiguredCount, results.length)}</strong>{' '}
+            in DomainPulse and were not queried.
+          </aside>
+        )}
+
+        {hasResults && failedProviders.length > 0 && (
+          <aside
+            role="note"
+            className="rounded-lg border border-amber-200/50 bg-amber-50 px-unit-base py-unit-sm text-body-sm text-amber-900"
+          >
+            <strong>Partial results.</strong>{' '}
+            {failedProviders.map((result) => providerLabel(result.provider)).join(', ')} could not
+            return {failedProviders.length === 1 ? 'a' : ''} complete
+            {failedProviders.length === 1 ? ' result' : ' results'}. Prices from the other
+            registrars are unaffected.
+          </aside>
+        )}
+
+        {hasResults && currencies.length > 1 && (
+          <aside
+            role="note"
+            className="rounded-lg border border-amber-200/50 bg-amber-50 px-unit-base py-unit-sm text-body-sm text-amber-900"
+          >
+            <strong>Mixed currencies ({currencies.join(', ')}).</strong> Registrars returned prices
+            in different currencies. DomainPulse does not convert currencies, so these prices are
+            not directly comparable and are never ranked against each other.
+          </aside>
+        )}
+
+        {availabilityOnly && activeDomain && (
+          <aside className="rounded-xl border border-amber-200 bg-amber-50 px-unit-base py-unit-md text-body-sm text-amber-950" role="status">
+            <strong>{results[0]?.available ? 'Possibly available' : 'Likely registered'}: {activeDomain}.</strong>{' '}
+            The deployed backend returned an availability estimate, but has no registrar price comparison endpoint.
+            Registration, renewal and transfer prices cannot be shown until that service is deployed.
+            Check availability and prices directly with a registrar before buying.
+          </aside>
+        )}
+
+        {/* SUMMARY STRIP */}
+        {hasResults && !availabilityOnly && <PricingSummaryStrip results={results} />}
+
+        {/* OWNERSHIP COST BENCHMARK */}
+        {hasResults && !availabilityOnly && (
+          <OwnershipCostBenchmark
+            results={results}
+            horizon={horizon}
+            onHorizonChange={setHorizon}
+            domain={activeDomain}
+          />
+        )}
+
+        {/* MAIN DATA MATRIX & PROVIDER INSPECTION DRAWER (SPLIT VIEW) */}
+        {!availabilityOnly && <div className="grid grid-cols-1 xl:grid-cols-12 gap-unit-md items-start">
+          <div className="xl:col-span-8">
+            <RegistrarComparisonMatrix
+              results={sortedResults}
+              searchState={searchState}
+              domain={activeDomain}
+              selectedProvider={selectedResult?.provider ?? null}
+              onSelectProvider={setSelectedProvider}
+              visibleColumns={visibleColumns}
+              markupThresholdPercent={pricingPrefs.renewalMarkupThreshold}
+            />
           </div>
-        </div>
-      )}
+
+          <div className="xl:col-span-4">
+            <PricingInspector result={hasResults ? selectedResult : undefined} />
+          </div>
+        </div>}
+
+        {/* TRANSFER SAVINGS CALCULATOR */}
+        {hasResults && !availabilityOnly && <TransferSavingsCalculator results={results} domain={activeDomain} />}
+      </div>
 
       {/* Methodology Modal */}
       {showMethodologyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-surface-container-lowest rounded-xl max-w-xl w-full p-unit-lg shadow-xl border border-outline-variant/30 flex flex-col gap-unit-md">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pricing methodology"
+            className="bg-surface-container-lowest rounded-xl max-w-xl w-full p-unit-lg shadow-xl border border-outline-variant/30 flex flex-col gap-unit-md"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-unit-xs">
                 <span className="material-symbols-outlined text-secondary text-[20px]">balance</span>
                 <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-                  Benchmark &amp; Methodology Guide
+                  Methodology &amp; Data Sources
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowMethodologyModal(false)}
+                aria-label="Close methodology"
                 className="p-1 rounded text-secondary hover:text-on-surface cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
@@ -346,16 +361,25 @@ export const PricingPage: React.FC = () => {
 
             <div className="flex flex-col gap-unit-sm text-body-sm text-secondary leading-relaxed">
               <p>
-                <strong>5-Year Cumulative Cost Trajectory:</strong> Calculated using the initial registration rate plus 4 consecutive annual renewal rates:
+                <strong>Current source.</strong> The deployed backend uses its domain availability
+                endpoint. It may fall back to DNS checks, so the result is an estimate. Confirm
+                availability with a registrar.
+              </p>
+              <p>
+                <strong>Pricing.</strong> This backend does not currently provide registrar quotes.
+                The website does not invent prices. Live comparison needs a pricing endpoint.
+              </p>
+              <p>
+                <strong>Currencies.</strong> Each registrar is shown in its own currency. There is no
+                exchange-rate source, so different currencies are never converted, summed or ranked
+                against each other.
+              </p>
+              <p>
+                <strong>Ownership cost.</strong> Uses the returned prices and assumes renewals stay
+                unchanged:
                 <code className="block p-2 bg-surface-container-low rounded my-1 font-label-mono text-[12px] text-on-surface">
-                  5-Yr Cost = Year_1_Registration + (4 × Recurring_Renewal_Rate)
+                  N-Yr Cost = Year_1_Registration + ((N − 1) × Renewal_Rate)
                 </code>
-              </p>
-              <p>
-                <strong>Wholesale At-Cost Pricing:</strong> Cloudflare Registrar offers domains at ICANN registry wholesale rates ($0 markup). Other registrars apply variable markups, intro promotions, or renewal escalations.
-              </p>
-              <p>
-                <strong>Reference Dataset:</strong> All pricing and fee data is stored for benchmarking and demonstrative analysis. Final billing terms must be verified directly with the individual registrar.
               </p>
             </div>
 

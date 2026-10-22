@@ -16,7 +16,7 @@ export const RegistrationDetails: React.FC<RegistrationDetailsProps> = ({ data }
             Registration &amp; Registrar Details
           </h2>
         </div>
-        <span className="px-unit-sm py-unit-2xs rounded bg-[#ecfdf5] text-[#065f46] font-caption-xs text-caption-xs font-semibold">
+        <span className="px-unit-sm py-unit-2xs rounded bg-healthy-bg text-healthy-text font-caption-xs text-caption-xs font-semibold">
           RDAP Data Available
         </span>
       </div>

@@ -184,7 +184,7 @@ export const DomainRow: React.FC<DomainRowProps> = ({
         >
           {domain.status === 'critical' && (
             <Link
-              to={`/domains/${domain.domain}`}
+              to={`/domains/${domain.id}`}
               className="px-2 py-1 rounded bg-primary text-on-primary text-caption-xs font-label-md font-semibold shadow-sm hover:bg-primary-container transition-colors"
             >
               Review Renewal
@@ -213,7 +213,7 @@ export const DomainRow: React.FC<DomainRowProps> = ({
                     <button
                       onClick={() => {
                         setIsMenuOpen(false);
-                        navigate(`/domains/${domain.domain}`);
+                        navigate(`/domains/${domain.id}`);
                       }}
                       className="w-full px-unit-md py-1.5 text-caption-xs font-label-md text-on-surface hover:bg-surface-container flex items-center gap-2"
                     >
@@ -248,7 +248,7 @@ export const DomainRow: React.FC<DomainRowProps> = ({
                     <button
                       onClick={() => {
                         setIsMenuOpen(false);
-                        navigate(`/domains/${domain.domain}`);
+                        navigate(`/domains/${domain.id}`);
                       }}
                       className="w-full px-unit-md py-1.5 text-caption-xs font-label-md text-on-surface hover:bg-surface-container flex items-center gap-2"
                     >
@@ -260,7 +260,7 @@ export const DomainRow: React.FC<DomainRowProps> = ({
                     <button
                       onClick={() => {
                         setIsMenuOpen(false);
-                        navigate(`/domains/${domain.domain}`);
+                        navigate(`/domains/${domain.id}`);
                       }}
                       className="w-full px-unit-md py-1.5 text-caption-xs font-label-md text-on-surface hover:bg-surface-container flex items-center gap-2"
                     >

@@ -9,6 +9,15 @@ import { EntityAssociations } from '@/components/integration/EntityAssociations'
 import { InventoryState, ResourceFormModal, StatePanel } from '@/components/integration/InventoryWorkspace';
 import { serverConfiguration } from '@/features/integration/resource-configs';
 import { useProviderLabels } from '@/features/provider-accounts/useProviderLabels';
+import { ServerAvailabilitySection } from '@/features/server-details/components/ServerAvailabilitySection';
+import {
+  formatCpu,
+  formatDisk,
+  formatMemory,
+  formatProviderCreatedAt,
+  formatProviderStatus,
+  operatingSystemDetailEntries,
+} from '@/features/server-details/serverProviderMetadata';
 
 const metadata = (value: string | null) => value || 'Not recorded';
 
@@ -89,7 +98,9 @@ export const ServerDetailPage: React.FC = () => {
         ].map(([icon, label, value]) => <div key={label} className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-unit-md shadow-sm"><div className="flex items-center justify-between"><span className="text-caption-xs font-semibold uppercase tracking-wider text-secondary">{label}</span><span className="material-symbols-outlined text-[20px] text-primary">{icon}</span></div><p className="mt-unit-xs break-words text-headline-sm font-semibold text-on-surface">{value}</p><p className="mt-1 text-caption-xs text-secondary">Stored metadata</p></div>)}
       </section>
 
-      <div className="rounded-xl border border-primary/15 bg-primary/5 p-unit-md"><div className="flex items-start gap-unit-sm"><span className="material-symbols-outlined text-[20px] text-primary">monitoring</span><div><p className="text-label-md font-semibold text-on-surface">Inventory record, not live monitoring</p><p className="mt-1 text-body-sm text-secondary">CPU, memory, storage usage, uptime, latency, health, renewal, and billing telemetry are not supplied by the current API.</p></div></div></div>
+      <ServerAvailabilitySection serverId={server.id} inventoryState={server.inventoryState} primaryIp={server.primaryIp} hostname={server.hostname} />
+
+      <div className="rounded-xl border border-primary/15 bg-primary/5 p-unit-md"><div className="flex items-start gap-unit-sm"><span className="material-symbols-outlined text-[20px] text-primary">info</span><div><p className="text-label-md font-semibold text-on-surface">Provider data is stored metadata</p><p className="mt-1 text-body-sm text-secondary">CPU, memory, disk, and provider status below are as last reported at provider sync time, not live usage or observed network availability. Uptime percentage, renewal, and billing telemetry are not supplied here.</p></div></div></div>
 
       <div className="grid grid-cols-1 items-start gap-unit-lg lg:grid-cols-3">
         <section className="overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm lg:col-span-2">
@@ -107,6 +118,35 @@ export const ServerDetailPage: React.FC = () => {
           <Link className="text-label-md font-semibold text-primary hover:underline" to="/infrastructure-map">Open infrastructure map →</Link>
         </aside>
       </div>
+
+      <section className="overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm" aria-label="Provider compute information">
+        <div className="flex items-center gap-unit-sm border-b border-outline-variant/30 bg-surface-container-low p-unit-md"><span className="material-symbols-outlined text-[20px] text-primary">memory</span><div><h2 className="text-headline-sm font-semibold text-on-surface">Provider / Compute Information</h2><p className="text-caption-xs text-secondary">Last reported by the provider at sync time</p></div></div>
+        {server.providerMetadata ? (
+          <>
+            <dl className="grid grid-cols-1 gap-unit-md p-unit-md sm:grid-cols-2 lg:grid-cols-3">{[
+              ['Provider status', formatProviderStatus(server.providerMetadata.providerStatus)],
+              ['Provider-reported created', formatProviderCreatedAt(server.providerMetadata.providerCreatedAt)],
+              ['CPU', formatCpu(server.providerMetadata.specs.cpuCount) ?? 'Not reported'],
+              ['RAM', formatMemory(server.providerMetadata.specs.memoryMb) ?? 'Not reported'],
+              ['Disk', formatDisk(server.providerMetadata.specs.diskGb) ?? 'Not reported'],
+            ].map(([label, value]) => <div key={label} className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm"><dt className="text-caption-xs text-secondary">{label}</dt><dd className="mt-unit-2xs break-words text-body-sm font-semibold text-on-surface">{value}</dd></div>)}</dl>
+            {operatingSystemDetailEntries(server.providerMetadata.operatingSystemDetail).length > 0 && (
+              <div className="px-unit-md pb-unit-md">
+                <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-unit-sm">
+                  <p className="text-caption-xs text-secondary">Additional OS detail reported by the provider</p>
+                  <dl className="mt-unit-xs grid grid-cols-1 gap-unit-2xs sm:grid-cols-2">
+                    {operatingSystemDetailEntries(server.providerMetadata.operatingSystemDetail).map(([label, value]) => (
+                      <div key={label} className="flex justify-between gap-2 text-caption-xs"><dt className="text-secondary">{label}</dt><dd className="font-medium text-on-surface">{value}</dd></div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="p-unit-md text-body-sm text-secondary">This server has not been linked to a provider sync, so no provider-reported compute information is available.</p>
+        )}
+      </section>
 
       <EntityAssociations title="Hosted applications and immediate relationships" sources={associationSources} />
       {editing && <ResourceFormModal config={config} record={server} onClose={() => setEditing(false)} onSaved={setServer} />}

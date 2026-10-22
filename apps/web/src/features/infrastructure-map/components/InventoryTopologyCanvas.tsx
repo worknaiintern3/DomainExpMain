@@ -413,7 +413,7 @@ export const InventoryTopologyCanvas: React.FC<{
         </div>
       </div>
 
-      <div className="relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/60">
+      <div className="relative bg-surface-container-low">
         <svg
           aria-label={`Stored infrastructure topology with ${graph.nodes.length} nodes and ${graph.edges.length} relationships. Drag to pan.`}
           className={`h-[28rem] min-h-96 w-full select-none lg:h-[32rem] ${panning ? 'cursor-grabbing' : 'cursor-grab'}`}
