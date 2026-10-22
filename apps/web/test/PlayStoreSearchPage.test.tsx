@@ -103,7 +103,7 @@ describe('PlayStoreSearchPage', () => {
     expect(appsMock).toHaveBeenCalledWith('Google LLC', 100);
     expect(screen.getByText('com.android.chrome')).toBeInTheDocument();
     expect(screen.getByText('4.4')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Open on Play Store/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Open on Google Play Store/ })).toHaveAttribute(
       'href',
       'https://play.google.com/store/apps/details?id=com.android.chrome',
     );

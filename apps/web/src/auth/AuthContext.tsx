@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 
-import { ApiError, apiRequest, configureApiAuthentication } from '@/api/client';
+import { ApiError, apiRequest, configureApiAuthentication, setApiCacheSession } from '@/api/client';
 import { deleteWebPushSubscription } from '@/api/web-push';
 import type {
   GoogleLinkResult,
@@ -69,12 +69,6 @@ interface LoginInput {
   rememberMe?: boolean;
 }
 
-export interface DeleteAccountInput {
-  confirmEmail: string;
-  /** Required by the server only when the account has a password. */
-  password?: string;
-}
-
 interface RegisterInput extends LoginInput {
   displayName?: string;
 }
@@ -83,7 +77,6 @@ interface AuthContextValue {
   addPassword(password: string): Promise<LoginMethodsStatus>;
   completeGoogleLink(code: string, state: string): Promise<GoogleLinkResult>;
   completeGoogleLogin(code: string, state: string): Promise<void>;
-  deleteAccount(input: DeleteAccountInput): Promise<void>;
   error: string | null;
   getLoginMethods(): Promise<LoginMethodsStatus>;
   login(input: LoginInput): Promise<void>;
@@ -177,6 +170,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       return undefined;
     }).catch(() => undefined);
     accessTokenRef.current = null;
+    setApiCacheSession(null);
     refreshFlightRef.current = null;
     clearStoredRefreshTokens();
     rememberMeRef.current = false;
@@ -187,6 +181,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
   const acceptTokenPair = useCallback((pair: TokenPair) => {
     accessTokenRef.current = pair.accessToken;
+    setApiCacheSession(pair.session.id);
     writeRefreshToken(pair.refreshToken, rememberMeRef.current);
     setSessionId(pair.session.id);
   }, []);
@@ -257,6 +252,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   const beginAuthenticationAttempt = useCallback((rememberMe = false): number => {
     const generation = ++generationRef.current;
     accessTokenRef.current = null;
+    setApiCacheSession(null);
     clearStoredRefreshTokens();
     rememberMeRef.current = rememberMe;
     setError(null);
@@ -408,24 +404,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     }
   }, [clearSession]);
 
-  /** Permanently deletes the account server-side, then drops local credentials. Rejects (leaving the session intact) on any failure. */
-  const deleteAccount = useCallback(async (input: DeleteAccountInput) => {
-    await apiRequest<void>('/auth/account/delete', {
-      body: {
-        confirmEmail: input.confirmEmail,
-        ...(input.password ? { password: input.password } : {}),
-      },
-      method: 'POST',
-      retryAuthentication: false,
-    });
-    clearSession();
-  }, [clearSession]);
-
   const value = useMemo<AuthContextValue>(() => ({
     addPassword,
     completeGoogleLink,
     completeGoogleLogin,
-    deleteAccount,
     error,
     getLoginMethods,
     login,
@@ -441,7 +423,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     addPassword,
     completeGoogleLink,
     completeGoogleLogin,
-    deleteAccount,
     error,
     getLoginMethods,
     login,

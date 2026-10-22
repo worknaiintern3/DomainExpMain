@@ -3,6 +3,11 @@ import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import { NavItem } from '@/types';
 
+interface CustomIcon {
+  src: string;
+  style?: React.CSSProperties;
+}
+
 export interface SidebarItemProps {
   item: NavItem;
   /** Icon-rail mode: hides the label and badge, keeps the icon with a tooltip. */
@@ -11,6 +16,9 @@ export interface SidebarItemProps {
 }
 
 export const SidebarItem: React.FC<SidebarItemProps> = ({ item, collapsed = false, onNavigate }) => {
+  const isCustomIcon = (icon: string | CustomIcon): icon is CustomIcon =>
+    typeof icon === 'object' && icon !== null && 'src' in icon;
+
   return (
     <NavLink
       to={item.path}
@@ -29,11 +37,18 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({ item, collapsed = fals
       }
     >
       <div className={`flex items-center min-w-0 ${collapsed ? '' : 'gap-unit-md'}`}>
-        <span
-          className="material-symbols-outlined text-[20px] shrink-0 leading-none group-hover:scale-105 transition-transform"
-        >
-          {item.icon}
-        </span>
+        {isCustomIcon(item.icon) ? (
+          <img
+            src={item.icon.src}
+            alt={item.label}
+            className="w-5 h-5 shrink-0 group-hover:scale-105 transition-transform"
+            style={item.icon.style}
+          />
+        ) : (
+          <span className="material-symbols-outlined text-[20px] shrink-0 leading-none group-hover:scale-105 transition-transform">
+            {item.icon}
+          </span>
+        )}
         {!collapsed && <span className="truncate font-sans text-label-md">{item.label}</span>}
       </div>
 

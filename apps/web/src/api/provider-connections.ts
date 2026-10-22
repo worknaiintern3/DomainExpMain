@@ -1,4 +1,4 @@
-import { ApiError, apiRequest } from './client';
+import { apiRequest } from './client';
 import { backendProviderResourceCapabilities } from './provider-resource-capabilities';
 
 export type ProviderConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
@@ -82,12 +82,10 @@ export type ProviderResourceCapabilityCollection = {
 };
 
 export async function listProviderResourceCapabilities(signal?: AbortSignal): Promise<ProviderResourceCapabilityCollection> {
-  try {
-    return await apiRequest('/provider-connections/capabilities', { signal });
-  } catch (error) {
-    if (!(error instanceof ApiError) || (error.status !== 404 && error.status !== 400)) throw error;
-    return backendProviderResourceCapabilities();
-  }
+  // This backend has no /capabilities route. Keep the UI aligned with the
+  // adapters it ships instead of making a request that always returns 400.
+  void signal;
+  return backendProviderResourceCapabilities();
 }
 
 export function listProviderConnections(signal?: AbortSignal): Promise<ProviderConnectionCollection> {
@@ -141,8 +139,20 @@ export function disconnectProviderConnection(
   return apiRequest(`/provider-connections/${encodeURIComponent(id)}/disconnect`, { method: 'POST' });
 }
 
-export function listProviderAccounts(signal?: AbortSignal): Promise<{ items: ProviderAccountResponse[] }> {
-  return apiRequest('/provider-accounts', { signal });
+export async function listProviderAccounts(signal?: AbortSignal): Promise<{ items: ProviderAccountResponse[] }> {
+  const items: ProviderAccountResponse[] = [];
+  let cursor: string | null = null;
+  do {
+    const query = new URLSearchParams({ limit: '100' });
+    if (cursor) query.set('cursor', cursor);
+    const page = await apiRequest<{ items: ProviderAccountResponse[]; nextCursor: string | null }>(
+      `/provider-accounts?${query}`,
+      { cache: 'no-store', signal },
+    );
+    items.push(...page.items);
+    cursor = page.nextCursor ?? null;
+  } while (cursor);
+  return { items };
 }
 
 export function createProviderAccount(

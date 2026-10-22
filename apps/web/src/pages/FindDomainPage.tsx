@@ -17,7 +17,7 @@ import {
 import {
   AVAILABILITY_PROVIDER_LABELS,
   formatMinorUnits,
-  searchDomainAvailability,
+  searchDomainAvailabilityAcrossTlds,
   type DomainAvailabilityResult,
 } from '@/api/domain-search';
 import { ApiError } from '@/api/client';
@@ -242,24 +242,30 @@ export const FindDomainPage: React.FC = () => {
     setSearchState('loading');
     setSearchError(null);
 
-    const settled = await Promise.allSettled(
-      domains.map((domain) => searchDomainAvailability(domain, controller.signal)),
-    );
-    if (controller.signal.aborted || requestIdRef.current !== requestId) return;
-
-    const nextRows = settled.map((outcome, index) => {
-      const domain = domains[index] as string;
-      if (outcome.status === 'fulfilled') {
-        return buildRow(domain, outcome.value.results, null, savedSet.has(domain));
-      }
-      const reason =
-        outcome.reason instanceof ApiError
-          ? outcome.reason.status === 404
-            ? 'Live registrar availability and pricing are not available on this backend.'
-            : outcome.reason.detail
-          : 'The availability check could not be completed.';
-      return buildRow(domain, [], reason, savedSet.has(domain));
-    });
+    let nextRows: LiveRow[];
+    try {
+      const firstDomain = domains[0] as string;
+      const base = firstDomain.slice(0, firstDomain.indexOf('.'));
+      const results = await searchDomainAvailabilityAcrossTlds(
+        base,
+        domains.map(tldOf),
+        controller.signal,
+      );
+      if (controller.signal.aborted || requestIdRef.current !== requestId) return;
+      const byDomain = new Map(results.map((result) => [result.domain, result]));
+      nextRows = domains.map((domain) => {
+        const result = byDomain.get(domain);
+        return buildRow(domain, result?.results ?? [], result ? null : 'No availability result was returned.', savedSet.has(domain));
+      });
+    } catch (error) {
+      if (controller.signal.aborted || requestIdRef.current !== requestId) return;
+      const reason = error instanceof ApiError
+        ? error.status === 404
+          ? 'Domain availability is not available on this backend.'
+          : error.detail
+        : 'The availability check could not be completed.';
+      nextRows = domains.map((domain) => buildRow(domain, [], reason, savedSet.has(domain)));
+    }
 
     setRows(nextRows);
     setSelectedDomain(nextRows[0]?.item.domain ?? null);
@@ -492,7 +498,7 @@ export const FindDomainPage: React.FC = () => {
               <div className="bg-primary h-full rounded-full w-4/5 animate-pulse"></div>
             </div>
             <p className="text-center text-outline text-[11px] pt-1">
-              Live checks run against registrar APIs.
+              The backend checks domain availability; results are estimates until confirmed by a registrar.
             </p>
           </div>
         </div>

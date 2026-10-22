@@ -64,6 +64,18 @@ describe('data-transfer parsing', () => {
     expect(parsed.names).toEqual(['example.com']);
   });
 
+  it('imports mobile app CSV and Excel-compatible TSV exports', () => {
+    const mobileCsv = 'Domain Name,TLD,Registrar,Expires At\n"example.com","com","GoDaddy","2027-01-01"\n';
+    const mobileTsv = 'Domain Name\tTLD\tRegistrar\nexample.in\tin\tHostinger\n';
+    expect(parseDomainsCsv(mobileCsv).names).toEqual(['example.com']);
+    expect(parseDomainsCsv(mobileTsv).names).toEqual(['example.in']);
+  });
+
+  it('imports a domain from the mobile app BIND zone example', () => {
+    const zone = '$ORIGIN pulsezone.io.\n@ IN SOA ns1.example.com. admin.example.com.\napi IN A 192.0.2.10\n';
+    expect(parseDomainsCsv(zone)).toEqual({ names: ['pulsezone.io'], invalid: [] });
+  });
+
   it('round-trips domains through CSV', () => {
     const csv = domainsToCsv([domain('example.com')]);
     expect(csv.split('\n')[0]).toContain('domain_name');

@@ -48,20 +48,8 @@ export const AVAILABILITY_PROVIDER_LABELS: Record<DomainAvailabilityProvider, st
 
 type WhoisAvailability = { domain: string; tld: string; available: boolean; nameservers: string[] };
 
-/** The deployed backend provides availability but no registrar pricing endpoint. */
-export async function searchDomainAvailability(
-  domain: string,
-  signal?: AbortSignal,
-): Promise<DomainSearchResponse> {
-  const normalized = domain.trim().toLowerCase().replace(/\.$/u, '');
-  const dot = normalized.indexOf('.');
-  if (dot < 1 || dot === normalized.length - 1) throw new Error('Enter a full domain name.');
-  const query = normalized.slice(0, dot);
-  const tld = normalized.slice(dot);
-  const search = new URLSearchParams({ query, tlds: tld });
-  const checks = await apiRequest<WhoisAvailability[]>(`/whois/availability?${search.toString()}`, { signal });
-  const check = checks.find((entry) => entry.domain.toLowerCase() === normalized);
-  if (!check) throw new Error('The availability service returned no result for this domain.');
+function toDomainSearchResponse(check: WhoisAvailability): DomainSearchResponse {
+  const normalized = check.domain.toLowerCase();
   return {
     domain: normalized,
     results: [{
@@ -82,6 +70,32 @@ export async function searchDomainAvailability(
       fetchedAt: new Date().toISOString(),
     }],
   };
+}
+
+/** Check multiple extensions in one request, as supported by the backend. */
+export async function searchDomainAvailabilityAcrossTlds(
+  query: string,
+  tlds: string[],
+  signal?: AbortSignal,
+): Promise<DomainSearchResponse[]> {
+  if (!query.trim() || tlds.length === 0) throw new Error('Enter a domain name and at least one extension.');
+  const search = new URLSearchParams({ query, tlds: tlds.join(',') });
+  const checks = await apiRequest<WhoisAvailability[]>(`/whois/availability?${search.toString()}`, { signal });
+  return checks.map(toDomainSearchResponse);
+}
+
+/** The deployed backend provides availability but no registrar pricing endpoint. */
+export async function searchDomainAvailability(
+  domain: string,
+  signal?: AbortSignal,
+): Promise<DomainSearchResponse> {
+  const normalized = domain.trim().toLowerCase().replace(/\.$/u, '');
+  const dot = normalized.indexOf('.');
+  if (dot < 1 || dot === normalized.length - 1) throw new Error('Enter a full domain name.');
+  const responses = await searchDomainAvailabilityAcrossTlds(normalized.slice(0, dot), [normalized.slice(dot)], signal);
+  const check = responses.find((entry) => entry.domain === normalized);
+  if (!check) throw new Error('The availability service returned no result for this domain.');
+  return check;
 }
 
 /** Fraction digits of an ISO 4217 currency (USD 2, JPY 0, TND 3); null if unknown. */

@@ -4,6 +4,7 @@ import { apiRequest } from './client';
 import {
   formatMinorUnits,
   searchDomainAvailability,
+  searchDomainAvailabilityAcrossTlds,
 } from './domain-search';
 
 vi.mock('./client', () => ({ apiRequest: vi.fn() }));
@@ -34,6 +35,19 @@ describe('domain-search adapter', () => {
     const [path] = apiRequestMock.mock.calls[0] as [string];
     expect(path).toBe('/whois/availability?query=m%C3%BCnchen&tlds=.de');
     expect(response.results[0]).toMatchObject({ state: 'AVAILABLE', definitive: false, currency: null });
+  });
+
+  it('checks several extensions through one backend request', async () => {
+    apiRequestMock.mockResolvedValue([
+      { domain: 'example.com', tld: '.com', available: false, nameservers: [] },
+      { domain: 'example.in', tld: '.in', available: true, nameservers: [] },
+    ]);
+
+    const results = await searchDomainAvailabilityAcrossTlds('example', ['.com', '.in']);
+
+    expect(apiRequestMock).toHaveBeenCalledOnce();
+    expect(apiRequestMock.mock.calls[0]?.[0]).toBe('/whois/availability?query=example&tlds=.com%2C.in');
+    expect(results.map((result) => result.results[0]?.state)).toEqual(['UNAVAILABLE', 'AVAILABLE']);
   });
 
   it('formats minor units only when both amount and currency exist', () => {

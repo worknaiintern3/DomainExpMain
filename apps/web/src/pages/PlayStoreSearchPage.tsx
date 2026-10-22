@@ -496,12 +496,19 @@ export const PlayStoreSearchPage: React.FC = () => {
 
                       <div className="mt-auto flex flex-wrap items-center justify-between gap-unit-xs">
                         <a
-                          className="inline-flex items-center gap-1 font-label-md text-label-md text-primary transition-colors hover:text-tertiary"
+                          className="inline-flex items-center gap-1.5 font-label-md text-label-md text-primary transition-colors hover:text-tertiary"
                           href={app.playStoreUrl}
                           rel="noopener noreferrer"
                           target="_blank"
+                          aria-label="Open on Google Play Store"
                         >
-                          Open on Play Store
+                          <img
+                            src="/google-play.png"
+                            alt="Google Play"
+                            className="w-5 h-5"
+                            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
+                          />
+                          <span className="hidden sm:inline">Play Store</span>
                           <span className="material-symbols-outlined text-[14px]">open_in_new</span>
                         </a>
                         {trackedPackageIds.has(app.packageId) ? (

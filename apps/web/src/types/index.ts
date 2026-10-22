@@ -6,7 +6,7 @@ export interface NavItem {
   id: string;
   label: string;
   path: string;
-  icon: string;
+  icon: string | { src: string; style?: React.CSSProperties };
   badge?: string | number;
   exact?: boolean;
 }

@@ -21,6 +21,7 @@ export function getInventorySummary(signal?: AbortSignal): Promise<InventorySumm
 
 export interface InventoryListOptions {
   cursor?: string;
+  forceRefresh?: boolean;
   includeArchived?: boolean;
   limit?: number;
   signal?: AbortSignal;
@@ -39,6 +40,7 @@ export function listInventory<R extends InventoryResource>(
   options: InventoryListOptions = {},
 ): Promise<CursorPage<InventoryResourceMap[R]>> {
   return apiRequest(`/${resource}?${listQuery(options)}`, {
+    ...(options.forceRefresh ? { cache: 'no-store' as const } : {}),
     signal: options.signal,
   });
 }

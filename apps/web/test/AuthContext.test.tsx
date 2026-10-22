@@ -233,39 +233,4 @@ describe('AuthContext Google OAuth methods', () => {
     })));
   });
 
-  it('deleteAccount posts the confirmation, then clears the local session only on success', async () => {
-    function DeleteProbe() {
-      const auth = useAuth();
-      return (
-        <div>
-          <span data-testid="status">{auth.status}</span>
-          <button onClick={() => auth.login({ email: 'user@example.test', password: 'a-perfectly-fine-password' }).catch(() => {})}>login</button>
-          <button onClick={() => auth.deleteAccount({ confirmEmail: 'user@example.test', password: 'a-perfectly-fine-password' }).catch(() => {})}>delete</button>
-        </div>
-      );
-    }
-
-    apiRequest.mockResolvedValueOnce(loginResponse);
-    render(<AuthProvider><DeleteProbe /></AuthProvider>);
-    fireEvent.click(screen.getByText('login'));
-    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('authenticated'));
-    expect(sessionStorage.getItem('domainpulse.refresh-token')).toBe('refresh-token');
-
-    // Failure: server rejects, the session must stay intact.
-    apiRequest.mockRejectedValueOnce(new Error('Incorrect password'));
-    fireEvent.click(screen.getByText('delete'));
-    await waitFor(() => expect(apiRequest).toHaveBeenLastCalledWith('/auth/account/delete', expect.objectContaining({
-      body: { confirmEmail: 'user@example.test', password: 'a-perfectly-fine-password' },
-      method: 'POST',
-      retryAuthentication: false,
-    })));
-    expect(screen.getByTestId('status').textContent).toBe('authenticated');
-    expect(sessionStorage.getItem('domainpulse.refresh-token')).toBe('refresh-token');
-
-    // Success: the account is gone, so local credentials are dropped.
-    apiRequest.mockResolvedValueOnce(undefined);
-    fireEvent.click(screen.getByText('delete'));
-    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('unauthenticated'));
-    expect(sessionStorage.getItem('domainpulse.refresh-token')).toBeNull();
-  });
 });

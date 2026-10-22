@@ -94,7 +94,6 @@ export const providerConfiguration: ResourceConfiguration<'provider-accounts'> =
   fields: [
     { key: 'label', label: 'Account label', required: true },
     { key: 'providerKey', label: 'Provider key', required: true, placeholder: 'example-provider' },
-    { key: 'externalAccountId', label: 'External account ID', nullable: true },
     { input: 'email-account-select', key: 'loginEmailAccountId', label: 'Login email account', nullable: true, render: emailRender },
     notes,
   ],

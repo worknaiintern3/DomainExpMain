@@ -45,7 +45,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
 
   if (!isOpen) return null;
 
-  const accept = selectedFormat === 'csv' ? '.csv' : '.json';
+  const accept = selectedFormat === 'csv' ? '.csv,.tsv,.txt,.zone,.bind' : '.json';
   const handleClose = () => {
     if (!importing) onClose();
   };
@@ -164,7 +164,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px]">table_rows</span>
-                <span>CSV Spreadsheet</span>
+                <span>CSV / TSV / TXT / BIND</span>
               </div>
               {selectedFormat === 'csv' && (
                 <span className="material-symbols-outlined text-[16px]">check</span>
@@ -257,7 +257,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
           </span>
           <p className="font-caption-xs text-caption-xs text-secondary leading-normal">
             {selectedFormat === 'csv'
-              ? 'CSV needs a domain_name column (domainName or domain also work). Names already in your workspace are skipped.'
+              ? 'Use a domain_name or Domain Name column, including mobile exports. TXT lists and a BIND zone $ORIGIN also work; DNS records are not imported. Existing names are skipped.'
               : 'JSON imports missing domains from a DomainPulse domain snapshot (version "1.0"). Existing domains and other resources are not replaced.'}
           </p>
         </div>

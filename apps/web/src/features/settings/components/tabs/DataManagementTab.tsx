@@ -159,10 +159,10 @@ export const DataManagementTab: React.FC<DataManagementTabProps> = ({
               </div>
               <div className="flex flex-col">
                 <span className="font-label-md text-label-md text-on-surface font-semibold">
-                  Import CSV
+                  Import CSV / TSV / TXT / BIND
                 </span>
                 <span className="font-caption-xs text-caption-xs text-secondary mt-0.5">
-                  Add domains from a CSV file (needs a domain_name column).
+                  Add domains from an app export, a text list, or a BIND zone origin.
                 </span>
               </div>
             </button>

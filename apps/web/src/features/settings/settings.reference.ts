@@ -92,7 +92,7 @@ export const LANDING_PAGE_OPTIONS: ReadonlyArray<{ value: LandingPage; label: st
   { value: '/notifications', label: 'Notifications' },
   { value: '/infrastructure-map', label: 'Infrastructure Map' },
   { value: '/google-play', label: 'Google Play Console' },
-  { value: '/play-store', label: 'Play Store Search' },
+  { value: '/play-store', label: 'Play Store' },
 ];
 
 export const AVAILABLE_TLDS = [

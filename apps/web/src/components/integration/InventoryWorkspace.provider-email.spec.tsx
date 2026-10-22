@@ -66,15 +66,15 @@ describe('provider login email mapping', () => {
     expect(listInventory).toHaveBeenCalledWith('email-accounts', expect.objectContaining({ includeArchived: true, limit: 100 }));
   });
 
-  it('submits the selected email account UUID and preserves other provider fields', async () => {
-    const select = openProvider();
+  it('submits the selected email account UUID without exposing a stored credential', async () => {
+    const select = openProvider({ ...provider, externalAccountId: 'private-token-value' });
     await screen.findByRole('option', { name: 'Mapping test — mapping-test@example.invalid' });
     fireEvent.change(select, { target: { value: emailId } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Account label' }), { target: { value: 'Cloudflare test' } });
-    fireEvent.change(screen.getByRole('textbox', { name: /External account ID/i }), { target: { value: 'cf-test' } });
+    expect(screen.queryByRole('textbox', { name: /External account ID/i })).toBeNull();
+    expect(document.body.textContent).not.toContain('private-token-value');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(updateInventory).toHaveBeenCalledWith('provider-accounts', providerId, {
-      externalAccountId: 'cf-test',
       label: 'Cloudflare test',
       loginEmailAccountId: emailId,
     }));

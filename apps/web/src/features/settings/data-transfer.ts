@@ -50,7 +50,7 @@ async function fetchAll<R extends InventoryResource>(resource: R): Promise<Array
   const items: Array<InventoryResourceMap[R]> = [];
   let cursor: string | undefined;
   for (;;) {
-    const page = await listInventory(resource, { cursor, limit: 100 });
+    const page = await listInventory(resource, { cursor, forceRefresh: true, limit: 100 });
     items.push(...page.items);
     if (!page.nextCursor) return items;
     cursor = page.nextCursor;
@@ -90,7 +90,7 @@ export function domainsToCsv(domains: Domain[]): string {
   return [header, ...lines].join('\n');
 }
 
-function splitCsvLine(line: string): string[] {
+function splitDelimitedLine(line: string, delimiter: ',' | '\t'): string[] {
   const cells: string[] = [];
   let current = '';
   let quoted = false;
@@ -109,7 +109,7 @@ function splitCsvLine(line: string): string[] {
       }
     } else if (char === '"') {
       quoted = true;
-    } else if (char === ',') {
+    } else if (char === delimiter) {
       cells.push(current);
       current = '';
     } else {
@@ -125,14 +125,15 @@ export interface ParsedCsv {
   invalid: string[];
 }
 
-/** Accepts `domain_name` (or `domainName`/`domain`) headers; extra columns are ignored. */
+/** Accepts website CSV, mobile "Domain Name" CSV/TSV, plain lists, and a BIND zone's $ORIGIN. */
 export function parseDomainsCsv(text: string): ParsedCsv {
   const names: string[] = [];
   const invalid: string[] = [];
-  const lines = text.split(/\r?\n/u).filter((line) => line.trim() !== '');
+  const lines = text.split(/\r?\n/u).filter((line) => line.trim() !== '' && !line.trim().startsWith('#'));
   if (lines.length === 0) return { invalid, names };
-  const header = splitCsvLine(lines[0] ?? '').map((cell) => cell.toLowerCase());
-  let nameIndex = header.findIndex((cell) => cell === 'domain_name' || cell === 'domainname' || cell === 'domain');
+  const delimiter: ',' | '\t' = (lines[0] ?? '').includes('\t') ? '\t' : ',';
+  const header = splitDelimitedLine(lines[0] ?? '', delimiter).map((cell) => cell.toLowerCase().replace(/[\s_-]/gu, ''));
+  let nameIndex = header.findIndex((cell) => cell === 'domainname' || cell === 'domain');
   let start = 1;
   if (nameIndex === -1) {
     // No header row: treat every line as a bare domain name.
@@ -141,7 +142,10 @@ export function parseDomainsCsv(text: string): ParsedCsv {
   }
   const seen = new Set<string>();
   for (let i = start; i < lines.length; i += 1) {
-    const raw = splitCsvLine(lines[i] ?? '')[nameIndex] ?? '';
+    const line = (lines[i] ?? '').trim();
+    if (start === 0 && (line.startsWith(';') || /^\$(?!ORIGIN\b)/iu.test(line) || /\sIN\s/iu.test(line))) continue;
+    const origin = start === 0 ? /^\$ORIGIN\s+(\S+)/iu.exec(line)?.[1] : undefined;
+    const raw = origin?.replace(/\.$/u, '') ?? splitDelimitedLine(line, delimiter)[nameIndex] ?? '';
     if (raw === '') continue;
     const normalized = normalizeDomainName(raw);
     if (!normalized) {

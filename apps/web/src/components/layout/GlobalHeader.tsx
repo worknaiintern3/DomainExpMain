@@ -19,7 +19,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/activities': 'Recent Activity',
   '/notifications': 'Notifications',
   '/google-play': 'Google Play Console',
-  '/play-store': 'Play Store Search',
+  '/play-store': 'Play Store',
   '/domain-intelligence': 'Domain Intelligence',
   '/infrastructure-map': 'Infrastructure Map',
   '/settings': 'Settings',
