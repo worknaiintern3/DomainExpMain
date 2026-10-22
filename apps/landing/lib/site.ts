@@ -1,10 +1,10 @@
 /**
  * Canonical site URL — single source of truth for metadata, sitemap, robots.
  *
- * The production origin is domainexp.info. Override it for other deployments.
+ * The production origin is app.domainexprt.com. Override it for other deployments.
  */
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://domainexp.info";
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://app.domainexprt.com";
 
 /**
  * Origin of the DomainPulse web app that owns /login and /register.

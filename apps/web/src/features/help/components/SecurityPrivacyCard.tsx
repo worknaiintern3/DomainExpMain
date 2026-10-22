@@ -3,7 +3,7 @@ import { SECURITY_PRIVACY_DATA } from '../help.reference';
 
 export const SecurityPrivacyCard: React.FC = () => {
   const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
-  const landingUrl = env?.['VITE_LANDING_URL']?.replace(/\/$/, '') ?? 'https://domainexp.info';
+  const landingUrl = env?.['VITE_LANDING_URL']?.replace(/\/$/, '') ?? 'https://app.domainexprt.com';
 
   return (
     <section id="sec-security" className="bg-surface-container-lowest rounded-xl p-unit-lg shadow-micro border border-outline-variant/30 scroll-mt-20 flex flex-col gap-unit-md">
