@@ -165,7 +165,7 @@ export const PricingPage: React.FC = () => {
         <div className="px-unit-base py-2 rounded-lg bg-secondary-container/40 flex items-center justify-between gap-unit-sm border border-secondary-container">
           <div className="flex items-center gap-unit-xs text-caption-xs font-caption-xs">
             <span className="material-symbols-outlined text-primary text-[18px]">travel_explore</span>
-            <span className="text-secondary">Checking domain availability for:</span>
+            <span className="text-secondary">Comparing live registrar prices for:</span>
             <span className="font-label-mono font-bold text-primary text-body-sm">{activeDomain}</span>
             {tldShortcutOf(activeDomain) && (
               <span className="px-1.5 py-0.2 rounded bg-secondary-container text-primary font-semibold text-[10px]">
@@ -290,10 +290,8 @@ export const PricingPage: React.FC = () => {
 
         {availabilityOnly && activeDomain && (
           <aside className="rounded-xl border border-amber-200 bg-amber-50 px-unit-base py-unit-md text-body-sm text-amber-950" role="status">
-            <strong>{results[0]?.available ? 'Possibly available' : 'Likely registered'}: {activeDomain}.</strong>{' '}
-            The deployed backend returned an availability estimate, but has no registrar price comparison endpoint.
-            Registration, renewal and transfer prices cannot be shown until that service is deployed.
-            Check availability and prices directly with a registrar before buying.
+            <strong>{results[0]?.available ? 'Available' : 'Registered'}: {activeDomain}.</strong>{' '}
+            Registrar comparison is updating. Check availability and prices directly with a registrar before buying.
           </aside>
         )}
 

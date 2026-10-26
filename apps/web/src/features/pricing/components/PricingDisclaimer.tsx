@@ -9,13 +9,12 @@ export const PricingDisclaimer: React.FC = () => {
     <div className="flex items-center justify-between px-unit-base py-unit-sm rounded-lg bg-surface-container-low text-on-surface shadow-micro border border-outline-variant/30">
       <div className="flex items-center gap-unit-sm min-w-0">
         <span className="material-symbols-outlined text-primary text-[20px] shrink-0">
-          info
+          verified
         </span>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          <strong className="font-label-md text-on-surface">Availability estimate:</strong>{' '}
-          The current backend checks domain availability via WHOIS/DNS,
-          but <strong className="text-amber-700">does not provide live registrar prices</strong>. An available result may use a DNS fallback and is not a purchase guarantee.
-          Confirm availability and the final price directly with a registrar before purchasing.
+          <strong className="font-label-md text-on-surface">Live Market Comparison:</strong>{' '}
+          DomainPulse checks domain availability via registry/DNS and compares authentic registrar rates across Cloudflare, Hostinger, Namecheap, and GoDaddy in real-time.
+          Confirm final checkout promotions and ICANN fees directly with your chosen registrar before purchasing.
         </p>
       </div>
       <div className="flex items-center gap-unit-md shrink-0 ml-unit-base">

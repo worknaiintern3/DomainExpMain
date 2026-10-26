@@ -76,7 +76,7 @@ export const RegistrarPriceCards: React.FC<RegistrarPriceCardsProps> = ({
             </span>
           </div>
           <span className="font-caption-xs text-caption-xs text-secondary mt-0.5">
-            Registrar pricing is unavailable on this backend
+            {quotes.length > 0 ? 'Live registrar pricing rates' : 'Registrar pricing unavailable'}
           </span>
         </div>
         <span className="material-symbols-outlined text-[20px] text-primary">price_change</span>

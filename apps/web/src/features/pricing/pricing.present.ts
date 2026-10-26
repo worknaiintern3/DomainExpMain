@@ -9,6 +9,7 @@ export const PROVIDER_ICONS: Record<DomainAvailabilityProvider, string> = {
   cloudflare: 'cloud',
   godaddy: 'language',
   namecheap: 'tag',
+  hostinger: 'dns',
   whois: 'travel_explore',
 };
 

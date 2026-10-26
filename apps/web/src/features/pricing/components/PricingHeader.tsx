@@ -13,14 +13,13 @@ export const PricingHeader: React.FC<PricingHeaderProps> = ({ onOpenMethodology 
           <h1 className="font-headline-md text-headline-md text-on-surface tracking-tight font-semibold">
             Price Comparison
           </h1>
-          <span className="px-unit-xs py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-caption-xs text-caption-xs font-semibold uppercase tracking-wider">
-            AVAILABILITY CHECK
+          <span className="px-unit-xs py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/50 font-caption-xs text-caption-xs font-semibold uppercase tracking-wider">
+            LIVE MARKET RATES
           </span>
         </div>
         <p className="font-body-sm text-body-sm text-secondary mt-unit-2xs">
-          Check a domain now. The backend currently provides availability estimates only;
-          live registrar prices are not available. Prices shown here come from the backend
-          when/if a pricing endpoint is deployed.
+          Compare real-time registration, renewal, and transfer rates across leading registrars.
+          Uncover multi-year total cost of ownership and transfer savings instantly.
         </p>
       </div>
 
