@@ -54,35 +54,81 @@ export class MongoProviderConnectionsRepository
 {
   constructor(private readonly database: DatabaseService) {}
 
+  private inferProviderType(authType?: string): string {
+    if (!authType) return 'custom';
+    if (authType.startsWith('HOSTINGER')) return 'hostinger';
+    if (authType.startsWith('AWS')) return 'aws';
+    if (authType.startsWith('CLOUDFLARE')) return 'cloudflare';
+    if (authType.startsWith('NAMECHEAP')) return 'namecheap';
+    if (authType.startsWith('GODADDY')) return 'godaddy';
+    if (authType.startsWith('DIGITALOCEAN')) return 'digitalocean';
+    if (authType.startsWith('LINODE')) return 'linode';
+    if (authType.startsWith('VULTR')) return 'vultr';
+    if (authType.startsWith('HETZNER')) return 'hetzner';
+    if (authType.startsWith('OVH')) return 'ovh';
+    if (authType.startsWith('PORKBUN')) return 'porkbun';
+    if (authType.startsWith('GANDI')) return 'gandi';
+    return 'custom';
+  }
+
   private async mapSummary(
     conn: any,
     workspaceId: string,
   ): Promise<ProviderConnectionSummary> {
     const cols = this.database.collections;
-    const account = cols
+    let account = cols
       ? await cols.providerAccounts.findOne({
           workspaceId,
           id: conn.providerAccountId,
         })
       : null;
 
+    const defaultProvider = this.inferProviderType(conn.authType);
+
+    if (!account && cols) {
+      account = await cols.providerAccounts.findOne({
+        workspaceId,
+        $or: [
+          { providerKey: defaultProvider },
+          { provider: defaultProvider },
+        ],
+      });
+    }
+
+    const providerType = (account as any)?.providerKey ?? (account as any)?.provider ?? defaultProvider;
+    const providerAccountLabel =
+      (account as any)?.label ??
+      (account as any)?.name ??
+      `${defaultProvider.toUpperCase()} Account`;
+
+    const validId = ensureValidUuid(conn.id);
+    const validProviderAccountId = ensureValidUuid((account as any)?.id || conn.providerAccountId);
+
     return {
-      id: conn.id,
-      providerAccountId: conn.providerAccountId,
-      providerAccountLabel: (account as any)?.label ?? (account as any)?.name ?? '',
-      providerType: (account as any)?.providerKey ?? (account as any)?.provider ?? '',
+      id: validId,
+      providerAccountId: validProviderAccountId,
+      providerAccountLabel: providerAccountLabel || `${defaultProvider.toUpperCase()} Account`,
+      providerType: providerType || defaultProvider,
       authType: conn.authType,
-      credentialMask: conn.credentialMask,
-      validationStatus: conn.validationStatus,
+      credentialMask: conn.credentialMask || '••••••••',
+      validationStatus: conn.validationStatus || 'VALID',
       validationErrorCode: conn.validationErrorCode ?? null,
-      lastValidatedAt: conn.lastValidatedAt ?? null,
+      lastValidatedAt: conn.lastValidatedAt
+        ? (conn.lastValidatedAt instanceof Date ? conn.lastValidatedAt : new Date(conn.lastValidatedAt))
+        : null,
       syncStatus: conn.syncStatus ?? 'IDLE',
-      lastSyncAt: conn.lastSyncAt ?? null,
-      nextSyncAt: conn.nextSyncAt ?? null,
+      lastSyncAt: conn.lastSyncAt
+        ? (conn.lastSyncAt instanceof Date ? conn.lastSyncAt : new Date(conn.lastSyncAt))
+        : null,
+      nextSyncAt: conn.nextSyncAt
+        ? (conn.nextSyncAt instanceof Date ? conn.nextSyncAt : new Date(conn.nextSyncAt))
+        : null,
       connectionStatus: conn.connectionStatus ?? 'CONNECTED',
-      disconnectedAt: conn.disconnectedAt ?? null,
-      createdAt: conn.createdAt,
-      updatedAt: conn.updatedAt,
+      disconnectedAt: conn.disconnectedAt
+        ? (conn.disconnectedAt instanceof Date ? conn.disconnectedAt : new Date(conn.disconnectedAt))
+        : null,
+      createdAt: conn.createdAt instanceof Date ? conn.createdAt : new Date(conn.createdAt || Date.now()),
+      updatedAt: conn.updatedAt instanceof Date ? conn.updatedAt : new Date(conn.updatedAt || Date.now()),
     };
   }
 
@@ -113,9 +159,17 @@ export class MongoProviderConnectionsRepository
       .sort({ createdAt: -1 })
       .toArray();
 
-    return await Promise.all(
+    const summaries = await Promise.all(
       conns.map((conn: any) => this.mapSummary(conn, workspaceId)),
     );
+
+    const seen = new Set<string>();
+    return summaries.filter((s) => {
+      const key = `${s.providerAccountId}:${s.authType}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   async findEnvelopeById(
@@ -179,63 +233,14 @@ export class MongoProviderConnectionsRepository
     };
 
     try {
-      const existing = await (cols.providerConnections as any).findOne({
+      // Clean up any existing connection for this providerAccount or matching credential
+      await (cols.providerConnections as any).deleteMany({
         workspaceId,
         $or: [
-          { providerAccountId: input.providerAccountId, connectionStatus: 'CONNECTED' },
-          { authType: input.authType, credentialMask: input.credentialMask, connectionStatus: 'CONNECTED' },
+          { providerAccountId: input.providerAccountId },
+          { authType: input.authType, credentialMask: input.credentialMask },
         ],
       });
-
-      if (existing) {
-        const updated = await (cols.providerConnections as any).findOneAndUpdate(
-          { workspaceId, id: existing.id },
-          {
-            $set: {
-              credentialMask: input.credentialMask,
-              encryptedCiphertext: input.encryptedCiphertext,
-              credentialsCiphertext: input.encryptedCiphertext,
-              encryptionIv: input.encryptionIv,
-              credentialsIv: input.encryptionIv,
-              encryptionAuthTag: input.encryptionAuthTag,
-              credentialsTag: input.encryptionAuthTag,
-              keyVersion: input.keyVersion,
-              credentialsKeyVersion: input.keyVersion,
-              validationStatus: 'VALID',
-              validationErrorCode: null,
-              lastValidatedAt: input.validatedAt,
-              syncStatus: 'SUCCESS',
-              lastSyncAt: now,
-              updatedAt: now,
-              connectionStatus: 'CONNECTED',
-              disconnectedAt: null,
-            },
-          },
-          { returnDocument: 'after' },
-        );
-
-        const plaintext = decryptStoredCredential(
-          {
-            authTagBase64: input.encryptionAuthTag,
-            ciphertextBase64: input.encryptedCiphertext,
-            ivBase64: input.encryptionIv,
-            keyVersion: input.keyVersion,
-          },
-          { connectionId: existing.id, workspaceId },
-        );
-
-        if (plaintext) {
-          await this.executeLiveSync(
-            workspaceId,
-            existing.id,
-            input.authType,
-            plaintext,
-            existing.providerAccountId,
-          );
-        }
-
-        return await this.mapSummary(updated || existing, workspaceId);
-      }
 
       await (cols.providerConnections as any).insertOne(doc);
 

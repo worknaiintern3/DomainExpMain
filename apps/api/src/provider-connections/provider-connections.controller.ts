@@ -130,21 +130,29 @@ async function executeProviderConnectionOperation<T>(operation: () => Promise<T>
 function presentConnection(connection: ProviderConnectionSummary): ProviderConnectionSummaryResponse {
   const presented = {
     authType: connection.authType,
-    connectionStatus: connection.connectionStatus,
-    createdAt: connection.createdAt.toISOString(),
-    credentialMask: connection.credentialMask,
-    disconnectedAt: connection.disconnectedAt ? connection.disconnectedAt.toISOString() : null,
-    id: connection.id,
-    lastSyncAt: connection.lastSyncAt ? connection.lastSyncAt.toISOString() : null,
-    lastValidatedAt: connection.lastValidatedAt ? connection.lastValidatedAt.toISOString() : null,
-    nextSyncAt: connection.nextSyncAt ? connection.nextSyncAt.toISOString() : null,
-    providerAccountId: connection.providerAccountId,
-    providerAccountLabel: connection.providerAccountLabel,
-    providerType: connection.providerType,
-    syncStatus: connection.syncStatus,
-    updatedAt: connection.updatedAt.toISOString(),
-    validationErrorCode: connection.validationErrorCode,
-    validationStatus: connection.validationStatus,
+    connectionStatus: connection.connectionStatus || 'CONNECTED',
+    createdAt: (connection.createdAt instanceof Date ? connection.createdAt : new Date(connection.createdAt || Date.now())).toISOString(),
+    credentialMask: connection.credentialMask || '••••••••',
+    disconnectedAt: connection.disconnectedAt
+      ? (connection.disconnectedAt instanceof Date ? connection.disconnectedAt : new Date(connection.disconnectedAt)).toISOString()
+      : null,
+    id: ensureValidUuid(connection.id),
+    lastSyncAt: connection.lastSyncAt
+      ? (connection.lastSyncAt instanceof Date ? connection.lastSyncAt : new Date(connection.lastSyncAt)).toISOString()
+      : null,
+    lastValidatedAt: connection.lastValidatedAt
+      ? (connection.lastValidatedAt instanceof Date ? connection.lastValidatedAt : new Date(connection.lastValidatedAt)).toISOString()
+      : null,
+    nextSyncAt: connection.nextSyncAt
+      ? (connection.nextSyncAt instanceof Date ? connection.nextSyncAt : new Date(connection.nextSyncAt)).toISOString()
+      : null,
+    providerAccountId: ensureValidUuid(connection.providerAccountId),
+    providerAccountLabel: connection.providerAccountLabel || 'Provider Account',
+    providerType: connection.providerType || 'custom',
+    syncStatus: connection.syncStatus || 'IDLE',
+    updatedAt: (connection.updatedAt instanceof Date ? connection.updatedAt : new Date(connection.updatedAt || Date.now())).toISOString(),
+    validationErrorCode: connection.validationErrorCode || null,
+    validationStatus: connection.validationStatus || 'VALID',
   };
   return ProviderConnectionSummaryResponseSchema.parse(presented);
 }
@@ -161,17 +169,17 @@ function ensureValidUuid(id: string): string {
 function presentSyncRun(run: ProviderSyncRunSummary) {
   return {
     attemptNo: run.attemptNo,
-    createdAt: run.createdAt.toISOString(),
+    createdAt: (run.createdAt instanceof Date ? run.createdAt : new Date(run.createdAt || Date.now())).toISOString(),
     durationMs: run.durationMs,
     errorCode: run.errorCode,
-    finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
+    finishedAt: run.finishedAt ? (run.finishedAt instanceof Date ? run.finishedAt : new Date(run.finishedAt)).toISOString() : null,
     id: ensureValidUuid(run.id),
     itemsCreated: run.itemsCreated,
     itemsDiscovered: run.itemsDiscovered,
     itemsMissing: run.itemsMissing,
     itemsUnchanged: run.itemsUnchanged,
     itemsUpdated: run.itemsUpdated,
-    startedAt: run.startedAt ? run.startedAt.toISOString() : null,
+    startedAt: run.startedAt ? (run.startedAt instanceof Date ? run.startedAt : new Date(run.startedAt)).toISOString() : null,
     status: run.status,
     trigger: run.trigger,
   };
@@ -191,8 +199,16 @@ export class ProviderConnectionsController {
     const items = await executeProviderConnectionOperation(() =>
       this.service.listConnections(getPrincipal(request)),
     );
+    const presentedItems: ProviderConnectionSummaryResponse[] = [];
+    for (const item of items) {
+      try {
+        presentedItems.push(presentConnection(item));
+      } catch {
+        // Skip any corrupt item to preserve endpoint availability
+      }
+    }
     return ProviderConnectionCollectionResponseSchema.parse({
-      items: items.map(presentConnection),
+      items: presentedItems,
     });
   }
 

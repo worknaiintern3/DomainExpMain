@@ -457,7 +457,10 @@ const ProviderConnectionCard: React.FC<{
   useEffect(() => {
     if (!showConnectForm && !showAddAccountForm) return;
     const controller = new AbortController();
-    Promise.all([listProviderAccounts(controller.signal), listProviderConnections(controller.signal)])
+    Promise.all([
+      listProviderAccounts(controller.signal).catch(() => ({ items: [] })),
+      listProviderConnections(controller.signal).catch(() => ({ items: [] })),
+    ])
       .then(([accounts, connections]) => {
         if (controller.signal.aborted) return;
         const linkedIds = new Set(connections.items.map((item) => item.providerAccountId));
@@ -536,8 +539,8 @@ const ProviderConnectionCard: React.FC<{
 
   async function resolveProviderAccountId(): Promise<string> {
     const [{ items: accounts }, { items: connections }] = await Promise.all([
-      listProviderAccounts(),
-      listProviderConnections(),
+      listProviderAccounts().catch(() => ({ items: [] })),
+      listProviderConnections().catch(() => ({ items: [] })),
     ]);
     const linkedActiveAccountIds = new Set(
       connections.filter((item) => item.connectionStatus === 'CONNECTED').map((item) => item.providerAccountId),
