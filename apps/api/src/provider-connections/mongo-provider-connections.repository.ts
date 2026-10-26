@@ -179,6 +179,64 @@ export class MongoProviderConnectionsRepository
     };
 
     try {
+      const existing = await (cols.providerConnections as any).findOne({
+        workspaceId,
+        $or: [
+          { providerAccountId: input.providerAccountId, connectionStatus: 'CONNECTED' },
+          { authType: input.authType, credentialMask: input.credentialMask, connectionStatus: 'CONNECTED' },
+        ],
+      });
+
+      if (existing) {
+        const updated = await (cols.providerConnections as any).findOneAndUpdate(
+          { workspaceId, id: existing.id },
+          {
+            $set: {
+              credentialMask: input.credentialMask,
+              encryptedCiphertext: input.encryptedCiphertext,
+              credentialsCiphertext: input.encryptedCiphertext,
+              encryptionIv: input.encryptionIv,
+              credentialsIv: input.encryptionIv,
+              encryptionAuthTag: input.encryptionAuthTag,
+              credentialsTag: input.encryptionAuthTag,
+              keyVersion: input.keyVersion,
+              credentialsKeyVersion: input.keyVersion,
+              validationStatus: 'VALID',
+              validationErrorCode: null,
+              lastValidatedAt: input.validatedAt,
+              syncStatus: 'SUCCESS',
+              lastSyncAt: now,
+              updatedAt: now,
+              connectionStatus: 'CONNECTED',
+              disconnectedAt: null,
+            },
+          },
+          { returnDocument: 'after' },
+        );
+
+        const plaintext = decryptStoredCredential(
+          {
+            authTagBase64: input.encryptionAuthTag,
+            ciphertextBase64: input.encryptedCiphertext,
+            ivBase64: input.encryptionIv,
+            keyVersion: input.keyVersion,
+          },
+          { connectionId: existing.id, workspaceId },
+        );
+
+        if (plaintext) {
+          await this.executeLiveSync(
+            workspaceId,
+            existing.id,
+            input.authType,
+            plaintext,
+            existing.providerAccountId,
+          );
+        }
+
+        return await this.mapSummary(updated || existing, workspaceId);
+      }
+
       await (cols.providerConnections as any).insertOne(doc);
 
       const plaintext = decryptStoredCredential(

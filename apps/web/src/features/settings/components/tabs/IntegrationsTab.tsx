@@ -396,11 +396,23 @@ const ProviderConnectionCard: React.FC<{
       const active = matches.filter((c) => c.connectionStatus === 'CONNECTED');
       if (signal?.aborted) return;
       setLoadError(null);
-      if (active.length > 0) {
-        setConnection(active[0] ?? null);
-        setExtraConnections(active.slice(1));
+
+      // Deduplicate active connections by providerAccountId and id so redundant records never duplicate in the UI
+      const seenAccounts = new Set<string>();
+      const uniqueActive: ProviderConnectionResponse[] = [];
+      for (const c of active) {
+        const key = c.providerAccountId || c.id;
+        if (!seenAccounts.has(key)) {
+          seenAccounts.add(key);
+          uniqueActive.push(c);
+        }
+      }
+
+      if (uniqueActive.length > 0) {
+        setConnection(uniqueActive[0] ?? null);
+        setExtraConnections(uniqueActive.slice(1));
         try {
-          const { items: runs } = await listProviderConnectionSyncRuns(active[0].id, 1, signal);
+          const { items: runs } = await listProviderConnectionSyncRuns(uniqueActive[0].id, 1, signal);
           if (signal?.aborted) return;
           setLatestRun(runs[0] ?? null);
         } catch {
@@ -527,13 +539,19 @@ const ProviderConnectionCard: React.FC<{
       listProviderAccounts(),
       listProviderConnections(),
     ]);
-    const linkedAccountIds = new Set(connections.map((item) => item.providerAccountId));
-    // The backend keeps disconnected connections and enforces one connection
-    // per provider account. Reconnecting therefore needs an unlinked account.
-    const existing = accounts.find((account) =>
-      account.providerKey === config.providerKey && !linkedAccountIds.has(account.id),
+    const linkedActiveAccountIds = new Set(
+      connections.filter((item) => item.connectionStatus === 'CONNECTED').map((item) => item.providerAccountId),
     );
+    // Reuse an existing account that is not currently actively connected
+    const existingUnlinked = accounts.find((account) =>
+      account.providerKey === config.providerKey && !linkedActiveAccountIds.has(account.id),
+    );
+    if (existingUnlinked) return existingUnlinked.id;
+
+    // If an account already exists for this provider, reuse it
+    const existing = accounts.find((account) => account.providerKey === config.providerKey);
     if (existing) return existing.id;
+
     const created = await createProviderAccount({ label: config.displayName, providerKey: config.providerKey });
     return created.id;
   }
@@ -569,8 +587,15 @@ const ProviderConnectionCard: React.FC<{
       const created = await createProviderConnection({ authType: config.authType, credential, providerAccountId });
       if (!connection || connection.connectionStatus === 'DISCONNECTED') {
         setConnection(created);
+      } else if (connection.id === created.id || connection.providerAccountId === created.providerAccountId) {
+        setConnection(created);
       } else {
-        setExtraConnections((prev) => [...prev, created]);
+        setExtraConnections((prev) => {
+          const filtered = prev.filter(
+            (item) => item.id !== created.id && item.providerAccountId !== created.providerAccountId,
+          );
+          return [...filtered, created];
+        });
       }
       setShowConnectForm(false);
       setShowAddAccountForm(false);
