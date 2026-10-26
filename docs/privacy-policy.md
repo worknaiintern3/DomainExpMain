@@ -5,7 +5,7 @@
 **Application Name:** DomainPulse  
 **Android Package Name:** `com.domainpulse.mobile`  
 **Developer / Service Provider:** DomainPulse Team  
-**Contact Email:** [support@domainpulse.io](mailto:support@domainpulse.io) / [admin@domainexp.info](mailto:admin@domainexp.info)  
+**Contact Email:** [support@domainpulse.io](mailto:support@domainpulse.io) / [admin@domainexprt.com](mailto:admin@domainexprt.com)  
 
 ---
 
@@ -13,7 +13,7 @@
 
 Welcome to **DomainPulse** ("we," "our," or "us"). DomainPulse is a multi-cloud infrastructure, domain monitoring, and application telemetry platform developed to help developers, IT administrators, and digital teams monitor domain names, SSL certificates, cloud servers, and mobile applications from a single interface.
 
-This Privacy Policy explains how we collect, use, disclose, protect, and handle your information when you use our mobile application (**DomainPulse**, package name `com.domainpulse.mobile`) and related backend services hosted at `https://app.domainexp.info` (collectively, the "Service").
+This Privacy Policy explains how we collect, use, disclose, protect, and handle your information when you use our mobile application (**DomainPulse**, package name `com.domainpulse.mobile`) and related backend services hosted at `https://app.domainexprt.com` (collectively, the "Service").
 
 By accessing or using DomainPulse, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with any part of this policy, please do not use the Service.
 
@@ -70,7 +70,7 @@ DomainPulse strictly complies with the **Google API Services User Data Policy**,
 
 We implement industry-standard administrative, physical, and technical security controls to safeguard your data:
 
-* **Encryption in Transit:** All communication between the DomainPulse mobile app, backend servers (`https://app.domainexp.info`), and external APIs is encrypted using **TLS 1.3 / HTTPS**. Plaintext HTTP connections are rejected.
+* **Encryption in Transit:** All communication between the DomainPulse mobile app, backend servers (`https://app.domainexprt.com`), and external APIs is encrypted using **TLS 1.3 / HTTPS**. Plaintext HTTP connections are rejected.
 * **Encryption at Rest:** Sensitive provider API tokens, Google OAuth refresh tokens, and credentials are encrypted at rest using **AES-256-GCM** encryption before being stored in the database.
 * **Tenant Isolation:** Database records and mobile caches are keyed to authenticated workspace and user IDs. Users can only query and view resources belonging to their own verified account.
 * **Password Hashing:** Passwords are never stored in plaintext and are hashed using modern cryptographic algorithms with unique salt.
@@ -96,7 +96,7 @@ We retain your account information and telemetry data for as long as your accoun
 You have the right to request the permanent deletion of your account and all associated data at any time:
 
 1. **In-App Deletion:** Navigate to **Settings** / **More** &rarr; **Account** &rarr; **Delete Account**. Confirming this action will immediately terminate your session and schedule your account data for permanent removal.
-2. **Web / Email Request:** You can submit a deletion request at any time by emailing [support@domainpulse.io](mailto:support@domainpulse.io) or [admin@domainexp.info](mailto:admin@domainexp.info) with the subject *"Account Deletion Request"*.
+2. **Web / Email Request:** You can submit a deletion request at any time by emailing [support@domainpulse.io](mailto:support@domainpulse.io) or [admin@domainexprt.com](mailto:admin@domainexprt.com) with the subject *"Account Deletion Request"*.
 3. **Deletion Timeline:** Upon receiving a verified request, your account details, stored provider tokens, monitored domains, server nodes, and application records will be permanently deleted from our primary databases within **30 days**.
 
 ---
@@ -131,8 +131,8 @@ We may periodically update this Privacy Policy to reflect enhancements to our fe
 If you have questions, comments, or concerns regarding this Privacy Policy or our data handling practices, please contact us:
 
 * **Email:** [support@domainpulse.io](mailto:support@domainpulse.io)
-* **Alternate Contact:** [admin@domainexp.info](mailto:admin@domainexp.info)
-* **Service URL:** `https://app.domainexp.info`
+* **Alternate Contact:** [admin@domainexprt.com](mailto:admin@domainexprt.com)
+* **Service URL:** `https://app.domainexprt.com`
 * **Application:** DomainPulse (`com.domainpulse.mobile`)
 
 ---
@@ -157,6 +157,6 @@ When completing the **App Content &rarr; Data safety** section in Google Play Co
 
 ### Security Practices Checklist:
 * **Is data encrypted in transit?** Yes (All network calls use HTTPS / TLS 1.3).
-* **Do you provide a way for users to request data deletion?** Yes (In-app deletion and email request via support@domainpulse.io / admin@domainexp.info).
+* **Do you provide a way for users to request data deletion?** Yes (In-app deletion and email request via support@domainpulse.io / admin@domainexprt.com).
 * **Target age group:** 18 and older.
 

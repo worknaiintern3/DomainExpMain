@@ -24,7 +24,11 @@ export default defineConfig({
     // Paths pass through unchanged; the backend serves /api/v1 directly.
     // String shorthand keeps this assignable without new dependencies.
     proxy: {
-      '/api': 'http://127.0.0.1:4000',
+      '/api': {
+        target: process.env.VITE_API_TARGET || 'http://localhost:4000',
+        changeOrigin: true,
+        secure: false,
+      },
       '/whoisfreaks-api': {
         target: 'https://api.whoisfreaks.com',
         changeOrigin: true,

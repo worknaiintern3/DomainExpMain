@@ -1,6 +1,6 @@
 # DomainExp production
 
-Dedicated checkout: `/opt/domainexp-app`. Domain: `https://app.domainexp.info`.
+Dedicated checkout: `/opt/domainexp-app`. Domain: `https://app.domainexprt.com`.
 Backend: `domainexp_app_backend`, internal `0.0.0.0:4000`, host `127.0.0.1:5011`.
 
 ## Persistent infrastructure
@@ -92,4 +92,4 @@ by service name. Git checkout is restored. There is no Compose down, orphan
 removal, global prune, database restart/reset, or destructive schema rollback.
 Applied migrations remain applied, so releases must keep rollback compatibility.
 
-API base URL: `https://app.domainexp.info/api/v1`.
+API base URL: `https://app.domainexprt.com/api/v1`.

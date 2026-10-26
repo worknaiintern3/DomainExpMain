@@ -81,21 +81,11 @@ export async function fetchInventorySummary(options?: { forceRefresh?: boolean }
   return fetchWithCache(
     'inventory_summary',
     async () => {
-      // 1. Try fast backend endpoint first (48ms, single query)
-      try {
-        const backendSummary = await apiGet<InventorySummary>('/inventory/summary');
-        if (backendSummary && typeof backendSummary.domains === 'number') {
-          return backendSummary;
-        }
-      } catch {
-        // Fallback to local aggregation
-      }
-
       const [domains, servers, apps, alerts] = await Promise.all([
-        fetchDomainsList(),
-        fetchServersList(),
-        fetchApplicationsList(),
-        fetchAlertsList(),
+        fetchDomainsList({ forceRefresh: options?.forceRefresh }),
+        fetchServersList({ forceRefresh: options?.forceRefresh }),
+        fetchApplicationsList({ forceRefresh: options?.forceRefresh }),
+        fetchAlertsList({ forceRefresh: options?.forceRefresh }),
       ]);
 
       const critical = alerts.filter((a) => a.severity === 'critical' && a.status === 'active').length;
@@ -117,7 +107,7 @@ export async function fetchInventorySummary(options?: { forceRefresh?: boolean }
         alerts: critical + warning,
       };
     },
-    { ttlMs: 30000, forceRefresh: options?.forceRefresh }
+    { ttlMs: 15000, forceRefresh: options?.forceRefresh }
   );
 }
 

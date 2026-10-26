@@ -36,6 +36,8 @@ export interface ProviderSyncResult {
   serversCount?: number;
   domains?: string[];
   servers?: string[];
+  totalDomainsCount?: number;
+  totalServersCount?: number;
   message: string;
 }
 
@@ -919,19 +921,24 @@ export async function syncProviderAccount(params: {
     }
   }
 
-  if (rawKey && !DUMMY_TOKENS.has(rawKey) && params.providerAccountId) {
-    await saveProviderToken(params.providerAccountId, rawKey);
-  }
+  let effectiveAccountId = isValidUuid(params.providerAccountId) ? params.providerAccountId : undefined;
 
   // 1. Ensure provider account is saved
   try {
-    await createProviderAccount({
+    const createdAcc = await createProviderAccount({
       providerKey: cleanKey,
       label,
       notes: params.notes || `Provider connection for ${label}. Live API sync enabled.`,
       externalAccountId: rawKey || label.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 50),
     });
+    if (createdAcc?.id && isValidUuid(createdAcc.id)) {
+      effectiveAccountId = createdAcc.id;
+    }
   } catch {}
+
+  if (rawKey && !DUMMY_TOKENS.has(rawKey) && effectiveAccountId) {
+    await saveProviderToken(effectiveAccountId, rawKey);
+  }
 
   if (!rawKey || DUMMY_TOKENS.has(rawKey)) {
     return {
@@ -1014,11 +1021,14 @@ export async function syncProviderAccount(params: {
 
   // Also notify backend /provider-connections if available
   const authType = PROVIDER_AUTH_TYPE_MAP[cleanKey];
-  if (authType && isValidUuid(params.providerAccountId)) {
+  const backendAccountId = isValidUuid(effectiveAccountId)
+    ? effectiveAccountId
+    : (isValidUuid(params.providerAccountId) ? params.providerAccountId : undefined);
+  if (authType && backendAccountId) {
     apiPost('/provider-connections', {
       authType,
       credential: rawKey,
-      providerAccountId: params.providerAccountId,
+      providerAccountId: backendAccountId,
     }).then((conn: any) => {
       if (conn?.id) {
         apiPost(`/provider-connections/${conn.id}/sync`, {}).catch(() => {});
@@ -1098,18 +1108,21 @@ export async function syncProviderAccount(params: {
         tags: ['Live', `${label} Portfolio`],
         notes: `Discovered from ${label}`,
         logoUrl: getDomainLogoUrl(cleanDom),
-        providerAccountId: params.providerAccountId,
+        providerAccountId: effectiveAccountId || params.providerAccountId,
         providerLabel: label,
         providerKey: cleanKey,
       };
       domainMap.set(cleanDom, newDomain);
 
       // Post to backend API
+      const registrarAccId = isValidUuid(effectiveAccountId)
+        ? effectiveAccountId
+        : (isValidUuid(params.providerAccountId) ? params.providerAccountId : null);
       apiPost<BackendDomain>('/domains', {
         domainName: cleanDom,
         autoRenew: true,
         notes: `Discovered from ${label}`,
-        registrarProviderAccountId: isValidUuid(params.providerAccountId) ? params.providerAccountId : null,
+        registrarProviderAccountId: registrarAccId,
       }).catch(() => {});
 
       if (!domItem.expiresAt) {
@@ -1193,10 +1206,13 @@ export async function syncProviderAccount(params: {
         memoryUsagePercent: 44,
         diskUsagePercent: 26,
         connectedDomains: mappedDoms.length > 0 ? mappedDoms : [],
-        providerAccountId: params.providerAccountId,
+        providerAccountId: effectiveAccountId || params.providerAccountId,
       };
       serverMap.set(key, newServer);
 
+      const serverAccId = isValidUuid(effectiveAccountId)
+        ? effectiveAccountId
+        : (isValidUuid(params.providerAccountId) ? params.providerAccountId : null);
       apiPost<BackendServer>('/servers', {
         name: s.name,
         hostname: s.hostname || s.name,
@@ -1204,7 +1220,7 @@ export async function syncProviderAccount(params: {
         operatingSystem: s.os || 'Ubuntu 24.04 LTS',
         serverKind: cleanKey,
         region: (s as any).region || null,
-        providerAccountId: isValidUuid(params.providerAccountId) ? params.providerAccountId : null,
+        providerAccountId: serverAccId,
         notes: `Synced from ${label}`,
       }).catch(() => {});
     } else {
@@ -1222,18 +1238,21 @@ export async function syncProviderAccount(params: {
   await setUserItem(STORAGE_KEYS.SERVERS_LIST, JSON.stringify(Array.from(serverMap.values())));
 
   const totalSynced = validDiscoveredDomains.length + discoveredServers.length;
+  const finalDomainsCount = Array.from(domainMap.values()).filter((d) => d?.name && !isInfrastructureDomain(d.name)).length;
+  const finalServersCount = Array.from(serverMap.values()).length;
+
   let message = '';
   if (validDiscoveredDomains.length > 0 && discoveredServers.length > 0) {
-    message = `Successfully synced ${validDiscoveredDomains.length} domain(s), ${validDiscoveredDomains.length} website(s), and ${discoveredServers.length} VPS server(s) from ${label}!`;
+    message = `Successfully synced ${validDiscoveredDomains.length} domain(s) and ${discoveredServers.length} VPS server(s) from ${label}! Portfolio now has ${finalDomainsCount} domain(s) and ${finalServersCount} server(s).`;
   } else if (validDiscoveredDomains.length > 0) {
-    message = `Successfully synced ${validDiscoveredDomains.length} domain(s) and active website(s) from ${label}! Check the Domains and Websites tabs.`;
+    message = `Successfully synced ${validDiscoveredDomains.length} domain(s) from ${label}! Portfolio now has ${finalDomainsCount} domain(s) and ${finalServersCount} server(s).`;
   } else if (discoveredServers.length > 0) {
-    message = `Synced ${discoveredServers.length} VPS server(s) to the Servers tab from ${label}!`;
+    message = `Synced ${discoveredServers.length} VPS server(s) from ${label}! Portfolio now has ${finalDomainsCount} domain(s) and ${finalServersCount} server(s).`;
     if (providerError && (providerError.includes('AccessDenied') || providerError.includes('authorized'))) {
       message += ` (Notice: 0 domains were retrieved because your IAM user lacks Route 53 permissions: ${providerError})`;
     }
   } else {
-    message = `Connected to ${label}. Your account authenticated, but returned 0 active domains or VPS nodes.`;
+    message = `Connected to ${label}. Portfolio currently has ${finalDomainsCount} domain(s) and ${finalServersCount} VPS server(s).`;
     if (providerError) {
       message += ` (${providerError})`;
     } else {
@@ -1253,6 +1272,8 @@ export async function syncProviderAccount(params: {
     itemsSynced: totalSynced,
     domainsCount: validDiscoveredDomains.length,
     serversCount: discoveredServers.length,
+    totalDomainsCount: finalDomainsCount,
+    totalServersCount: finalServersCount,
     domains: domainNames,
     servers: discoveredServers.map((s) => s.name),
     message,
@@ -1265,6 +1286,9 @@ export async function syncProviderAccount(params: {
 export async function syncAllConnectedProviders(): Promise<{
   totalDomains: number;
   totalServers: number;
+  portfolioDomainsCount: number;
+  portfolioServersCount: number;
+  portfolioAppsCount: number;
   results: ProviderSyncResult[];
 }> {
   const rawAccounts = await fetchProviderAccountsList({ forceRefresh: true });
@@ -1299,8 +1323,38 @@ export async function syncAllConnectedProviders(): Promise<{
   invalidateCache('inventory_summary');
   invalidateCache('provider_accounts_list');
   invalidateCache('servers_list');
+  invalidateCache('applications_list');
 
-  return { totalDomains, totalServers, results };
+  // Compute the true total portfolio counts
+  let portfolioDomainsCount = 0;
+  let portfolioServersCount = 0;
+  let portfolioAppsCount = 0;
+  try {
+    const rawDom = await getUserItem(STORAGE_KEYS.DOMAINS_LIST);
+    if (rawDom) {
+      const parsedDom: any[] = JSON.parse(rawDom);
+      portfolioDomainsCount = parsedDom.filter((d) => d?.name && !isInfrastructureDomain(d.name)).length;
+    }
+    const rawSrv = await getUserItem(STORAGE_KEYS.SERVERS_LIST);
+    if (rawSrv) {
+      const parsedSrv: any[] = JSON.parse(rawSrv);
+      portfolioServersCount = parsedSrv.length;
+    }
+    const rawApp = await getUserItem(STORAGE_KEYS.APPLICATIONS_LIST);
+    if (rawApp) {
+      const parsedApp: any[] = JSON.parse(rawApp);
+      portfolioAppsCount = parsedApp.length;
+    }
+  } catch {}
+
+  return {
+    totalDomains,
+    totalServers,
+    portfolioDomainsCount: portfolioDomainsCount || totalDomains,
+    portfolioServersCount: portfolioServersCount || totalServers,
+    portfolioAppsCount,
+    results,
+  };
 }
 
 // -------------------------------------------------------------

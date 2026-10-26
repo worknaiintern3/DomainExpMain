@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 
 import { useAuth } from '@/auth/AuthContext';
 import { NavItem } from '@/types';
 import { SidebarItem } from './SidebarItem';
+import { fetchPortfolioSummary } from '@/services/portfolioService';
 
-const MAIN_NAV_ITEMS: NavItem[] = [
+const BASE_MAIN_NAV_ITEMS: NavItem[] = [
   { id: 'overview', label: 'Overview', path: '/overview', icon: 'grid_view' },
   { id: 'domains', label: 'My Domains', path: '/domains', icon: 'language' },
   { id: 'servers', label: 'VPS & Servers', path: '/servers', icon: 'dns' },
@@ -35,6 +36,71 @@ export const Sidebar: React.FC = () => {
   const { logout, user } = useAuth();
   const userLabel = user?.displayName?.trim() || user?.email || 'Signed-in user';
 
+  const [counts, setCounts] = useState<{
+    domains: number;
+    servers: number;
+    appsAndWebsites: number;
+    providers: number;
+    alerts: number;
+  }>({
+    domains: 0,
+    servers: 0,
+    appsAndWebsites: 0,
+    providers: 0,
+    alerts: 0,
+  });
+
+  const loadCounts = async () => {
+    try {
+      const summary = await fetchPortfolioSummary();
+      setCounts({
+        domains: summary.totalDomains,
+        servers: summary.totalServers,
+        appsAndWebsites: summary.totalWebsites + summary.totalApps,
+        providers: summary.totalProviders,
+        alerts: summary.totalAlerts,
+      });
+    } catch {}
+  };
+
+  useEffect(() => {
+    void loadCounts();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onPortfolioUpdated = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        void loadCounts();
+      }, 1000);
+    };
+    window.addEventListener('domainpulse:portfolio-updated', onPortfolioUpdated);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('domainpulse:portfolio-updated', onPortfolioUpdated);
+    };
+  }, []);
+
+  const navItems = useMemo(() => {
+    return BASE_MAIN_NAV_ITEMS.map((item) => {
+      if (item.id === 'domains' && counts.domains > 0) {
+        return { ...item, badge: counts.domains };
+      }
+      if (item.id === 'servers' && counts.servers > 0) {
+        return { ...item, badge: counts.servers };
+      }
+      if (item.id === 'websites' && counts.appsAndWebsites > 0) {
+        return { ...item, badge: counts.appsAndWebsites };
+      }
+      if (item.id === 'accounts' && counts.providers > 0) {
+        return { ...item, badge: counts.providers };
+      }
+      if (item.id === 'alerts' && counts.alerts > 0) {
+        return { ...item, badge: counts.alerts };
+      }
+      return item;
+    });
+  }, [counts]);
+
   return (
     <aside
       className="fixed left-0 top-0 h-full w-sidebar-width bg-surface-container-lowest text-on-surface z-50 flex flex-col justify-between select-none border-r border-outline-variant shadow-micro"
@@ -60,7 +126,7 @@ export const Sidebar: React.FC = () => {
         </div>
 
         <nav className="flex flex-col gap-unit-2xs px-unit-md mt-unit-xs overflow-y-auto max-h-[calc(100vh-18rem)] py-1" aria-label="Main navigation">
-          {MAIN_NAV_ITEMS.map((item) => <SidebarItem key={item.id} item={item} />)}
+          {navItems.map((item) => <SidebarItem key={item.id} item={item} />)}
         </nav>
       </div>
 

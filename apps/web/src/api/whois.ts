@@ -1,7 +1,13 @@
 import { apiRequest } from './client';
 import type { NormalizedWhoisData } from './whois.types';
 
-const FALLBACK_API_KEY = 'ce2619a4ee0e49799a05b15e731ce193';
+const FALLBACK_API_KEY =
+  (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.['VITE_WHOISFREAKS_API_KEY'] ||
+  'aa02fd191f444368a77d343ecf4c2994';
+
+const WHOIS_CACHE = new Map<string, { data: NormalizedWhoisData; timestamp: number }>();
+const WHOIS_INFLIGHT = new Map<string, Promise<NormalizedWhoisData>>();
+const WHOIS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
 
 function calculateDaysRemaining(expiryStr?: string | null): number | null {
   if (!expiryStr) return null;
@@ -42,38 +48,82 @@ function normalizeRawWhoisResponse(domain: string, raw: any): NormalizedWhoisDat
   };
 }
 
+export async function getSavedWhois(
+  domain: string,
+  signal?: AbortSignal,
+): Promise<NormalizedWhoisData | null> {
+  const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  try {
+    return await apiRequest<NormalizedWhoisData>(`/whois/record?domain=${encodeURIComponent(cleanDomain)}`, {
+      signal,
+      authenticated: false,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function lookupWhois(
   domain: string,
   domainId?: string,
   signal?: AbortSignal,
+  options?: { forceRefresh?: boolean },
 ): Promise<NormalizedWhoisData> {
   const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   
-  // 1. Primary path: Use backend API which automatically persists to Postgres database
-  try {
-    const queryParams = new URLSearchParams({ domain: cleanDomain });
-    if (domainId) queryParams.set('domainId', domainId);
-    
-    return await apiRequest<NormalizedWhoisData>(`/whois/live?${queryParams.toString()}`, {
-      signal,
-      authenticated: false, // Allows public or authenticated requests
-    });
-  } catch (apiError) {
-    // 2. Fallback: If backend is busy/restarting, use direct Vite proxy to WhoisFreaks
+  if (!options?.forceRefresh) {
+    const cached = WHOIS_CACHE.get(cleanDomain);
+    if (cached && Date.now() - cached.timestamp < WHOIS_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
+  if (WHOIS_INFLIGHT.has(cleanDomain)) {
+    return WHOIS_INFLIGHT.get(cleanDomain)!;
+  }
+
+  const promise = (async () => {
+    // 1. Primary path: Use backend API which automatically persists to database
     try {
-      const proxyUrl = `/whoisfreaks-api/v2.0/whois/live?apiKey=${FALLBACK_API_KEY}&domainName=${encodeURIComponent(
-        cleanDomain,
-      )}&format=json`;
-      const response = await fetch(proxyUrl, { signal });
-      if (response.ok) {
-        const json = await response.json();
-        return normalizeRawWhoisResponse(cleanDomain, json);
+      const queryParams = new URLSearchParams({ domain: cleanDomain });
+      if (domainId) queryParams.set('domainId', domainId);
+      
+      const res = await apiRequest<NormalizedWhoisData>(`/whois/live?${queryParams.toString()}`, {
+        signal,
+        authenticated: true,
+      });
+      if (res) {
+        WHOIS_CACHE.set(cleanDomain, { data: res, timestamp: Date.now() });
+        return res;
       }
     } catch {
-      // Fallback failed too, re-throw primary error
+      // 2. Fallback: If backend is busy/restarting, use direct Vite proxy to WhoisFreaks
+      try {
+        const proxyUrl = `/whoisfreaks-api/v2.0/whois/live?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&domainName=${encodeURIComponent(
+          cleanDomain,
+        )}&format=json`;
+        const response = await fetch(proxyUrl, { signal });
+        if (response.ok) {
+          const json = await response.json();
+          const normalized = normalizeRawWhoisResponse(cleanDomain, json);
+          WHOIS_CACHE.set(cleanDomain, { data: normalized, timestamp: Date.now() });
+          return normalized;
+        }
+      } catch {
+        // Fallback failed too
+      }
     }
-    throw apiError;
-  }
+
+    // Return cached if available, else throw
+    const stale = WHOIS_CACHE.get(cleanDomain);
+    if (stale) return stale.data;
+    throw new Error(`Unable to fetch live WHOIS for ${cleanDomain}`);
+  })().finally(() => {
+    WHOIS_INFLIGHT.delete(cleanDomain);
+  });
+
+  WHOIS_INFLIGHT.set(cleanDomain, promise);
+  return promise;
 }
 
 export async function refreshDomainWhois(

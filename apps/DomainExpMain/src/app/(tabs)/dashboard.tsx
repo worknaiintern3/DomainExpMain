@@ -138,13 +138,13 @@ export default function DashboardScreen() {
     return { text: 'Good Evening', icon: '🌙' };
   }, []);
 
-  // Real metric counts
-  const totalDomains = summary?.domains ?? domains.length;
-  const totalServers = summary?.servers ?? servers.length;
-  const totalApps = summary?.applications ?? apps.length;
+  // Real metric counts strictly matching real list lengths
+  const totalDomains = domains.length;
+  const totalServers = servers.length;
+  const totalApps = apps.length;
   const totalWebsites = websites.length;
   const totalProviders = providers.length;
-  const totalAlerts = summary?.alerts ?? alerts.length;
+  const totalAlerts = alerts.length;
 
   // Active unread alerts count
   const unreadAlertsCount = useMemo(() => {

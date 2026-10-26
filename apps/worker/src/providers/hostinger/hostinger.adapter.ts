@@ -42,7 +42,7 @@ type FetchImplementation = typeof fetch;
  * one array) -- see hostinger.constants.ts.
  */
 const domainEntrySchema = z.object({
-  domain: z.string().min(1).max(253),
+  domain: z.string().min(1).max(253).nullable().optional(),
   id: z.union([z.number().int().positive(), z.string().min(1)]),
   status: z.string().min(1).max(64),
 });
@@ -95,7 +95,10 @@ export function parseHostingerRetryAfter(value: string | null, now: number): num
 
 function normalizeDomain(
   entry: z.infer<typeof domainEntrySchema>,
-): DiscoveredProviderDomain {
+): DiscoveredProviderDomain | null {
+  if (!entry.domain || entry.domain.trim().length === 0) {
+    return null;
+  }
   try {
     return {
       // The portfolio list has no nameserver field (only the per-domain
@@ -183,6 +186,7 @@ export class HostingerAdapter implements
     const discovered = new Map<string, DiscoveredProviderDomain>();
     for (const entry of entries) {
       const normalized = normalizeDomain(entry);
+      if (!normalized) continue;
       const prior = discovered.get(normalized.externalResourceId);
       if (
         prior &&

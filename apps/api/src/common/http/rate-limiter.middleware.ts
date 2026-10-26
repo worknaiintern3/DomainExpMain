@@ -12,7 +12,7 @@ export function registerRateLimiterMiddleware(
     max: number;
     windowMs: number;
   } = {
-    max: 5000,
+    max: 100000,
     windowMs: 15 * 60 * 1000, // 15 minutes = 900,000 ms
   },
 ): void {
@@ -36,12 +36,33 @@ export function registerRateLimiterMiddleware(
   fastify.addHook('onRequest', (request, reply, done) => {
     // Skip healthcheck/readiness probes
     const url = request.url || '';
-    if (url === '/health' || url === '/ready') {
+    if (url === '/health' || url === '/ready' || url === '/privacy') {
       return done();
     }
 
     const now = Date.now();
-    const clientKey = request.ip || 'global';
+    const headers = request.headers || {};
+    // Extract real client IP behind reverse proxy / CDN (Nginx, Cloudflare)
+    const rawForwarded = headers['x-forwarded-for'];
+    const forwardedIp = typeof rawForwarded === 'string'
+      ? rawForwarded.split(',')[0]?.trim()
+      : Array.isArray(rawForwarded)
+        ? rawForwarded[0]?.trim()
+        : null;
+    const realIp = typeof headers['x-real-ip'] === 'string'
+      ? (headers['x-real-ip'] as string).trim()
+      : null;
+    const clientKey = forwardedIp || realIp || request.ip || 'global';
+
+    // Exempt localhost loopback in development
+    if (
+      clientKey === '127.0.0.1' ||
+      clientKey === '::1' ||
+      clientKey === 'localhost' ||
+      process.env.NODE_ENV === 'development'
+    ) {
+      return done();
+    }
 
     let bucket = ipBuckets.get(clientKey);
     if (!bucket || bucket.resetAt <= now) {

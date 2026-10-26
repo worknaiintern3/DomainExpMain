@@ -146,18 +146,27 @@ export class WhoisService {
         recordId = newId;
         savedToDatabase = true;
 
-        if (domainId && workspaceId) {
-          await (cols.domains as any).updateOne(
-            { workspaceId, id: domainId },
-            {
-              $set: {
-                ...(regDate ? { registeredAt: regDate } : {}),
-                ...(expDate ? { expiresAt: expDate } : {}),
-                updatedAt: new Date(),
-              },
+        const registrarName = responseJson.domain_registrar?.registrar_name || null;
+        const domainFilter: any = {
+          $or: [
+            ...(domainId ? [{ id: domainId }] : []),
+            { normalizedDomainName: domainName.toLowerCase().trim() },
+            { domainName: domainName.trim() },
+          ],
+        };
+        if (workspaceId) domainFilter.workspaceId = workspaceId;
+
+        await (cols.domains as any).updateMany(
+          domainFilter,
+          {
+            $set: {
+              ...(regDate ? { registeredAt: regDate } : {}),
+              ...(expDate ? { expiresAt: expDate } : {}),
+              ...(registrarName ? { notes: `Registrar: ${registrarName}` } : {}),
+              updatedAt: new Date(),
             },
-          );
-        }
+          },
+        );
       }
     } catch (dbError) {
       this.logger.error(`Failed to persist WHOIS record to database: ${dbError}`);

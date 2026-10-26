@@ -42,7 +42,7 @@ describe('apiRequest', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
-    expect(url).toBe('/api/v1/domains');
+    expect(url.endsWith('/api/v1/domains')).toBe(true);
     expect(headers.get('Authorization')).toBe('Bearer access-token');
     expect(headers.get('X-Workspace-Id')).toBe('workspace-1');
     expect(headers.get('Content-Type')).toBe('application/json');

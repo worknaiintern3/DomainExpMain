@@ -41,6 +41,18 @@ export class WhoisController {
     return this.service.lookupLive(domain, workspaceId, domainId);
   }
 
+  @Get('record')
+  async record(
+    @Req() request: WorkspaceContextRequest,
+    @Query('domain') domain?: string,
+  ): Promise<NormalizedWhoisData | null> {
+    if (!domain || !domain.trim()) {
+      throw new BadRequestException('Query parameter "domain" is required');
+    }
+    const workspaceId = request.workspacePrincipal?.workspaceId;
+    return this.service.getLastKnown(domain, workspaceId);
+  }
+
   @Get('dns')
   async dns(
     @Query('domain') domain?: string,

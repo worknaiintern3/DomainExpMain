@@ -104,13 +104,23 @@ export async function executeInventoryOperation<T>(
   }
 }
 
+function toIsoDate(val: unknown): string | null {
+  if (!val) return null;
+  if (val instanceof Date) return val.toISOString();
+  if (typeof val === 'string') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? val : d.toISOString();
+  }
+  return null;
+}
+
 function metadata(record: InventoryRecordEnvelope['record']) {
   return {
-    createdAt: record.createdAt.toISOString(),
+    createdAt: (record.createdAt instanceof Date ? record.createdAt : new Date(record.createdAt)).toISOString(),
     id: record.id,
     inventoryState: record.inventoryState,
     provenance: record.provenance,
-    updatedAt: record.updatedAt.toISOString(),
+    updatedAt: (record.updatedAt instanceof Date ? record.updatedAt : new Date(record.updatedAt)).toISOString(),
   };
 }
 
@@ -146,9 +156,9 @@ export function presentInventoryRecord(
         autoRenew: result.record.autoRenew,
         dnsProviderAccountId: result.record.dnsProviderAccountId,
         domainName: result.record.domainName,
-        expiresAt: result.record.expiresAt?.toISOString() ?? null,
+        expiresAt: toIsoDate(result.record.expiresAt),
         notes: result.record.notes,
-        registeredAt: result.record.registeredAt?.toISOString() ?? null,
+        registeredAt: toIsoDate(result.record.registeredAt),
         registrarProviderAccountId: result.record.registrarProviderAccountId,
       };
     case 'server':

@@ -22,7 +22,7 @@ const MAX_RESPONSE_BYTES = 4_000_000;
 const MAX_TOKEN_LENGTH = 4_096;
 
 const domainEntrySchema = z.object({
-  domain: z.string().min(1).max(253),
+  domain: z.string().min(1).max(253).nullable().optional(),
 }).passthrough();
 
 const domainListSchema = z.union([

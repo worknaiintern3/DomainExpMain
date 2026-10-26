@@ -1,28 +1,12 @@
 import { Platform } from 'react-native';
 
-const PRODUCTION_API_URL = 'https://app.domainexp.info/api/v1';
+const PRODUCTION_API_URL = 'https://app.domainexprt.com/api/v1';
 const LOCAL_BACKEND_URL = 'http://192.168.1.39:4000/api/v1';
 
 const getInitialApiUrl = (): string => {
-  // 1. Explicitly configured via environment variable
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  // 2. Production release build
-  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
-    return PRODUCTION_API_URL;
-  }
-  // 3. Web environment
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.location?.hostname) {
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return 'http://localhost:4000/api/v1';
-      }
-      return `http://${window.location.hostname}:4000/api/v1`;
-    }
-    return 'http://localhost:4000/api/v1';
-  }
-  // 4. Default to live production URL
   return PRODUCTION_API_URL;
 };
 

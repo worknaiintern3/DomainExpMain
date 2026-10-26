@@ -37,7 +37,7 @@ export async function createApplication(): Promise<NestFastifyApplication> {
     new FastifyAdapter({
       genReqId: createRequestId,
       logger: fastifyLogger,
-      trustProxy: (_address, hop) => hop < environment.API_TRUST_PROXY_HOPS,
+      trustProxy: true,
     }),
     nestOptions,
   );

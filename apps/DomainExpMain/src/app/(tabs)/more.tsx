@@ -470,9 +470,12 @@ export default function MoreScreen() {
     try {
       const res = await syncAllConnectedProviders();
       await loadAccounts(true);
+      const totalDom = res.portfolioDomainsCount;
+      const totalSrv = res.portfolioServersCount;
+      const totalApp = res.portfolioAppsCount;
       showFeedback(
         'Portfolio Synced',
-        `Discovered ${res.totalDomains} domains and ${res.totalServers} servers across connected providers.`,
+        `Portfolio updated: ${totalDom} domains, ${totalSrv} servers, and ${totalApp} applications synced across connected providers.`,
         'success'
       );
     } catch (err: any) {

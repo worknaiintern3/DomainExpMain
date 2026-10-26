@@ -145,9 +145,9 @@ export async function bootstrapMobileSession(email?: string): Promise<boolean> {
 
 export async function initApiClient(): Promise<void> {
   const savedUrl = await getItem(STORAGE_KEYS.API_URL);
-  if (savedUrl && !savedUrl.includes('app.domainexp.info')) {
+  if (savedUrl && !savedUrl.includes('app.domainexp.info') && !savedUrl.includes('app.domainexprt.com')) {
     customApiUrl = savedUrl;
-  } else if (savedUrl && savedUrl.includes('app.domainexp.info')) {
+  } else if (savedUrl && (savedUrl.includes('app.domainexp.info') || savedUrl.includes('app.domainexprt.com'))) {
     await deleteItem(STORAGE_KEYS.API_URL);
     customApiUrl = null;
   }

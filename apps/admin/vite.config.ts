@@ -14,7 +14,11 @@ export default defineConfig({
     port: 5174,
     host: true,
     proxy: {
-      '/api': 'http://127.0.0.1:4000',
-    } as Record<string, string>,
+      '/api': {
+        target: process.env.VITE_API_TARGET || 'https://app.domainexprt.com',
+        changeOrigin: true,
+        secure: true,
+      },
+    } as Record<string, any>,
   },
 });

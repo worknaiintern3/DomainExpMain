@@ -16,14 +16,22 @@ export const LoginPage: React.FC = () => {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     setMessage(null);
     try {
       await auth.login({ email, password });
       const state = location.state as { from?: string } | null;
       navigate(state?.from ?? '/overview', { replace: true });
-    } catch {
-      setMessage('Sign-in failed. Check your email and password.');
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 429) {
+        const detail = (err as { detail?: string }).detail;
+        setMessage(detail || 'Too many requests. Please wait a moment before trying again.');
+      } else if (err && typeof err === 'object' && 'detail' in err && typeof (err as { detail: unknown }).detail === 'string') {
+        setMessage((err as { detail: string }).detail);
+      } else {
+        setMessage('Sign-in failed. Check your email and password.');
+      }
     } finally {
       setSubmitting(false);
     }
