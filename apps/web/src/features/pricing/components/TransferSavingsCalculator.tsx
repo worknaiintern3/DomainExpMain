@@ -1,62 +1,103 @@
-import React, { useState } from 'react';
-import { RegistrarPricing } from '../pricing.types';
-import { calculateTransferSavings, COM_REGISTRAR_PRICING } from '../pricing.reference';
+import React, { useMemo, useState } from 'react';
+import { formatMinorUnits, type DomainAvailabilityResult, type DomainAvailabilityProvider } from '@/api/domain-search';
+import { calculateTransferSavings, priceOf, providerLabel } from '../pricing.calc';
 
 interface TransferSavingsCalculatorProps {
-  registrars?: RegistrarPricing[];
-  tld?: string;
+  results: DomainAvailabilityResult[];
+  domain: string | null;
+}
+
+function csvCell(value: string): string {
+  return `"${value.replace(/"/gu, '""')}"`;
+}
+
+/** Defaults to the dearest vs cheapest renewal within one shared currency. */
+function defaultPair(
+  eligible: readonly DomainAvailabilityResult[],
+): { current: DomainAvailabilityProvider | null; target: DomainAvailabilityProvider | null } {
+  const byCurrency = new Map<string, DomainAvailabilityResult[]>();
+  for (const result of eligible) {
+    const key = result.currency ?? '';
+    byCurrency.set(key, [...(byCurrency.get(key) ?? []), result]);
+  }
+  for (const group of [...byCurrency.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, g]) => g)) {
+    if (group.length < 2) continue;
+    const ordered = [...group].sort(
+      (a, b) => (priceOf(b, 'renewal') ?? 0) - (priceOf(a, 'renewal') ?? 0),
+    );
+    return { current: ordered[0]?.provider ?? null, target: ordered[ordered.length - 1]?.provider ?? null };
+  }
+  return { current: eligible[0]?.provider ?? null, target: eligible[1]?.provider ?? null };
 }
 
 export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps> = ({
-  registrars = COM_REGISTRAR_PRICING,
-  tld = '.com',
+  results,
+  domain,
 }) => {
-  const [currentRegId, setCurrentRegId] = useState<string>('godaddy');
-  const [targetRegId, setTargetRegId] = useState<string>('cloudflare');
+  const eligible = useMemo(
+    () => results.filter((r) => priceOf(r, 'renewal') !== null),
+    [results],
+  );
+  const defaults = useMemo(() => defaultPair(eligible), [eligible]);
+  const [currentChoice, setCurrentChoice] = useState<DomainAvailabilityProvider | null>(null);
+  const [targetChoice, setTargetChoice] = useState<DomainAvailabilityProvider | null>(null);
   const [domainCount, setDomainCount] = useState<number>(12);
   const [guideModalOpen, setGuideModalOpen] = useState<boolean>(false);
   const [exportNotice, setExportNotice] = useState<boolean>(false);
 
-  // Derive active registrar objects from the passed active-TLD dataset
-  const currentReg =
-    registrars.find((r) => r.id === currentRegId) ||
-    registrars.find((r) => r.id === 'godaddy') ||
-    registrars[0];
+  const currentProvider = eligible.some((r) => r.provider === currentChoice)
+    ? currentChoice
+    : defaults.current;
+  const targetProvider = eligible.some((r) => r.provider === targetChoice)
+    ? targetChoice
+    : defaults.target;
+  const currentReg = eligible.find((r) => r.provider === currentProvider);
+  const targetReg = eligible.find((r) => r.provider === targetProvider);
 
-  const targetReg =
-    registrars.find((r) => r.id === targetRegId) ||
-    registrars.find((r) => r.id === 'cloudflare') ||
-    registrars[1] ||
-    registrars[0];
+  const calc = calculateTransferSavings(currentReg, targetReg, domainCount);
+  const currency = currentReg?.currency ?? null;
+  const fmt = (minor: number | null) => formatMinorUnits(minor, currency) ?? '—';
+  const currentRenewal = currentReg ? formatMinorUnits(priceOf(currentReg, 'renewal'), currentReg.currency) : null;
+  const targetRenewal = targetReg ? formatMinorUnits(priceOf(targetReg, 'renewal'), targetReg.currency) : null;
 
-  const currentRate = currentReg ? currentReg.renewalPrice : 1499;
-  const targetRate = targetReg ? targetReg.renewalPrice : 899;
-
-  const calc = calculateTransferSavings(currentRate, targetRate, domainCount);
+  let unavailableReason: string | null = null;
+  if (eligible.length < 2) {
+    unavailableReason =
+      'Needs renewal prices from at least two registrars. Fewer than two returned one for this domain.';
+  } else if (calc === null) {
+    unavailableReason =
+      currentReg && targetReg && currentReg.currency !== targetReg.currency
+        ? 'The selected registrars quote in different currencies, and no exchange-rate source is used, so savings cannot be computed.'
+        : 'Savings could not be computed for this selection.';
+  }
 
   const handleExportCsv = () => {
+    if (!calc || !currentReg || !targetReg) return;
     setExportNotice(true);
     setTimeout(() => setExportNotice(false), 2500);
 
+    const rows: [string, string][] = [
+      ['Domain', domain ?? ''],
+      ['Currency', currentReg.currency ?? ''],
+      ['Current Registrar', providerLabel(currentReg.provider)],
+      ['Target Registrar', providerLabel(targetReg.provider)],
+      ['Number of Domains', String(domainCount)],
+      ['Current Annual Renewal Rate', currentRenewal ?? ''],
+      ['Target Annual Renewal Rate', targetRenewal ?? ''],
+      ['Current Annual Total', fmt(calc.currentAnnualMinorUnits)],
+      ['Projected Annual Total', fmt(calc.projectedAnnualMinorUnits)],
+      ['Estimated Annual Savings', fmt(calc.annualSavingsMinorUnits)],
+      ['Estimated 3-Year Savings', fmt(calc.threeYearSavingsMinorUnits)],
+      ['Estimated Savings Percentage', `${calc.percentSavings}%`],
+    ];
     const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      'Metric,Value\n' +
-      `Active TLD,${tld}\n` +
-      `Current Registrar,${currentReg?.registrarName || 'Current'}\n` +
-      `Target Registrar,${targetReg?.registrarName || 'Target'}\n` +
-      `Number of Domains,${domainCount}\n` +
-      `Current Annual Renewal Rate (INR),${currentRate}\n` +
-      `Target Annual Renewal Rate (INR),${targetRate}\n` +
-      `Current Annual Total (INR),${calc.currentAnnual}\n` +
-      `Projected Annual Total (INR),${calc.projectedAnnual}\n` +
-      `Estimated Annual Savings (INR),${calc.annualSavings}\n` +
-      `Estimated 3-Year Savings (INR),${calc.threeYearSavings}\n` +
-      `Estimated Savings Percentage,${calc.percentSavings}%\n`;
+      'data:text/csv;charset=utf-8,Metric,Value\n' +
+      rows.map(([metric, value]) => `${csvCell(metric)},${csvCell(value)}`).join('\n') +
+      '\n';
 
-    const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `domainpulse_transfer_savings_${tld.replace('.', '')}_${domainCount}_domains.csv`);
+    link.setAttribute('href', encodeURI(csvContent));
+    link.setAttribute('download', `domainpulse_renewal_savings_${domainCount}_domains.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -72,10 +113,11 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
           </div>
           <div>
             <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-              Transfer Savings Calculator
+              Renewal Savings Estimate
             </h3>
             <p className="font-caption-xs text-caption-xs text-secondary">
-              Estimate portfolio consolidation savings using reference renewal pricing ({tld}).
+              Estimate portfolio consolidation savings from the live renewal prices returned above
+              {domain ? ` for ${domain}` : ''}.
             </p>
           </div>
         </div>
@@ -89,10 +131,11 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
           <button
             type="button"
             onClick={handleExportCsv}
-            className="h-8 px-unit-sm rounded bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
+            disabled={calc === null}
+            className="h-8 px-unit-sm rounded bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-[16px]">download</span>
-            <span>Export Transfer Plan (CSV)</span>
+            <span>Export Savings Estimate (CSV)</span>
           </button>
           <button
             type="button"
@@ -109,72 +152,90 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
         {/* Input Deck (5 cols) */}
         <div className="lg:col-span-5 grid grid-cols-2 gap-unit-sm">
           <div className="flex flex-col gap-1">
-            <label className="font-caption-xs text-caption-xs text-secondary font-medium">
+            <label
+              htmlFor="transfer-current-registrar"
+              className="font-caption-xs text-caption-xs text-secondary font-medium"
+            >
               Current Registrar
             </label>
             <select
-              value={currentReg?.id || currentRegId}
-              onChange={(e) => setCurrentRegId(e.target.value)}
+              id="transfer-current-registrar"
+              value={currentProvider ?? ''}
+              disabled={eligible.length === 0}
+              onChange={(event) => setCurrentChoice(event.target.value as DomainAvailabilityProvider)}
               className="h-9 px-unit-sm rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary border border-outline-variant/30 cursor-pointer truncate"
             >
-              {registrars.map((reg) => (
-                <option key={reg.id} value={reg.id}>
-                  {reg.registrarName} ({reg.renewalFormatted}/yr)
+              {eligible.length === 0 && <option value="">No renewal prices</option>}
+              {eligible.map((reg) => (
+                <option key={reg.provider} value={reg.provider}>
+                  {providerLabel(reg.provider)} (
+                  {formatMinorUnits(priceOf(reg, 'renewal'), reg.currency)}/yr)
                 </option>
               ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="font-caption-xs text-caption-xs text-secondary font-medium">
+            <span className="font-caption-xs text-caption-xs text-secondary font-medium">
               Current Renewal Price
-            </label>
+            </span>
             <div className="h-9 px-unit-sm rounded bg-surface-container flex items-center font-label-mono text-label-mono text-rose-700 font-bold border border-outline-variant/20">
-              {currentReg ? currentReg.renewalFormatted : `₹${currentRate.toLocaleString('en-IN')}`} /yr
+              {currentRenewal ? `${currentRenewal} /yr` : '—'}
             </div>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="font-caption-xs text-caption-xs text-secondary font-medium">
+            <label
+              htmlFor="transfer-target-registrar"
+              className="font-caption-xs text-caption-xs text-secondary font-medium"
+            >
               Target Registrar
             </label>
             <select
-              value={targetReg?.id || targetRegId}
-              onChange={(e) => setTargetRegId(e.target.value)}
+              id="transfer-target-registrar"
+              value={targetProvider ?? ''}
+              disabled={eligible.length === 0}
+              onChange={(event) => setTargetChoice(event.target.value as DomainAvailabilityProvider)}
               className="h-9 px-unit-sm rounded bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary border border-outline-variant/30 cursor-pointer truncate"
             >
-              {registrars.map((reg) => (
-                <option key={reg.id} value={reg.id}>
-                  {reg.registrarName} ({reg.renewalFormatted}/yr)
+              {eligible.length === 0 && <option value="">No renewal prices</option>}
+              {eligible.map((reg) => (
+                <option key={reg.provider} value={reg.provider}>
+                  {providerLabel(reg.provider)} (
+                  {formatMinorUnits(priceOf(reg, 'renewal'), reg.currency)}/yr)
                 </option>
               ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="font-caption-xs text-caption-xs text-secondary font-medium">
+            <span className="font-caption-xs text-caption-xs text-secondary font-medium">
               Target Renewal Price
-            </label>
+            </span>
             <div className="h-9 px-unit-sm rounded bg-surface-container flex items-center font-label-mono text-label-mono text-primary font-bold border border-outline-variant/20">
-              {targetReg ? targetReg.renewalFormatted : `₹${targetRate.toLocaleString('en-IN')}`} /yr
+              {targetRenewal ? `${targetRenewal} /yr` : '—'}
             </div>
           </div>
 
           <div className="col-span-2 flex flex-col gap-1 mt-1">
             <div className="flex items-center justify-between">
-              <label className="font-caption-xs text-caption-xs text-secondary font-medium">
-                Number of Domains to Transfer
+              <label
+                htmlFor="transfer-domain-count"
+                className="font-caption-xs text-caption-xs text-secondary font-medium"
+              >
+                Number of Domains
               </label>
               <span className="font-label-mono text-label-mono font-bold text-primary">
                 {domainCount} domains
               </span>
             </div>
             <input
+              id="transfer-domain-count"
               type="range"
               min="1"
               max="100"
               value={domainCount}
-              onChange={(e) => setDomainCount(Number(e.target.value))}
+              onChange={(event) => setDomainCount(Number(event.target.value))}
               className="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary"
             />
             <div className="flex items-center justify-between text-caption-xs font-caption-xs text-secondary select-none">
@@ -193,11 +254,9 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
               Current Annual
             </span>
             <span className="font-headline-sm text-headline-sm font-label-mono text-rose-700 font-bold mt-1">
-              {calc.currentAnnualFormatted}
+              {calc ? fmt(calc.currentAnnualMinorUnits) : '—'}
             </span>
-            <span className="font-caption-xs text-caption-xs text-secondary">
-              Without transfers
-            </span>
+            <span className="font-caption-xs text-caption-xs text-secondary">Without transfers</span>
           </div>
 
           <div className="flex flex-col">
@@ -205,10 +264,10 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
               Projected Annual
             </span>
             <span className="font-headline-sm text-headline-sm font-label-mono text-primary font-bold mt-1">
-              {calc.projectedAnnualFormatted}
+              {calc ? fmt(calc.projectedAnnualMinorUnits) : '—'}
             </span>
             <span className="font-caption-xs text-caption-xs text-secondary">
-              At wholesale rate
+              At the target renewal rate
             </span>
           </div>
 
@@ -217,10 +276,10 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
               Estimated Annual Savings
             </span>
             <span className="font-headline-sm text-headline-sm font-label-mono text-primary font-bold mt-1">
-              {calc.annualSavingsFormatted}
+              {calc ? fmt(calc.annualSavingsMinorUnits) : '—'}
             </span>
             <span className="font-caption-xs text-caption-xs text-emerald-700 font-semibold">
-              {calc.percentSavings}% Cost Drop
+              {calc ? `${calc.percentSavings}% Cost Drop` : ' '}
             </span>
           </div>
 
@@ -229,17 +288,23 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
               Estimated 3-Year Savings
             </span>
             <span className="font-headline-sm text-headline-sm font-label-mono text-on-surface font-bold mt-1">
-              {calc.threeYearSavingsFormatted}
+              {calc ? fmt(calc.threeYearSavingsMinorUnits) : '—'}
             </span>
-            <span className="font-caption-xs text-caption-xs text-secondary">
-              Total Net Saved
-            </span>
+            <span className="font-caption-xs text-caption-xs text-secondary">Total Net Saved</span>
           </div>
         </div>
       </div>
 
+      {unavailableReason && (
+        <p role="note" className="mt-unit-sm font-caption-xs text-caption-xs text-amber-800">
+          {unavailableReason}
+        </p>
+      )}
+
       <div className="mt-unit-sm pt-unit-xs text-caption-xs font-caption-xs text-secondary border-t border-surface-container/60">
-        Note: Estimated reference savings. Actual savings may differ due to taxes, promotions, transfer fees and future pricing changes.
+        Note: Estimate from returned renewal prices only; one-time transfer fees are excluded.
+        Actual savings may differ due to taxes, promotions, transfer fees and future pricing
+        changes.
       </div>
 
       {/* Guide Modal */}
@@ -253,6 +318,7 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
               <button
                 type="button"
                 onClick={() => setGuideModalOpen(false)}
+                aria-label="Close guide"
                 className="p-1 rounded text-secondary hover:text-on-surface cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
@@ -273,7 +339,7 @@ export const TransferSavingsCalculator: React.FC<TransferSavingsCalculatorProps>
               </div>
               <div className="flex gap-2">
                 <span className="font-bold text-primary">4.</span>
-                <span><strong>Preserve DNS:</strong> Ensure your nameservers remain pointing to Cloudflare/Cloud DNS during the 5-day transfer window.</span>
+                <span><strong>Preserve DNS:</strong> Keep your nameservers pointing at your current DNS provider during the transfer window.</span>
               </div>
             </div>
             <button

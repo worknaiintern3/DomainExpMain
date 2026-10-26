@@ -3,6 +3,16 @@
 Dedicated checkout: `/opt/domainexp-app`. Domain: `https://app.domainexprt.com`.
 Backend: `domainexp_app_backend`, internal `0.0.0.0:4000`, host `127.0.0.1:5011`.
 
+Before deploying this domain change, point `app.domainexprt.com` DNS to
+`200.234.45.233` and run the one-time HTTPS setup below from this updated revision
+on the VPS. Normal CI does not install the new Nginx route or certificate and
+requires the new public HTTPS health check to pass. Update any old-domain values
+in the server-only `.env` and registered Google OAuth callback as applicable.
+When CI imports `PROD_ENV_FILE` (or `ENV_FILE`), it replaces the former domain in
+CORS, OAuth callback and JWT issuer values before copying the environment files.
+Without that secret, CI preserves the server file. Update clients to the API base
+URL below. Existing installed mobile builds need their API URL updated or a new build.
+
 ## Persistent infrastructure
 
 Existing `domainexp_app_postgres` (`postgres:16-alpine`) and
@@ -21,7 +31,7 @@ unset does not grant permission to modify any unrelated network.
 ## Production configuration
 
 Keep `apps/api/deploy/.env` on the VPS only. It is ignored, never printed, and
-normal deployment does not rewrite it. `.env.example` lists required values.
+CI can refresh it from `PROD_ENV_FILE` (or `ENV_FILE`). `.env.example` lists required values.
 Preflight reports invalid/missing names, including required Google OAuth fields.
 Do not use fake OAuth credentials to bypass startup validation.
 

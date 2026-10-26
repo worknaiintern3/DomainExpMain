@@ -32,9 +32,9 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
       {/* Table Header / Filter Toolbar */}
       <div className="px-unit-md py-unit-sm bg-surface-container-low flex flex-wrap items-center justify-between gap-unit-xs border-b border-surface-container/50">
         <div className="flex items-center gap-unit-xs">
-          <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-            Reference Availability &amp; Pricing Matrix
-          </h2>
+            <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
+              Live Availability &amp; Pricing
+            </h2>
           <span className="text-caption-xs font-caption-xs text-secondary">
             ({items.length} Extensions)
           </span>
@@ -95,6 +95,7 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
             {filteredItems.map((item) => {
               const isSelected = item.domain === selectedDomain;
               const isAvailable = item.status === 'available';
+              const isUnknown = item.status === 'unknown';
 
               return (
                 <tr
@@ -111,10 +112,14 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                     <div className="flex items-center gap-unit-xs">
                       <span
                         className={`material-symbols-outlined text-[16px] ${
-                          isAvailable ? 'text-emerald-600' : 'text-outline'
+                          isAvailable
+                            ? 'text-emerald-600'
+                            : isUnknown
+                              ? 'text-amber-600'
+                              : 'text-outline'
                         }`}
                       >
-                        {isAvailable ? 'check_circle' : 'lock'}
+                        {isAvailable ? 'check_circle' : isUnknown ? 'help' : 'lock'}
                       </span>
                       <span
                         className={`font-label-mono font-semibold transition-colors ${
@@ -139,12 +144,14 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-caption-xs font-semibold ${
                         isAvailable
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50'
-                          : 'bg-rose-50 text-rose-700 border border-rose-200/50'
+                          : isUnknown
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200/50'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200/50'
                       }`}
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                          isAvailable ? 'bg-emerald-500' : 'bg-rose-500'
+                          isAvailable ? 'bg-emerald-500' : isUnknown ? 'bg-amber-500' : 'bg-rose-500'
                         }`}
                       ></span>
                       {item.statusLabel}
@@ -236,6 +243,14 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                             </span>
                           </button>
                         </>
+                      ) : isUnknown ? (
+                        <button
+                          type="button"
+                          onClick={() => onSelectDomain(item.domain, 'unknown')}
+                          className="h-7 px-2.5 rounded bg-surface-container hover:bg-surface-variant text-on-surface font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Details
+                        </button>
                       ) : (
                         <>
                           <button
@@ -243,7 +258,7 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                             onClick={() => onSelectDomain(item.domain, 'registered')}
                             className="h-7 px-2.5 rounded bg-surface-container hover:bg-surface-variant text-on-surface font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer"
                           >
-                            WHOIS Preview
+                            Details
                           </button>
                           <button
                             type="button"
@@ -269,12 +284,12 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
       {/* Table Footer */}
       <div className="px-unit-md py-2 bg-surface-container-low text-caption-xs font-caption-xs text-secondary flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-surface-container/50">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-          <span className="flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px] text-primary">task_alt</span>
-            Click any row to inspect WHOIS details or view multi-registrar comparison.
-          </span>
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-primary">task_alt</span>
+              Click any row to inspect live provider results or view registrar pricing.
+            </span>
           <span className="text-[11px] text-outline italic">
-            Reference/demo pricing. Actual registrar pricing may vary.
+            Live registrar checks. Prices appear only when returned by the provider.
           </span>
         </div>
         <span className="font-label-mono text-[11px] shrink-0">

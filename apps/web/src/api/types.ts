@@ -64,6 +64,8 @@ export interface InventoryMetadata {
     | 'RDAP_RETRIEVED'
     | 'DNS_RETRIEVED'
     | 'SSL_RETRIEVED'
+    | 'HTTP_RETRIEVED'
+    | 'INFRA_RETRIEVED'
     | 'CALCULATED';
   updatedAt: string;
 }
@@ -87,12 +89,20 @@ export interface Project extends InventoryMetadata {
   name: string;
 }
 
+export interface DomainRdapSummary {
+  expiresAt: string | null;
+  lastAttemptStatus: 'SUCCESS' | 'PARTIAL' | 'FAILED' | null;
+  registeredAt: string | null;
+  registrarName: string | null;
+}
+
 export interface Domain extends InventoryMetadata {
   autoRenew: boolean | null;
   dnsProviderAccountId: string | null;
   domainName: string;
   expiresAt: string | null;
   notes: string | null;
+  rdap: DomainRdapSummary | null;
   registeredAt: string | null;
   registrarProviderAccountId: string | null;
 }
@@ -103,17 +113,21 @@ export interface DomainMetadataAttempt {
   lastAttemptStatus: DomainMetadataAttemptStatus;
   lastAttemptedAt: string;
   lastErrorCode: string | null;
-  provenance: 'RDAP_RETRIEVED' | 'DNS_RETRIEVED' | 'SSL_RETRIEVED' | null;
+  provenance: 'RDAP_RETRIEVED' | 'DNS_RETRIEVED' | 'SSL_RETRIEVED' | 'HTTP_RETRIEVED' | 'INFRA_RETRIEVED' | null;
   retrievedAt: string | null;
 }
 
 export interface DomainRdapMetadata extends DomainMetadataAttempt {
+  abuseEmails: string[];
+  abusePhones: string[];
   changedAt: string | null;
+  events: Array<{ action: string; date: string }>;
   expiresAt: string | null;
   nameservers: string[];
   registeredAt: string | null;
   registrarIanaId: string | null;
   registrarName: string | null;
+  registryDomainId: string | null;
   secureDnsDelegationSigned: boolean | null;
   sourceUrl: string | null;
   statuses: string[];
@@ -122,52 +136,106 @@ export interface DomainRdapMetadata extends DomainMetadataAttempt {
 export interface DomainDnsMetadata extends DomainMetadataAttempt {
   aRecords: string[];
   aaaaRecords: string[];
+  caaRecords: string[];
   cnameRecords: string[];
+  dnskeyRecords: Array<{ algorithm: number; flags: number; protocol: number; publicKey: string }>;
   dsRecords: Array<{ algorithm: number; digest: string; digestType: number; keyTag: number }>;
   mxRecords: Array<{ exchange: string; priority: number }>;
   nsRecords: string[];
   recordErrors: Record<string, string>;
+  rrsigRecords: Array<{ algorithm: number; expiration: string; inception: string; keyTag: number; labels: number; originalTtl: number; signerName: string; typeCovered: string }>;
+  soaRecord: { expire: number; minimum: number; mname: string; refresh: number; retry: number; rname: string; serial: number } | null;
+  srvRecords: Array<{ name: string; port: number; priority: number; target: string; weight: number }>;
   txtRecordCount: number;
 }
 
 export interface DomainTlsMetadata extends DomainMetadataAttempt {
+  certificateStatus: string | null;
+  chain: Array<{ issuer: string | null; subject: string | null; validFrom: string | null; validTo: string | null }>;
   fingerprint256: string | null;
   issuerCommonName: string | null;
   issuerOrganization: string | null;
+  keyAlgorithm: string | null;
   serialNumber: string | null;
+  signatureAlgorithm: string | null;
   subjectAltNames: string[];
   subjectCommonName: string | null;
+  tlsVersion: string | null;
   validFrom: string | null;
   validTo: string | null;
+}
+
+export interface DomainHttpMetadata extends DomainMetadataAttempt {
+  contentType: string | null;
+  finalUrl: string | null;
+  httpStatus: number | null;
+  hstsEnabled: boolean | null;
+  pageTitle: string | null;
+  reachable: boolean | null;
+  redirectChain: Array<{ status: number | null; url: string }>;
+  responseTimeMs: number | null;
+  securityHeaders: Record<string, string>;
+  serverHeader: string | null;
+}
+
+export interface DomainInfraMetadata extends DomainMetadataAttempt {
+  asn: number | null;
+  cdnProxy: string | null;
+  country: string | null;
+  ipAddresses: string[];
+  network: string | null;
+  organization: string | null;
+  region: string | null;
+  reverseDns: string[];
 }
 
 export interface DomainMetadataResponse {
   canRefresh: boolean;
   dns: DomainDnsMetadata | null;
   domainId: string;
+  http: DomainHttpMetadata | null;
+  infra: DomainInfraMetadata | null;
   rdap: DomainRdapMetadata | null;
   tls: DomainTlsMetadata | null;
 }
 
-export type DomainMetadataSource = 'rdap' | 'dns' | 'tls';
+export type DomainMetadataSource = 'rdap' | 'dns' | 'tls' | 'http' | 'infra';
+
+export interface RefreshDomainMetadataQueuedRun {
+  id: string;
+  message: string;
+  status: 'QUEUED';
+  trigger: 'MANUAL';
+}
 
 export interface RefreshDomainMetadataResponse {
   domainId: string;
   metadata: DomainMetadataResponse;
-  results: Partial<Record<DomainMetadataSource, {
-    errorCode: string | null;
-    status: DomainMetadataAttemptStatus;
-  }>>;
+  requestedSources: DomainMetadataSource[];
+  run: RefreshDomainMetadataQueuedRun;
+}
+
+export interface ServerProviderSpecs {
+  cpuCount: number | null;
+  diskGb: number | null;
+  memoryMb: number | null;
+}
+
+export interface ServerProviderMetadata {
+  operatingSystemDetail: Record<string, string> | null;
+  providerCreatedAt: string | null;
+  providerStatus: string | null;
+  specs: ServerProviderSpecs;
 }
 
 export interface Server extends InventoryMetadata {
-  expiresAt: string | null;
   hostname: string | null;
   name: string;
   notes: string | null;
   operatingSystem: string | null;
   primaryIp: string | null;
   providerAccountId: string | null;
+  providerMetadata: ServerProviderMetadata | null;
   region: string | null;
   serverKind: string | null;
 }

@@ -24,7 +24,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               Pricing &amp; Currency Preferences
             </h3>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container text-secondary font-caption-xs text-caption-xs font-mono border border-outline-variant/30">
-              <span>Pricing Mode: Reference Dataset</span>
+              <span>Pricing Source: Live Registrar APIs</span>
             </span>
           </div>
           <p className="font-body-sm text-body-sm text-secondary mt-unit-2xs">
@@ -58,7 +58,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               })}
             </div>
             <span className="font-caption-xs text-caption-xs text-secondary">
-              Applied to valuation dashboards, renewal forecasting, and benchmark matrix views.
+              Saved on this device and shown in the header. Prices are always
+              shown in each registrar&apos;s own currency — never converted.
             </span>
           </div>
 
@@ -116,47 +117,19 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </div>
           </div>
 
-          {/* Feature Addon Inclusions (WHOIS Privacy & DNSSEC) */}
-          <div className="space-y-unit-sm pt-unit-xs">
-            <div className="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low border border-outline-variant/20">
-              <div className="flex flex-col">
-                <span className="font-label-md text-label-md text-on-surface font-medium">
-                  Include WHOIS Privacy
-                </span>
-                <span className="font-caption-xs text-caption-xs text-secondary">
-                  Include privacy protection fee in comparison benchmarks when charged separately.
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.includeWhoisPrivacy}
-                  onChange={(e) => onChange({ includeWhoisPrivacy: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-10 h-5 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:bg-primary transition-all"></div>
-              </label>
+          {/* DNSSEC fee inclusion is not available yet: registrar APIs return no fee data. */}
+          <div className="flex items-center justify-between gap-unit-sm p-unit-sm rounded-lg bg-surface-container-low border border-outline-variant/20 opacity-70">
+            <div className="flex flex-col">
+              <span className="font-label-md text-label-md text-on-surface font-medium">
+                Include DNSSEC
+              </span>
+              <span className="font-caption-xs text-caption-xs text-secondary">
+                DNS security extensions pricing in total cost calculations.
+              </span>
             </div>
-
-            <div className="flex items-center justify-between p-unit-sm rounded-lg bg-surface-container-low border border-outline-variant/20">
-              <div className="flex flex-col">
-                <span className="font-label-md text-label-md text-on-surface font-medium">
-                  Include DNSSEC
-                </span>
-                <span className="font-caption-xs text-caption-xs text-secondary">
-                  Include DNS security extensions pricing in total cost calculations.
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.includeDnssec}
-                  onChange={(e) => onChange({ includeDnssec: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-10 h-5 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:bg-primary transition-all"></div>
-              </label>
-            </div>
+            <span className="inline-flex shrink-0 rounded-full px-2 py-1 text-xs font-semibold bg-surface-container text-secondary">
+              Coming soon
+            </span>
           </div>
 
           {/* Comparison Table Columns */}
@@ -225,10 +198,11 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 value={settings.renewalMarkupThreshold}
                 onChange={(e) =>
                   onChange({
-                    renewalMarkupThreshold: parseInt(e.target.value, 10) || 50,
+                    renewalMarkupThreshold: Math.max(0, parseInt(e.target.value, 10) || 0),
                   })
                 }
                 className="w-16 h-8 text-center rounded bg-surface-container-lowest text-on-surface font-label-mono text-label-mono font-medium border border-outline-variant/40 shadow-micro"
+                min={0}
               />
               <span className="font-label-md text-label-md text-secondary font-mono">%</span>
             </div>
@@ -241,10 +215,10 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </span>
             <div className="flex flex-col">
               <span className="font-label-md text-label-md text-on-surface font-semibold">
-                Pricing Reference Notice
+                Pricing Notice
               </span>
               <p className="font-body-sm text-body-sm text-secondary mt-0.5">
-                Pricing shown in the demo is stored/reference data unless a provider integration supplies current pricing.
+                Domain availability and pricing are retrieved from supported registrar APIs. Pricing may be indicative or current depending on the provider and may change at checkout. Purchases, billing, and automatic renewals are handled directly by the registrar.
               </p>
             </div>
           </div>

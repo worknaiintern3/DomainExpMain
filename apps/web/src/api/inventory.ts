@@ -5,8 +5,23 @@ import type {
   InventoryResourceMap,
 } from './types';
 
+export interface InventorySummary {
+  applications: number;
+  cloudResources?: number;
+  domains: number;
+  emailAccounts?: number;
+  projects?: number;
+  providerAccounts?: number;
+  servers: number;
+}
+
+export function getInventorySummary(signal?: AbortSignal): Promise<InventorySummary> {
+  return apiRequest('/inventory/summary', { signal });
+}
+
 export interface InventoryListOptions {
   cursor?: string;
+  forceRefresh?: boolean;
   includeArchived?: boolean;
   limit?: number;
   signal?: AbortSignal;
@@ -25,8 +40,24 @@ export function listInventory<R extends InventoryResource>(
   options: InventoryListOptions = {},
 ): Promise<CursorPage<InventoryResourceMap[R]>> {
   return apiRequest(`/${resource}?${listQuery(options)}`, {
+    ...(options.forceRefresh ? { cache: 'no-store' as const } : {}),
     signal: options.signal,
   });
+}
+
+/** Collect every page when a view needs a complete relationship or import set. */
+export async function listAllInventory<R extends InventoryResource>(
+  resource: R,
+  options: Pick<InventoryListOptions, 'includeArchived' | 'signal'> = {},
+): Promise<Array<InventoryResourceMap[R]>> {
+  const items: Array<InventoryResourceMap[R]> = [];
+  let cursor: string | undefined;
+  do {
+    const page = await listInventory(resource, { ...options, cursor, limit: 100 });
+    items.push(...page.items);
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  return items;
 }
 
 export function getInventory<R extends InventoryResource>(
@@ -61,23 +92,5 @@ export function archiveInventory(
 ): Promise<void> {
   return apiRequest(`/${resource}/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-  });
-}
-
-export interface ApplicationProbeResult {
-  online: boolean;
-  statusCode: number | null;
-  latencyMs: number | null;
-  title: string | null;
-  ssl: boolean;
-  error: string | null;
-}
-
-export function probeApplicationUrl(
-  url: string,
-  signal?: AbortSignal,
-): Promise<ApplicationProbeResult> {
-  return apiRequest(`/applications/probe?url=${encodeURIComponent(url)}`, {
-    signal,
   });
 }

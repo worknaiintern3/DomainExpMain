@@ -38,7 +38,10 @@ function Probe() {
       <span data-testid="status">{auth.status}</span>
       <span data-testid="error">{auth.error ?? ''}</span>
       <button onClick={() => auth.startGoogleLogin().catch(() => {})}>start-login</button>
+      <button onClick={() => auth.startGoogleLogin(true).catch(() => {})}>start-remembered-login</button>
       <button onClick={() => auth.completeGoogleLogin('code-1', 'state-1').catch(() => {})}>complete-login</button>
+      <button onClick={() => auth.login({ email: 'user@example.test', password: 'password', rememberMe: true }).catch(() => {})}>remember-login</button>
+      <button onClick={() => auth.logout()}>logout</button>
       <button onClick={() => auth.startGoogleLink().catch(() => {})}>start-link</button>
       <button onClick={() => auth.completeGoogleLink('code-1', 'link-state-1').catch(() => {})}>complete-link</button>
       <button onClick={() => auth.getLoginMethods().catch(() => {})}>get-login-methods</button>
@@ -54,6 +57,7 @@ describe('AuthContext Google OAuth methods', () => {
   beforeEach(() => {
     apiRequest.mockReset();
     sessionStorage.clear();
+    localStorage.clear();
     assignSpy = vi.fn();
     Object.defineProperty(window, 'location', {
       configurable: true,
@@ -104,6 +108,51 @@ describe('AuthContext Google OAuth methods', () => {
       body: { code: 'code-1', state: 'state-1' },
       method: 'POST',
     }));
+  });
+
+  it('remembered password login survives provider remount and refresh-token rotation', async () => {
+    apiRequest.mockResolvedValueOnce(loginResponse);
+    const first = render(<AuthProvider><Probe /></AuthProvider>);
+    fireEvent.click(screen.getByText('remember-login'));
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('authenticated'));
+    expect(localStorage.getItem('domainpulse.refresh-token')).toBe('refresh-token');
+    expect(sessionStorage.getItem('domainpulse.refresh-token')).toBeNull();
+    expect(apiRequest).toHaveBeenCalledWith('/auth/login', expect.objectContaining({
+      body: { email: 'user@example.test', password: 'password' },
+    }));
+
+    first.unmount();
+    apiRequest.mockResolvedValueOnce({ ...loginResponse, refreshToken: 'rotated-token' });
+    apiRequest.mockResolvedValueOnce({ user: publicUser });
+    render(<AuthProvider><Probe /></AuthProvider>);
+
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('authenticated'));
+    expect(apiRequest).toHaveBeenCalledWith('/auth/refresh', expect.objectContaining({
+      body: { refreshToken: 'refresh-token' },
+    }));
+    expect(localStorage.getItem('domainpulse.refresh-token')).toBe('rotated-token');
+    expect(sessionStorage.getItem('domainpulse.refresh-token')).toBeNull();
+
+    apiRequest.mockResolvedValueOnce(undefined);
+    fireEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('unauthenticated'));
+    expect(localStorage.getItem('domainpulse.refresh-token')).toBeNull();
+    expect(sessionStorage.getItem('domainpulse.refresh-token')).toBeNull();
+  });
+
+  it('Google login carries the remember choice through its redirect', async () => {
+    apiRequest.mockResolvedValueOnce({ authorizationUrl: 'https://accounts.google.com/mock-login' });
+    apiRequest.mockResolvedValueOnce(loginResponse);
+    render(<AuthProvider><Probe /></AuthProvider>);
+
+    fireEvent.click(screen.getByText('start-remembered-login'));
+    await waitFor(() => expect(assignSpy).toHaveBeenCalled());
+    expect(sessionStorage.getItem('domainpulse.google-remember-me')).toBe('true');
+
+    fireEvent.click(screen.getByText('complete-login'));
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('authenticated'));
+    expect(localStorage.getItem('domainpulse.refresh-token')).toBe('refresh-token');
+    expect(sessionStorage.getItem('domainpulse.google-remember-me')).toBeNull();
   });
 
   it('completeGoogleLogin surfaces the same-email conflict message on failure', async () => {
@@ -183,4 +232,5 @@ describe('AuthContext Google OAuth methods', () => {
       method: 'POST',
     })));
   });
+
 });

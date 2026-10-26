@@ -1,16 +1,11 @@
 import React from 'react';
-import { SearchState } from '../findDomain.types';
 
 interface FindDomainHeaderProps {
-  searchState: SearchState;
-  onStateChange: (state: SearchState) => void;
   watchlistCount: number;
   onOpenWatchlist?: () => void;
 }
 
 export const FindDomainHeader: React.FC<FindDomainHeaderProps> = ({
-  searchState,
-  onStateChange,
   watchlistCount,
   onOpenWatchlist,
 }) => {
@@ -30,46 +25,8 @@ export const FindDomainHeader: React.FC<FindDomainHeaderProps> = ({
         </p>
       </div>
 
-      {/* State Pills & Quick Actions */}
+      {/* Quick Saved Watchlist Trigger Button */}
       <div className="flex items-center flex-wrap gap-unit-xs">
-        {/* Interactive State Switcher for rapid demo switching */}
-        <div className="flex items-center p-unit-2xs rounded-lg bg-surface-container shadow-sm border border-outline-variant/20">
-          <button
-            type="button"
-            onClick={() => onStateChange('results')}
-            className={`px-unit-sm py-1 rounded-md font-caption-xs text-caption-xs font-medium transition-all cursor-pointer ${
-              searchState === 'results'
-                ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
-                : 'text-secondary hover:text-on-surface'
-            }`}
-          >
-            Results Preview
-          </button>
-          <button
-            type="button"
-            onClick={() => onStateChange('loading')}
-            className={`px-unit-sm py-1 rounded-md font-caption-xs text-caption-xs font-medium transition-all cursor-pointer ${
-              searchState === 'loading'
-                ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
-                : 'text-secondary hover:text-on-surface'
-            }`}
-          >
-            Checking State
-          </button>
-          <button
-            type="button"
-            onClick={() => onStateChange('empty')}
-            className={`px-unit-sm py-1 rounded-md font-caption-xs text-caption-xs font-medium transition-all cursor-pointer ${
-              searchState === 'empty'
-                ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
-                : 'text-secondary hover:text-on-surface'
-            }`}
-          >
-            Empty State
-          </button>
-        </div>
-
-        {/* Quick Saved Watchlist Trigger Button */}
         <button
           type="button"
           onClick={onOpenWatchlist}

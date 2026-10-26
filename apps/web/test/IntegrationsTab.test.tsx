@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { backendProviderResourceCapabilities } from '@/api/provider-resource-capabilities';
 import { IntegrationsTab } from '@/features/settings/components/tabs/IntegrationsTab';
 
 const {
@@ -10,6 +11,7 @@ const {
   listProviderAccounts,
   listProviderConnections,
   listProviderConnectionSyncRuns,
+  listProviderResourceCapabilities,
   replaceProviderConnectionCredential,
   triggerProviderConnectionSync,
   validateProviderConnection,
@@ -20,6 +22,7 @@ const {
   listProviderAccounts: vi.fn(),
   listProviderConnections: vi.fn(),
   listProviderConnectionSyncRuns: vi.fn(),
+  listProviderResourceCapabilities: vi.fn(),
   replaceProviderConnectionCredential: vi.fn(),
   triggerProviderConnectionSync: vi.fn(),
   validateProviderConnection: vi.fn(),
@@ -32,6 +35,7 @@ vi.mock('@/api/provider-connections', () => ({
   listProviderAccounts,
   listProviderConnections,
   listProviderConnectionSyncRuns,
+  listProviderResourceCapabilities,
   replaceProviderConnectionCredential,
   triggerProviderConnectionSync,
   validateProviderConnection,
@@ -66,6 +70,10 @@ beforeEach(() => {
   sessionStorage.clear();
   listProviderConnectionSyncRuns.mockResolvedValue({ items: [] });
   listProviderAccounts.mockResolvedValue({ items: [] });
+  // This backend lacks the capabilities endpoint, so the frontend uses its worker map.
+  listProviderResourceCapabilities.mockResolvedValue({
+    items: backendProviderResourceCapabilities().items,
+  });
 });
 
 afterEach(() => {
@@ -73,6 +81,65 @@ afterEach(() => {
 });
 
 describe('IntegrationsTab', () => {
+  it('shows an app-saved provider account even when no backend connection was created', async () => {
+    listProviderConnections.mockResolvedValue({ items: [] });
+    listProviderAccounts.mockResolvedValue({
+      items: [{ id: 'account-from-app', providerKey: 'cloudflare', label: 'Mobile Cloudflare', externalAccountId: 'private-token-value' }],
+    });
+
+    render(<IntegrationsTab />);
+
+    const saved = await screen.findByTestId('saved-provider-accounts');
+    expect(within(saved).getByText('Mobile Cloudflare')).toBeInTheDocument();
+    expect(within(saved).getByText('Saved account only')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('private-token-value');
+  });
+
+  it('connects the selected app-saved account without creating a duplicate', async () => {
+    listProviderConnections.mockResolvedValue({ items: [] });
+    listProviderAccounts.mockResolvedValue({
+      items: [
+        { id: 'app-account-1', providerKey: 'cloudflare', label: 'Personal Cloudflare' },
+        { id: 'app-account-2', providerKey: 'cloudflare', label: 'Work Cloudflare' },
+      ],
+    });
+    createProviderConnection.mockResolvedValue({
+      ...connectedConnection,
+      providerAccountId: 'app-account-2',
+      providerAccountLabel: 'Work Cloudflare',
+    });
+
+    render(<IntegrationsTab />);
+    fireEvent.click(await within(cloudflareCard()).findByRole('button', { name: 'Connect' }));
+    const picker = await screen.findByTestId('cloudflare-saved-account-select');
+    fireEvent.change(picker, { target: { value: 'app-account-2' } });
+    fireEvent.change(screen.getByTestId('cloudflare-token-input'), { target: { value: 'new-secret' } });
+    fireEvent.click(within(cloudflareCard()).getByRole('button', { name: 'Save and connect' }));
+
+    await waitFor(() => expect(createProviderConnection).toHaveBeenCalledWith({
+      authType: 'CLOUDFLARE_API_TOKEN', credential: 'new-secret', providerAccountId: 'app-account-2',
+    }));
+    expect(createProviderAccount).not.toHaveBeenCalled();
+  });
+
+  it('queues a sync for every connected provider and skips disconnected ones', async () => {
+    listProviderConnections.mockResolvedValue({ items: [
+      connectedConnection,
+      { ...connectedConnection, id: 'connection-2', providerType: 'godaddy', providerAccountId: 'account-2' },
+      { ...connectedConnection, id: 'connection-3', providerAccountId: 'account-3', connectionStatus: 'DISCONNECTED' },
+    ] });
+    triggerProviderConnectionSync.mockResolvedValue({ id: 'run-1', status: 'QUEUED' });
+
+    render(<IntegrationsTab />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sync all connected' }));
+
+    await waitFor(() => expect(triggerProviderConnectionSync).toHaveBeenCalledTimes(2));
+    expect(triggerProviderConnectionSync).toHaveBeenCalledWith('connection-1', expect.any(String));
+    expect(triggerProviderConnectionSync).toHaveBeenCalledWith('connection-2', expect.any(String));
+    expect(triggerProviderConnectionSync).not.toHaveBeenCalledWith('connection-3', expect.anything());
+    expect(await screen.findByRole('status')).toHaveTextContent('2 provider syncs queued');
+  });
+
   it('renders a card for every supported provider (Cloudflare, GoDaddy, Namecheap, Hostinger, DigitalOcean, Hetzner, Vultr, Linode, AWS, GCP, Azure)', async () => {
     listProviderConnections.mockResolvedValue({ items: [] });
 
@@ -150,6 +217,123 @@ describe('IntegrationsTab', () => {
     expect(sessionStorage.length).toBe(0);
   });
 
+  it('reconnects with a new account when the previous account is linked to a disconnected connection', async () => {
+    const disconnected = { ...connectedConnection, connectionStatus: 'DISCONNECTED' as const };
+    listProviderConnections.mockResolvedValue({ items: [disconnected] });
+    listProviderAccounts.mockResolvedValue({
+      items: [{ externalAccountId: null, id: 'account-1', label: 'Cloudflare', providerKey: 'cloudflare' }],
+    });
+    createProviderAccount.mockResolvedValue({ id: 'account-2', label: 'Cloudflare', providerKey: 'cloudflare' });
+    createProviderConnection.mockResolvedValue({ ...connectedConnection, id: 'connection-2', providerAccountId: 'account-2' });
+
+    render(<IntegrationsTab />);
+    fireEvent.click(await within(cloudflareCard()).findByRole('button', { name: 'Connect' }));
+    fireEvent.change(screen.getByTestId('cloudflare-token-input'), { target: { value: 'new-token' } });
+    fireEvent.click(within(cloudflareCard()).getByRole('button', { name: 'Save and connect' }));
+
+    await waitFor(() => expect(createProviderAccount).toHaveBeenCalledWith({ label: 'Cloudflare', providerKey: 'cloudflare' }));
+    expect(createProviderConnection).toHaveBeenCalledWith({
+      authType: 'CLOUDFLARE_API_TOKEN', credential: 'new-token', providerAccountId: 'account-2',
+    });
+  });
+
+  it('still shows an active connection when sync history cannot load', async () => {
+    listProviderConnections.mockResolvedValue({ items: [connectedConnection] });
+    listProviderConnectionSyncRuns.mockRejectedValue(new Error('History unavailable'));
+
+    render(<IntegrationsTab />);
+
+    expect(await within(cloudflareCard()).findByText('Connected')).toBeInTheDocument();
+    expect(within(cloudflareCard()).getByRole('button', { name: 'Sync Now' })).toBeInTheDocument();
+    expect(within(cloudflareCard()).queryByText(/Failed to load this integration/)).toBeNull();
+  });
+
+  it('shows a failed connect request and keeps the credential available for correction', async () => {
+    listProviderConnections.mockResolvedValue({ items: [] });
+    createProviderAccount.mockResolvedValue({ id: 'account-1', label: 'Cloudflare', providerKey: 'cloudflare' });
+    createProviderConnection.mockRejectedValue(new Error('invalid token'));
+
+    render(<IntegrationsTab />);
+    fireEvent.click(await within(cloudflareCard()).findByRole('button', { name: 'Connect' }));
+    fireEvent.change(screen.getByTestId('cloudflare-token-input'), { target: { value: 'bad-token' } });
+    fireEvent.click(within(cloudflareCard()).getByRole('button', { name: 'Save and connect' }));
+
+    expect(await within(cloudflareCard()).findByRole('alert')).toHaveTextContent('Could not connect to Cloudflare.');
+    expect(screen.getByTestId('cloudflare-token-input')).toHaveValue('bad-token');
+  });
+
+  it.each([
+    ['cloudflare', 'Auto-syncs: Domains'],
+    ['godaddy', 'Auto-syncs: Domains'],
+    ['namecheap', 'Auto-syncs: Domains'],
+    ['hostinger', 'Auto-syncs: Domains + VPS'],
+    ['digitalocean', 'Auto-syncs: Servers'],
+    ['hetzner', 'Auto-syncs: Servers'],
+    ['vultr', 'Auto-syncs: Servers'],
+    ['linode', 'Auto-syncs: Servers'],
+    ['aws', 'Auto-syncs: Cloud Resources'],
+    ['gcp', 'Auto-syncs: Cloud Resources'],
+    ['azure', 'Auto-syncs: Cloud Resources'],
+  ])('renders the exact Auto-syncs note for %s from the shared capability source', async (providerKey, note) => {
+    listProviderConnections.mockResolvedValue({ items: [] });
+    render(<IntegrationsTab />);
+    expect((await screen.findByTestId(`${providerKey}-auto-syncs`)).textContent).toBe(note);
+  });
+
+  it('renders no note for a provider the capability response does not list', async () => {
+    // Test-only payload: Vultr is omitted on purpose to exercise the "no entry" path.
+    listProviderResourceCapabilities.mockResolvedValue({
+      items: backendProviderResourceCapabilities().items
+        .filter((entry) => entry.providerKey !== 'vultr')
+    });
+    listProviderConnections.mockResolvedValue({ items: [] });
+    render(<IntegrationsTab />);
+
+    expect(await screen.findByTestId('digitalocean-auto-syncs')).toHaveTextContent('Auto-syncs: Servers');
+    expect(screen.queryByTestId('vultr-auto-syncs')).toBeNull();
+  });
+
+  it('shows no Auto-syncs note when capabilities fail to load, and the card still works', async () => {
+    listProviderResourceCapabilities.mockRejectedValue(new Error('boom'));
+    listProviderConnections.mockResolvedValue({ items: [] });
+    render(<IntegrationsTab />);
+
+    expect(await within(cloudflareCard()).findByRole('button', { name: 'Connect' })).toBeInTheDocument();
+    expect(screen.queryByTestId('cloudflare-auto-syncs')).toBeNull();
+  });
+
+  it('shows a per-resource summary for the latest completed sync, only for supported resource kinds', async () => {
+    listProviderConnections.mockResolvedValue({ items: [connectedConnection] });
+    listProviderConnectionSyncRuns.mockResolvedValue({
+      items: [{
+        attemptNo: 1,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        durationMs: 10,
+        errorCode: null,
+        finishedAt: '2026-01-01T00:00:01.000Z',
+        id: 'run-9',
+        itemsCreated: 3,
+        itemsDiscovered: 9,
+        itemsMissing: 1,
+        itemsUnchanged: 5,
+        itemsUpdated: 1,
+        resourceSummary: {
+          DOMAIN: { created: 2, errorCode: null, missing: 0, status: 'SUCCESS', unchanged: 4, updated: 1 },
+          SERVER: { created: 1, errorCode: null, missing: 1, status: 'SUCCESS', unchanged: 1, updated: 0 },
+        },
+        startedAt: '2026-01-01T00:00:00.000Z',
+        status: 'SUCCESS',
+        trigger: 'MANUAL',
+      }],
+    });
+
+    render(<IntegrationsTab />);
+    const summary = await within(cloudflareCard()).findByTestId('sync-resource-summary');
+    expect(summary).toHaveTextContent('Domains: 2 created / 1 updated / 4 unchanged / 0 missing');
+    expect(summary).toHaveTextContent('Servers: 1 created / 0 updated / 1 unchanged / 1 missing');
+    expect(summary).not.toHaveTextContent('Cloud resources');
+  });
+
   it('Sync Now triggers a manual sync and shows the syncing indicator only while a run is actually in flight', async () => {
     listProviderConnections.mockResolvedValue({ items: [connectedConnection] });
     triggerProviderConnectionSync.mockResolvedValue({ id: 'run-1', message: 'queued', status: 'QUEUED', trigger: 'MANUAL' });
@@ -214,6 +398,39 @@ describe('IntegrationsTab', () => {
       expect(disconnectProviderConnection).toHaveBeenCalledWith('connection-1');
     });
     expect(await within(cloudflareCard()).findByRole('button', { name: 'Connect' })).toBeInTheDocument();
+  });
+
+  it('promotes another connected account when the primary one is disconnected', async () => {
+    const second = { ...connectedConnection, id: 'connection-2', providerAccountId: 'account-2', providerAccountLabel: 'Cloudflare - second' };
+    let items = [connectedConnection, second];
+    listProviderConnections.mockImplementation(async () => ({ items }));
+    disconnectProviderConnection.mockImplementation(async () => {
+      items = [{ ...connectedConnection, connectionStatus: 'DISCONNECTED' as const }, second];
+      return { connectionStatus: 'DISCONNECTED', disconnectedAt: '2026-01-05T00:00:00.000Z', id: 'connection-1' };
+    });
+
+    render(<IntegrationsTab />);
+    expect(await within(cloudflareCard()).findByText('Cloudflare - second')).toBeInTheDocument();
+    fireEvent.click(within(cloudflareCard()).getAllByRole('button', { name: 'Disconnect' })[0]);
+
+    await waitFor(() => expect(disconnectProviderConnection).toHaveBeenCalledWith('connection-1'));
+    await waitFor(() => expect(within(cloudflareCard()).getByText('Cloudflare - second')).toBeInTheDocument());
+    expect(within(cloudflareCard()).queryByRole('button', { name: 'Connect' })).not.toBeInTheDocument();
+    expect(within(cloudflareCard()).getAllByRole('button', { name: 'Disconnect' })).toHaveLength(1);
+  });
+
+  it('creates a separate provider account for an additional connection without a custom label', async () => {
+    listProviderConnections.mockResolvedValue({ items: [connectedConnection] });
+    createProviderAccount.mockResolvedValue({ id: 'account-2', label: 'Cloudflare account 2', providerKey: 'cloudflare' });
+    createProviderConnection.mockResolvedValue({ ...connectedConnection, id: 'connection-2', providerAccountId: 'account-2' });
+
+    render(<IntegrationsTab />);
+    fireEvent.click(await within(cloudflareCard()).findByRole('button', { name: /Add another Cloudflare account/iu }));
+    fireEvent.change(screen.getByTestId('cloudflare-token-input'), { target: { value: 'another-token' } });
+    fireEvent.click(within(cloudflareCard()).getByRole('button', { name: 'Save and connect' }));
+
+    await waitFor(() => expect(createProviderAccount).toHaveBeenCalledWith({ label: 'Cloudflare account 2', providerKey: 'cloudflare' }));
+    expect(createProviderConnection).toHaveBeenCalledWith({ authType: 'CLOUDFLARE_API_TOKEN', credential: 'another-token', providerAccountId: 'account-2' });
   });
 
   it('Validate action shows the validating indicator only during the real request', async () => {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { listInventory } from '@/api/inventory';
+import { usePreferences } from '@/preferences/PreferencesContext';
 import type {
   InventoryMetadata,
   InventoryResource,
@@ -11,6 +12,7 @@ export function useCursorInventory<R extends InventoryResource>(
   resource: R,
   includeArchived: boolean,
 ) {
+  const { rowsPerPage } = usePreferences().general;
   const [items, setItems] = useState<Array<InventoryResourceMap[R]>>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +23,7 @@ export function useCursorInventory<R extends InventoryResource>(
   const controllerRef = useRef<AbortController | null>(null);
   const loadMoreFlightRef = useRef<object | null>(null);
 
-  const reload = useCallback(async () => {
+  const fetchFirstPage = useCallback(async (forceRefresh: boolean) => {
     const generation = ++generationRef.current;
     controllerRef.current?.abort();
     const controller = new AbortController();
@@ -33,7 +35,9 @@ export function useCursorInventory<R extends InventoryResource>(
     setLoadMoreError(null);
     try {
       const page = await listInventory(resource, {
+        ...(forceRefresh ? { forceRefresh: true } : {}),
         includeArchived,
+        limit: rowsPerPage,
         signal: controller.signal,
       });
       if (generation !== generationRef.current) return;
@@ -47,16 +51,18 @@ export function useCursorInventory<R extends InventoryResource>(
     } finally {
       if (generation === generationRef.current) setLoading(false);
     }
-  }, [includeArchived, resource]);
+  }, [includeArchived, resource, rowsPerPage]);
 
   useEffect(() => {
-    void reload();
+    void fetchFirstPage(false);
     return () => {
       generationRef.current += 1;
       controllerRef.current?.abort();
       loadMoreFlightRef.current = null;
     };
-  }, [reload]);
+  }, [fetchFirstPage]);
+
+  const reload = useCallback(() => fetchFirstPage(true), [fetchFirstPage]);
 
   const loadMore = useCallback(async () => {
     if (loadMoreFlightRef.current || !nextCursor) return;
@@ -67,7 +73,7 @@ export function useCursorInventory<R extends InventoryResource>(
     setLoadingMore(true);
     setLoadMoreError(null);
     try {
-      const page = await listInventory(resource, { cursor, includeArchived });
+      const page = await listInventory(resource, { cursor, includeArchived, limit: rowsPerPage });
       if (generation !== generationRef.current || loadMoreFlightRef.current !== flight) return;
       setItems((current) => {
         const byId = new Map<string, InventoryResourceMap[R]>();
@@ -85,7 +91,7 @@ export function useCursorInventory<R extends InventoryResource>(
         if (generation === generationRef.current) setLoadingMore(false);
       }
     }
-  }, [includeArchived, nextCursor, resource]);
+  }, [includeArchived, nextCursor, resource, rowsPerPage]);
 
   const upsert = useCallback((record: InventoryResourceMap[R]) => {
     setItems((current) => {

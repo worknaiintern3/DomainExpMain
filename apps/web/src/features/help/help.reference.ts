@@ -200,10 +200,10 @@ export const DATA_SOURCES_DETAILS = [
   {
     id: 'pricing',
     title: 'Pricing',
-    tag: 'Benchmark Matrix',
+    tag: 'Live Registrar Prices',
     icon: 'payments',
     description:
-      'Pricing is reference/stored data unless a supported provider integration supplies current pricing. Provides multi-year ownership estimates and renewal markup benchmarks.',
+      'Registrar pricing is fetched live from the GoDaddy, Namecheap and Cloudflare APIs for the domain you enter. Only prices a registrar returns are shown, in that registrar\u2019s own currency. GoDaddy prices are indicative.',
   },
   {
     id: 'provider-accounts',
@@ -262,9 +262,9 @@ export const FEATURE_GUIDES: FeatureGuideItem[] = [
     subtitle: 'Search across target TLDs & brandable suggestions',
     icon: 'travel_explore',
     summary:
-      'Query keyword availability across selected extensions, evaluate heuristic brandable variations, and review reference pricing benchmarks.',
+      'Query live registrar availability across selected extensions, evaluate heuristic brandable variations, and compare live registrar pricing.',
     keyPoints: [
-      'Multi-TLD parallel availability preview against reference dataset',
+      'Multi-TLD parallel live availability checks via supported registrar APIs',
       'Smart suggestion engine with Brandable, Short, Modern, and Tech styles',
       'Open registrar options to verify current availability and pricing externally.',
     ],
@@ -362,7 +362,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: 'faq-pricing-difference',
     question: 'Why can pricing differ from a registrar website?',
     answer:
-      'Pricing shown in the demo is stored reference benchmark data. Registrars frequently adjust promotional rates, coupon codes, currency conversion margins, and taxes. Actual pricing should always be verified on the registrar’s website before purchase.',
+      'Price Comparison shows what each registrar’s API returned at the moment of the search (GoDaddy figures are indicative). Registrars frequently adjust promotional rates, coupon codes, fees, and taxes, and DomainPulse does not convert currencies. Actual pricing should always be verified on the registrar’s website before purchase.',
     category: 'Pricing',
     tags: ['pricing', 'registrars', 'currency'],
   },
@@ -529,7 +529,7 @@ export const DATA_LIMITATIONS_LIST: DataLimitationItem[] = [
   },
   {
     icon: 'check_circle',
-    text: 'Registrar pricing is stored/reference data unless a supported provider integration supplies current pricing.',
+    text: 'Registrar pricing on Price Comparison is fetched live from registrar APIs and only shown when returned. GoDaddy prices are indicative and currencies are never converted.',
   },
   {
     icon: 'check_circle',
@@ -550,6 +550,6 @@ export const PRODUCT_METADATA: ProductMetadata = {
   workspace: 'Portfolio Workspace',
   build: 'Demo Build',
   dataSources: 'RDAP / DNS / SSL',
-  pricing: 'Reference Dataset',
+  pricing: 'Live registrar APIs',
   monitoring: 'Not Connected',
 };

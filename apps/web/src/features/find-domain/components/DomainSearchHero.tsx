@@ -76,7 +76,7 @@ export const DomainSearchHero: React.FC<DomainSearchHeroProps> = ({
                 className="h-8 px-unit-md rounded-lg bg-primary-container text-on-primary font-label-md text-label-md flex items-center gap-unit-xs hover:bg-primary transition-colors shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2)] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">travel_explore</span>
-                <span>Preview Availability</span>
+                <span>Check Availability</span>
                 <span className="ml-1 text-[10px] font-label-mono bg-on-primary/20 px-1 py-0.5 rounded text-on-primary leading-none">
                   ↵
                 </span>
@@ -161,16 +161,16 @@ export const DomainSearchHero: React.FC<DomainSearchHeroProps> = ({
             <div className="flex items-center gap-unit-xs">
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-caption-xs font-semibold bg-emerald-50 text-emerald-800 shadow-sm border border-emerald-200/50">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
-                {summary.availableCount} Available • Reference
+                {summary.availableCount} Available · Live
               </span>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-caption-xs font-semibold bg-surface-container text-secondary shadow-sm">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary mr-1.5"></span>
-                {summary.registeredCount} Registered • Reference
+                {summary.registeredCount} Registered · Live
               </span>
             </div>
             <div className="h-3 w-px bg-outline-variant hidden md:block"></div>
             <div className="hidden md:flex items-center gap-1 text-secondary">
-              <span>Lowest Reference Reg:</span>
+              <span>Lowest live reg:</span>
               <span className="font-label-mono text-on-surface font-semibold text-emerald-700">
                 {summary.lowestRegPriceFormatted}
               </span>
@@ -178,7 +178,7 @@ export const DomainSearchHero: React.FC<DomainSearchHeroProps> = ({
             </div>
           </div>
           <span className="text-[11px] font-mono text-secondary bg-surface-container-low px-2 py-0.5 rounded">
-            Search Preview
+            Live search
           </span>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { apiRequest } from './client';
+import { backendProviderResourceCapabilities } from './provider-resource-capabilities';
 
 export type ProviderConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
 export type ProviderConnectionValidationStatus = 'PENDING' | 'VALID' | 'INVALID';
@@ -38,6 +39,19 @@ export type ProviderConnectionResponse = {
 
 export type ProviderConnectionCollection = { items: ProviderConnectionResponse[] };
 
+export type ProviderResourceSummary = {
+  created: number;
+  errorCode: string | null;
+  missing: number;
+  status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
+  unchanged: number;
+  updated: number;
+};
+
+export type ProviderResourceSummaryMap = Partial<
+  Record<'CLOUD_RESOURCE' | 'DOMAIN' | 'SERVER', ProviderResourceSummary>
+>;
+
 export type ProviderSyncRunResponse = {
   attemptNo: number;
   createdAt: string;
@@ -50,6 +64,7 @@ export type ProviderSyncRunResponse = {
   itemsMissing: number;
   itemsUnchanged: number;
   itemsUpdated: number;
+  resourceSummary?: ProviderResourceSummaryMap;
   startedAt: string | null;
   status: 'QUEUED' | 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED';
   trigger: 'INITIAL' | 'MANUAL' | 'SCHEDULED' | 'RETRY';
@@ -61,6 +76,17 @@ export type ProviderAccountResponse = {
   label: string;
   providerKey: string;
 };
+
+export type ProviderResourceCapabilityCollection = {
+  items: { providerKey: string; resources: { capability: 'CLOUD_RESOURCE' | 'DOMAIN' | 'SERVER'; label: string }[] }[];
+};
+
+export async function listProviderResourceCapabilities(signal?: AbortSignal): Promise<ProviderResourceCapabilityCollection> {
+  // This backend has no /capabilities route. Keep the UI aligned with the
+  // adapters it ships instead of making a request that always returns 400.
+  void signal;
+  return backendProviderResourceCapabilities();
+}
 
 export function listProviderConnections(signal?: AbortSignal): Promise<ProviderConnectionCollection> {
   return apiRequest('/provider-connections', { signal });
@@ -113,8 +139,20 @@ export function disconnectProviderConnection(
   return apiRequest(`/provider-connections/${encodeURIComponent(id)}/disconnect`, { method: 'POST' });
 }
 
-export function listProviderAccounts(signal?: AbortSignal): Promise<{ items: ProviderAccountResponse[] }> {
-  return apiRequest('/provider-accounts', { signal });
+export async function listProviderAccounts(signal?: AbortSignal): Promise<{ items: ProviderAccountResponse[] }> {
+  const items: ProviderAccountResponse[] = [];
+  let cursor: string | null = null;
+  do {
+    const query = new URLSearchParams({ limit: '100' });
+    if (cursor) query.set('cursor', cursor);
+    const page = await apiRequest<{ items: ProviderAccountResponse[]; nextCursor: string | null }>(
+      `/provider-accounts?${query}`,
+      { cache: 'no-store', signal },
+    );
+    items.push(...page.items);
+    cursor = page.nextCursor ?? null;
+  } while (cursor);
+  return { items };
 }
 
 export function createProviderAccount(

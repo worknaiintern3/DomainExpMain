@@ -169,6 +169,10 @@ export const SecurityPage: React.FC = () => {
           }}
         />
       )}
+
+      <p className="mt-unit-lg border-t border-outline-variant/30 pt-unit-md text-caption-xs text-secondary">
+        Account deletion is not available through the current backend. Contact your workspace administrator for account removal.
+      </p>
     </SecurityCard>
   );
 };

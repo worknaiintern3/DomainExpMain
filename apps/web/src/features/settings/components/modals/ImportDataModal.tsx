@@ -1,36 +1,121 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
+import {
+  MAX_IMPORT_ROWS,
+  describeImportResult,
+  importBackupDomains,
+  importDomainNames,
+  parseBackupJson,
+  parseDomainsCsv,
+  refreshInventoryViews,
+} from '../../data-transfer';
 
 interface ImportDataModalProps {
   isOpen: boolean;
   format: 'csv' | 'json';
   onClose: () => void;
-  onImport: (format: 'csv' | 'json', count: number) => void;
+  onImported: (message: string, description: string, type: 'success' | 'info' | 'error') => void;
 }
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 export const ImportDataModal: React.FC<ImportDataModalProps> = ({
   isOpen,
   format,
   onClose,
-  onImport,
+  onImported,
 }) => {
   const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json'>(format);
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedFormat(format);
+    setFile(null);
+    setPreview(null);
+    setFileError(null);
+    setProgress(null);
+  }, [isOpen, format]);
 
   if (!isOpen) return null;
 
-  const handleSimulateSelect = () => {
-    setSelectedFileName(
-      selectedFormat === 'csv'
-        ? 'domains_portfolio_export.csv (14.2 KB)'
-        : 'domainpulse_backup_snapshot.json (28.6 KB)'
-    );
+  const accept = selectedFormat === 'csv' ? '.csv,.tsv,.txt,.zone,.bind' : '.json';
+  const handleClose = () => {
+    if (!importing) onClose();
   };
 
-  const handleExecuteImport = () => {
-    onImport(selectedFormat, selectedFormat === 'csv' ? 12 : 42);
-    onClose();
-  };
+  async function handleFile(picked: File | null) {
+    setFileError(null);
+    setPreview(null);
+    setProgress(null);
+    if (!picked) {
+      setFile(null);
+      return;
+    }
+    if (picked.size > MAX_FILE_BYTES) {
+      setFile(null);
+      setFileError('This file is larger than 5 MB.');
+      return;
+    }
+    setFile(picked);
+    try {
+      const text = await picked.text();
+      if (selectedFormat === 'csv') {
+        const parsed = parseDomainsCsv(text);
+        setPreview(
+          `${parsed.names.length} domain${parsed.names.length === 1 ? '' : 's'} ready` +
+            (parsed.invalid.length > 0 ? `, ${parsed.invalid.length} invalid row${parsed.invalid.length === 1 ? '' : 's'} skipped` : ''),
+        );
+      } else {
+        const parsed = parseBackupJson(text);
+        setPreview(
+          `${parsed.domains.length} domain${parsed.domains.length === 1 ? '' : 's'} ready` +
+            (parsed.invalid.length > 0 ? `, ${parsed.invalid.length} invalid ${parsed.invalid.length === 1 ? 'entry' : 'entries'} skipped` : ''),
+        );
+      }
+    } catch (error) {
+      setPreview(null);
+      setFileError(error instanceof Error ? error.message : 'This file could not be read.');
+    }
+  }
+
+  async function handleExecuteImport() {
+    if (!file || importing) return;
+    setImporting(true);
+    setFileError(null);
+    try {
+      const text = await file.text();
+      const total = selectedFormat === 'csv'
+        ? parseDomainsCsv(text)
+        : parseBackupJson(text);
+      const result = selectedFormat === 'csv'
+        ? await importDomainNames(
+            (total as ReturnType<typeof parseDomainsCsv>).names,
+            (done, count) => setProgress({ done, total: count }),
+          )
+        : await importBackupDomains(
+            (total as ReturnType<typeof parseBackupJson>).domains,
+            (done, count) => setProgress({ done, total: count }),
+          );
+      refreshInventoryViews();
+      const described = describeImportResult(result, selectedFormat);
+      onImported(described.message, described.description, described.type);
+      setFile(null);
+      setPreview(null);
+      setProgress(null);
+      onClose();
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : 'This file could not be imported.');
+    } finally {
+      setImporting(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/40 backdrop-blur-sm animate-in fade-in duration-200">
@@ -51,7 +136,8 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={importing}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-secondary hover:bg-surface-container hover:text-on-surface transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
@@ -68,7 +154,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
               type="button"
               onClick={() => {
                 setSelectedFormat('csv');
-                setSelectedFileName(null);
+                void handleFile(null);
               }}
               className={`p-2.5 rounded-lg font-label-md text-label-md flex items-center justify-between border cursor-pointer transition-colors ${
                 selectedFormat === 'csv'
@@ -78,7 +164,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px]">table_rows</span>
-                <span>CSV Spreadsheet</span>
+                <span>CSV / TSV / TXT / BIND</span>
               </div>
               {selectedFormat === 'csv' && (
                 <span className="material-symbols-outlined text-[16px]">check</span>
@@ -89,7 +175,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
               type="button"
               onClick={() => {
                 setSelectedFormat('json');
-                setSelectedFileName(null);
+                void handleFile(null);
               }}
               className={`p-2.5 rounded-lg font-label-md text-label-md flex items-center justify-between border cursor-pointer transition-colors ${
                 selectedFormat === 'json'
@@ -109,6 +195,16 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
         </div>
 
         {/* Upload Drop Zone */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          className="hidden"
+          onChange={(event) => {
+            void handleFile(event.target.files?.[0] ?? null);
+            event.target.value = '';
+          }}
+        />
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -118,9 +214,9 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
           onDrop={(e) => {
             e.preventDefault();
             setIsDragging(false);
-            handleSimulateSelect();
+            void handleFile(e.dataTransfer.files?.[0] ?? null);
           }}
-          onClick={handleSimulateSelect}
+          onClick={() => inputRef.current?.click()}
           className={`p-unit-lg rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 text-center cursor-pointer transition-colors ${
             isDragging
               ? 'border-primary bg-primary/5'
@@ -132,16 +228,24 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
           </div>
           <div className="flex flex-col">
             <span className="font-label-md text-label-md text-on-surface font-semibold">
-              {selectedFileName ? selectedFileName : 'Drag and drop file here, or browse'}
+              {file ? file.name : 'Drag and drop file here, or browse'}
             </span>
             <span className="font-caption-xs text-caption-xs text-secondary mt-0.5">
-              Supports .csv, .json (max demo size: 5 MB)
+              Supports {accept} files up to 5 MB and {MAX_IMPORT_ROWS} rows per import.
             </span>
           </div>
-          {selectedFileName && (
+          {preview && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 font-caption-xs text-caption-xs font-mono mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>Ready to parse in frontend demo session</span>
+              <span>{preview}</span>
+            </span>
+          )}
+          {fileError && (
+            <span className="font-caption-xs text-caption-xs text-error mt-1" role="alert">{fileError}</span>
+          )}
+          {progress && (
+            <span className="font-caption-xs text-caption-xs text-secondary mt-1" role="status">
+              Importing {progress.done} of {progress.total}…
             </span>
           )}
         </div>
@@ -153,25 +257,27 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
           </span>
           <p className="font-caption-xs text-caption-xs text-secondary leading-normal">
             {selectedFormat === 'csv'
-              ? 'Expected CSV headers: domain_name, registrar, expiry_date, auto_renew, nameservers, status.'
-              : 'Expected JSON schema: { version: "1.0", domains: [...], servers: [...], tags: [...] }.'}
+              ? 'Use a domain_name or Domain Name column, including mobile exports. TXT lists and a BIND zone $ORIGIN also work; DNS records are not imported. Existing names are skipped.'
+              : 'JSON imports missing domains from a DomainPulse domain snapshot (version "1.0"). Existing domains and other resources are not replaced.'}
           </p>
         </div>
 
         <div className="flex items-center justify-end gap-unit-sm pt-unit-xs border-t border-surface-container-low mt-unit-2xs">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={importing}
             className="h-9 px-unit-md rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors border border-outline-variant/30 cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="button"
-            onClick={handleExecuteImport}
-            className="h-9 px-unit-md rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-tertiary transition-colors shadow-micro cursor-pointer font-medium"
+            onClick={() => void handleExecuteImport()}
+            disabled={!file || !preview || importing}
+            className="h-9 px-unit-md rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-tertiary transition-colors shadow-micro cursor-pointer font-medium disabled:opacity-50"
           >
-            Import Records
+            {importing ? 'Importing…' : 'Import Records'}
           </button>
         </div>
       </div>

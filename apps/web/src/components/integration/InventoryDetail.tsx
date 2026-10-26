@@ -6,6 +6,7 @@ import type { InventoryMetadata, InventoryResource, InventoryResourceMap } from 
 import { Button } from '@/components/common/Button';
 import { InventoryState, ResourceFormModal, StatePanel, type ResourceConfiguration } from './InventoryWorkspace';
 
+import { formatDateTime } from '@/lib/format';
 export const InventoryDetail = <R extends InventoryResource>({
   children,
   config,
@@ -67,11 +68,11 @@ export const InventoryDetail = <R extends InventoryResource>({
             let output: React.ReactNode = value === null || value === undefined || value === '' ? 'Unknown' : String(value);
             if (field.render) output = field.render(value, shape);
             else if (typeof value === 'boolean') output = value ? 'Enabled' : 'Disabled';
-            else if (field.key.endsWith('At') && typeof value === 'string') output = new Date(value).toLocaleString();
+            else if (field.key.endsWith('At') && typeof value === 'string') output = formatDateTime(value);
             return <div key={field.key} className="rounded-lg bg-surface-container-low p-3 min-w-0"><dt className="text-caption-xs uppercase text-secondary">{field.label}</dt><dd className="text-body-sm text-on-surface mt-1 break-words">{output}</dd></div>;
           })}
-          <div className="rounded-lg bg-surface-container-low p-3"><dt className="text-caption-xs uppercase text-secondary">Created</dt><dd className="text-body-sm mt-1">{new Date(record.createdAt).toLocaleString()}</dd></div>
-          <div className="rounded-lg bg-surface-container-low p-3"><dt className="text-caption-xs uppercase text-secondary">Updated</dt><dd className="text-body-sm mt-1">{new Date(record.updatedAt).toLocaleString()}</dd></div>
+          <div className="rounded-lg bg-surface-container-low p-3"><dt className="text-caption-xs uppercase text-secondary">Created</dt><dd className="text-body-sm mt-1">{formatDateTime(record.createdAt)}</dd></div>
+          <div className="rounded-lg bg-surface-container-low p-3"><dt className="text-caption-xs uppercase text-secondary">Updated</dt><dd className="text-body-sm mt-1">{formatDateTime(record.updatedAt)}</dd></div>
         </dl>
       </section>
       {children}

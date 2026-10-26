@@ -74,7 +74,7 @@ export const AlertsHeader: React.FC<AlertsHeaderProps> = ({
             onClick={() => onViewModeChange('feed')}
             className={`px-unit-sm py-1 rounded-md font-label-md text-label-md transition-all cursor-pointer ${
               viewMode === 'feed'
-                ? 'text-white bg-[#4f46e5] font-semibold shadow-sm'
+                ? 'text-white bg-primary-container font-semibold shadow-sm'
                 : 'text-secondary hover:text-on-surface'
             }`}
           >
@@ -86,7 +86,7 @@ export const AlertsHeader: React.FC<AlertsHeaderProps> = ({
             onClick={() => onViewModeChange('matrix')}
             className={`px-unit-sm py-1 rounded-md font-label-md text-label-md transition-all cursor-pointer ${
               viewMode === 'matrix'
-                ? 'text-white bg-[#4f46e5] font-semibold shadow-sm'
+                ? 'text-white bg-primary-container font-semibold shadow-sm'
                 : 'text-secondary hover:text-on-surface'
             }`}
           >
@@ -98,7 +98,7 @@ export const AlertsHeader: React.FC<AlertsHeaderProps> = ({
             onClick={() => onViewModeChange('coverage')}
             className={`px-unit-sm py-1 rounded-md font-label-md text-label-md transition-all cursor-pointer ${
               viewMode === 'coverage'
-                ? 'text-white bg-[#4f46e5] font-semibold shadow-sm'
+                ? 'text-white bg-primary-container font-semibold shadow-sm'
                 : 'text-secondary hover:text-on-surface'
             }`}
           >
@@ -110,7 +110,7 @@ export const AlertsHeader: React.FC<AlertsHeaderProps> = ({
             onClick={() => onViewModeChange('rules')}
             className={`px-unit-sm py-1 rounded-md font-label-md text-label-md transition-all cursor-pointer ${
               viewMode === 'rules'
-                ? 'text-white bg-[#4f46e5] font-semibold shadow-sm'
+                ? 'text-white bg-primary-container font-semibold shadow-sm'
                 : 'text-secondary hover:text-on-surface'
             }`}
           >
@@ -122,7 +122,7 @@ export const AlertsHeader: React.FC<AlertsHeaderProps> = ({
             onClick={() => onViewModeChange('empty')}
             className={`px-unit-sm py-1 rounded-md font-label-md text-label-md transition-all cursor-pointer ${
               viewMode === 'empty'
-                ? 'text-white bg-[#4f46e5] font-semibold shadow-sm'
+                ? 'text-white bg-primary-container font-semibold shadow-sm'
                 : 'text-secondary hover:text-on-surface'
             }`}
           >

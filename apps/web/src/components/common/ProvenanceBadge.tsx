@@ -12,7 +12,7 @@ export const ProvenanceBadge: React.FC<ProvenanceBadgeProps> = ({ source, classN
     'RDAP Retrieved': 'bg-indigo-50 text-indigo-700 border-indigo-200/80',
     'DNS Retrieved': 'bg-sky-50 text-sky-700 border-sky-200/80',
     'SSL Retrieved': 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
-    'User Mapped': 'bg-slate-100 text-slate-700 border-slate-200',
+    'User Mapped': 'bg-surface-container text-on-surface-variant border-outline-variant',
     'Stored Record': 'bg-surface-container text-secondary border-outline-variant/60',
     'Reference Dataset': 'bg-amber-50 text-amber-800 border-amber-200/80',
   }[source] || 'bg-surface-container text-secondary border-outline-variant/60';

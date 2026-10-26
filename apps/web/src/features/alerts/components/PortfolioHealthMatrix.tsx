@@ -1,6 +1,7 @@
 import React from 'react';
 import { HealthMatrixItem } from '../alerts.types';
 
+import { expiryTier } from '@/lib/expiry';
 interface PortfolioHealthMatrixProps {
   items: HealthMatrixItem[];
   onInspect: (item: HealthMatrixItem) => void;
@@ -34,8 +35,9 @@ export const PortfolioHealthMatrix: React.FC<PortfolioHealthMatrixProps> = ({
   };
 
   const getDaysColor = (days: number) => {
-    if (days <= 7) return 'text-rose-700 font-bold';
-    if (days <= 30) return 'text-amber-700 font-bold';
+    const tier = expiryTier(days);
+    if (tier === 'critical') return 'text-rose-700 font-bold';
+    if (tier === 'warning') return 'text-amber-700 font-bold';
     return 'text-secondary font-medium';
   };
 

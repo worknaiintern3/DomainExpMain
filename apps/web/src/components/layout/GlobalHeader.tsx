@@ -10,9 +10,17 @@ const ROUTE_LABELS: Record<string, string> = {
   '/find-domain': 'Find Domain',
   '/servers': 'VPS & Servers',
   '/websites': 'Websites & Apps',
+  '/applications': 'Websites & Apps',
+  '/projects': 'Projects',
+  '/cloud-resources': 'Cloud Resources',
   '/accounts': 'Accounts & Emails',
   '/pricing': 'Price Comparison',
   '/alerts': 'Alerts & Monitoring',
+  '/activities': 'Recent Activity',
+  '/notifications': 'Notifications',
+  '/google-play': 'Google Play Console',
+  '/play-store': 'Play Store',
+  '/domain-intelligence': 'Domain Intelligence',
   '/infrastructure-map': 'Infrastructure Map',
   '/settings': 'Settings',
   '/help': 'Help & Support',
@@ -29,7 +37,7 @@ function initialsFor(label: string): string {
     .join('') || 'DP';
 }
 
-export const GlobalHeader: React.FC = () => {
+export const GlobalHeader: React.FC<{ onOpenMenu?: () => void; sidebarCollapsed?: boolean }> = ({ onOpenMenu, sidebarCollapsed = false }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
@@ -53,10 +61,11 @@ export const GlobalHeader: React.FC = () => {
   return (
     <>
       <header
-        className="fixed top-0 left-sidebar-width right-0 h-header-height bg-surface-container-lowest/90 backdrop-blur-xl border-b border-outline-variant shadow-micro z-40 px-unit-xl flex items-center justify-between gap-unit-lg"
+        className={`fixed top-0 right-0 h-header-height bg-surface-container-lowest/90 backdrop-blur-xl border-b border-outline-variant shadow-micro z-40 px-unit-md sm:px-unit-xl flex items-center justify-between gap-unit-sm md:gap-unit-lg ${sidebarCollapsed ? 'left-0 md:left-[4.25rem]' : 'left-0 md:left-sidebar-width'}`}
         aria-label="Application header"
       >
         <div className="flex items-center gap-unit-xs min-w-0">
+          <button aria-label="Open navigation" className="mr-unit-xs flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-outline-variant text-secondary hover:bg-surface-container md:hidden" onClick={onOpenMenu} type="button"><span className="material-symbols-outlined">menu</span></button>
           <span className="font-caption-xs text-caption-xs text-secondary font-medium select-none">DomainPulse</span>
           <span className="text-outline-variant text-[13px] select-none">/</span>
           <span className="font-label-md text-label-md text-on-surface font-semibold truncate">

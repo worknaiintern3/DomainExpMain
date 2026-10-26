@@ -2,6 +2,9 @@ import React from 'react';
 import { SECURITY_PRIVACY_DATA } from '../help.reference';
 
 export const SecurityPrivacyCard: React.FC = () => {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+  const landingUrl = env?.['VITE_LANDING_URL']?.replace(/\/$/, '') ?? 'https://app.domainexprt.com';
+
   return (
     <section id="sec-security" className="bg-surface-container-lowest rounded-xl p-unit-lg shadow-micro border border-outline-variant/30 scroll-mt-20 flex flex-col gap-unit-md">
       <div className="flex items-center gap-2 pb-unit-sm border-b border-surface-container-low">
@@ -42,6 +45,9 @@ export const SecurityPrivacyCard: React.FC = () => {
           {SECURITY_PRIVACY_DATA.clarification}
         </p>
       </div>
+      <a className="inline-flex w-fit items-center gap-2 text-label-md font-semibold text-primary underline-offset-2 hover:underline" href={`${landingUrl}/privacy-policy`} rel="noopener noreferrer" target="_blank">
+        Read the privacy policy <span aria-hidden="true" className="material-symbols-outlined text-[17px]">open_in_new</span>
+      </a>
     </section>
   );
 };

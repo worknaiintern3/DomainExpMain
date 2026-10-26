@@ -62,7 +62,7 @@ export const DnsRecordsSection: React.FC<DnsRecordsSectionProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-unit-xs mb-unit-xs">
-              <span className="w-2 h-2 rounded-full bg-[#10b981]" />
+              <span className="w-2 h-2 rounded-full bg-healthy" />
               <span className="font-label-md text-label-md text-on-surface font-semibold">
                 Active &amp; Cryptographically Signed
               </span>

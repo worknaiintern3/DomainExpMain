@@ -95,7 +95,6 @@ export const AccountsPage: React.FC = () => {
     return providers.items.filter((account) => [
       account.label,
       account.providerKey,
-      account.externalAccountId,
       account.notes,
     ].some((value) => value?.toLowerCase().includes(query)));
   }, [providers.items, search]);
@@ -332,7 +331,6 @@ export const AccountsPage: React.FC = () => {
                     </div>
                     <InventoryState state={account.inventoryState} />
                   </div>
-
                   <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 border-t border-outline-variant/30 pt-3">
                     <div>
                       <dt className="text-caption-xs uppercase font-medium text-secondary">Login email</dt>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ApiError } from '@/api/client';
 import { listAlertRules, patchAlertRule, type AlertRuleResponse } from '@/api/monitoring';
 import { Button } from '@/components/common/Button';
+import { BrowserPushControl } from './BrowserPushControl';
 
 const RULES = [
   'DOMAIN_EXPIRY_CRITICAL',
@@ -18,28 +19,21 @@ type RuleKey = typeof RULES[number];
 function isExpiry(key: RuleKey) { return key.includes('_EXPIRY_'); }
 function isRetrieval(key: RuleKey) { return key === 'RETRIEVAL_FAILURE_REPEATED'; }
 
-import type { AlertsNotificationSettings } from '../../settings.types';
-
 export const AlertsTab: React.FC<{
-  settings: AlertsNotificationSettings;
-  onChange: (updated: Partial<AlertsNotificationSettings>) => void;
-  onSave: () => void;
-  isSaving: boolean;
-  onOpenChannelConfig: (channel: 'email' | 'whatsapp') => void;
-  role?: 'owner' | 'admin' | 'member';
-}> = ({ role = 'owner' }) => {
+  role: 'owner' | 'admin' | 'member' | null;
+}> = ({ role }) => {
   const canWrite = role === 'owner' || role === 'admin';
   const [rules, setRules] = useState<AlertRuleResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, { enabled: boolean; severity: 'CRITICAL' | 'WARNING' | 'INFO'; thresholdDays?: number | null; thresholdCount?: number | null }>>({});
 
-  useEffect(() => {
-    let cancelled = false;
+  const reload = () => {
     setLoading(true);
+    setLoadError(null);
     listAlertRules().then((data) => {
-      if (cancelled) return;
       setRules(data);
       const next: typeof form = {};
       for (const r of data) {
@@ -47,18 +41,23 @@ export const AlertsTab: React.FC<{
       }
       setForm(next);
     }).catch((e) => {
-      if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load rules');
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      setLoadError(e instanceof ApiError ? e.detail : e instanceof Error ? e.message : 'Could not load rules');
+    }).finally(() => { setLoading(false); });
+  };
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = async (key: RuleKey) => {
     if (!canWrite) return;
     setSavingKey(key);
-    setError(null);
-    const current = form[key];
-    if (!current) {
-      setError('Rule not configured');
+    setSaveError(null);
+    const current = form[key] ?? { enabled: true, severity: 'INFO' as const };
+    if ((isExpiry(key) && (current.thresholdDays === null || current.thresholdDays === undefined || !Number.isInteger(current.thresholdDays) || current.thresholdDays < 0)) ||
+        (isRetrieval(key) && (current.thresholdCount === null || current.thresholdCount === undefined || !Number.isInteger(current.thresholdCount) || current.thresholdCount < 1))) {
+      setSaveError(`${key}: enter a valid threshold before saving.`);
       setSavingKey(null);
       return;
     }
@@ -75,21 +74,29 @@ export const AlertsTab: React.FC<{
       });
       setForm((prev) => ({ ...prev, [key]: { enabled: updated.enabled, severity: updated.severity, thresholdDays: updated.thresholdDays, thresholdCount: updated.thresholdCount } }));
     } catch (e) {
-      setError(e instanceof ApiError ? e.detail : e instanceof Error ? e.message : 'Could not save');
+      setSaveError(e instanceof ApiError ? e.detail : e instanceof Error ? e.message : 'Could not save');
     } finally {
       setSavingKey(null);
     }
   };
 
   if (loading) return <div className="p-8 text-center text-body-sm text-secondary" role="status">Loading alert rules…</div>;
-  if (error) return <div className="rounded-xl border border-error/30 bg-error/5 p-4" role="alert"><p className="text-error">{error}</p></div>;
+  if (loadError) {
+    return (
+      <div className="rounded-xl border border-error/30 bg-error/5 p-4" role="alert">
+        <p className="text-error">{loadError}</p>
+        <Button className="mt-3" onClick={reload}>Try again</Button>
+      </div>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-unit-lg">
       <div className="rounded-xl bg-surface-container-lowest p-unit-lg shadow-micro border border-outline-variant/30">
         <h3 className="font-headline-sm text-headline-sm font-semibold">Alert Rules</h3>
         <p className="mt-1 text-body-sm text-secondary">Truthful per-rule configuration from the server. No defaults are fabricated.</p>
-        {!canWrite && <p className="mt-2 text-body-sm text-secondary">Read-only: you need owner/admin to configure.</p>}
+        {!canWrite && <p className="mt-2 text-body-sm text-secondary">Read-only: owner/admin access is required to configure rules.</p>}
+        {saveError && <p className="mt-2 text-body-sm text-error" role="alert">{saveError}</p>}
       </div>
       <div className="flex flex-col gap-4">
         {RULES.map((key) => {
@@ -136,6 +143,19 @@ export const AlertsTab: React.FC<{
             </div>
           );
         })}
+      </div>
+      <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-unit-lg shadow-micro">
+        <div className="flex items-center gap-2">
+          <h3 className="font-headline-sm text-headline-sm font-semibold">Notification channels</h3>
+        </div>
+        <p className="mt-1 text-body-sm text-secondary">
+          In-app alerts are available on the Alerts page. Browser push can be enabled per browser; email and WhatsApp delivery are not connected yet.
+        </p>
+        <BrowserPushControl />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="inline-flex rounded-full px-2 py-1 text-xs font-semibold bg-surface-container text-secondary">Email — Coming soon</span>
+          <span className="inline-flex rounded-full px-2 py-1 text-xs font-semibold bg-surface-container text-secondary">WhatsApp — Coming soon</span>
+        </div>
       </div>
     </section>
   );

@@ -151,13 +151,13 @@ export const TopologyCanvas: React.FC<TopologyCanvasProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className="relative flex-1 w-full h-full overflow-hidden bg-[#fbfcff] cursor-grab active:cursor-grabbing"
+        className="relative flex-1 w-full h-full overflow-hidden bg-surface-container-low cursor-grab active:cursor-grabbing"
       >
         {/* Subtle Radial Dot Grid Backdrop */}
         <div
           className="absolute inset-0 opacity-40 pointer-events-none"
           style={{
-            backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(rgb(var(--c-surface-container-highest)) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
             transform: `translate(${panOffset.x % 20}px, ${panOffset.y % 20}px)`,
           }}

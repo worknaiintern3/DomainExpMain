@@ -1,6 +1,7 @@
 function getApiBasePath(): string {
   try {
-    const envBase = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.['VITE_API_BASE_URL'];
+    const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+    const envBase = env?.['VITE_API_BASE_URL'];
     if (envBase && envBase.trim()) {
       const clean = envBase.trim().replace(/\/+$/, '');
       return clean.endsWith('/api/v1') ? clean : `${clean}/api/v1`;
@@ -25,6 +26,28 @@ export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
 
 let authBridge: AuthBridge | null = null;
 let explicitWorkspaceId: string | null = null;
+let cacheSessionId: string | null = null;
+let cacheGeneration = 0;
+const INVENTORY_CACHE_TTL_MS = 20_000;
+const INVENTORY_CACHE_MAX_ENTRIES = 100;
+const inventoryReadCache = new Map<string, { expiresAt: number; value: unknown }>();
+const INVENTORY_READ_PATH = /^\/(?:inventory\/summary|(?:domains|servers|applications|projects|cloud-resources|provider-accounts|email-accounts)(?:\/[^/?]+)?)(?:\?.*)?$/u;
+
+function clearInventoryReadCache(): void {
+  cacheGeneration += 1;
+  inventoryReadCache.clear();
+}
+
+/** Keep private inventory cached only for the active browser login session. */
+export function setApiCacheSession(sessionId: string | null): void {
+  if (cacheSessionId === sessionId) return;
+  cacheSessionId = sessionId;
+  clearInventoryReadCache();
+}
+
+function cloneJson<T>(value: T): T {
+  return typeof structuredClone === 'function' ? structuredClone(value) as T : value;
+}
 
 export class ApiError extends Error {
   readonly detail: string;
@@ -52,6 +75,7 @@ export function configureApiAuthentication(bridge: AuthBridge | null): void {
 }
 
 export function setExplicitWorkspaceId(workspaceId: string | null): void {
+  if (explicitWorkspaceId !== workspaceId) clearInventoryReadCache();
   explicitWorkspaceId = workspaceId;
 }
 
@@ -149,6 +173,15 @@ async function executeRequest<T>(
     ...requestInit
   } = options;
   const headers = new Headers(inputHeaders);
+  const method = (requestInit.method ?? 'GET').toUpperCase();
+  const cacheable = authenticated && cacheSessionId !== null && method === 'GET' && INVENTORY_READ_PATH.test(path);
+  const cacheKey = path;
+  if (cacheable && requestInit.cache !== 'no-store' && !requestInit.signal?.aborted) {
+    const cached = inventoryReadCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cloneJson(cached.value as T);
+    if (cached) inventoryReadCache.delete(cacheKey);
+  }
+  const requestCacheGeneration = cacheGeneration;
   headers.set('Accept', 'application/json');
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   if (authenticated) {
@@ -202,6 +235,7 @@ async function executeRequest<T>(
   }
 
   if (!response.ok) throw await toApiError(response);
+  if (method !== 'GET') clearInventoryReadCache();
   if (response.status === 204) return undefined as T;
 
   if (!hasJsonContentType(response)) {
@@ -211,7 +245,15 @@ async function executeRequest<T>(
       title: 'Invalid server response',
     });
   }
-  return (await response.json()) as T;
+  const value = (await response.json()) as T;
+  if (cacheable && requestCacheGeneration === cacheGeneration && !requestInit.signal?.aborted) {
+    if (inventoryReadCache.size >= INVENTORY_CACHE_MAX_ENTRIES) {
+      const oldestKey = inventoryReadCache.keys().next().value;
+      if (oldestKey) inventoryReadCache.delete(oldestKey);
+    }
+    inventoryReadCache.set(cacheKey, { expiresAt: Date.now() + INVENTORY_CACHE_TTL_MS, value: cloneJson(value) });
+  }
+  return value;
 }
 
 export function apiRequest<T>(

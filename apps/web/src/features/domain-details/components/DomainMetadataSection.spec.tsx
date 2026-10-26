@@ -11,7 +11,9 @@ const metadata: DomainMetadataResponse = {
   dns: {
     aRecords: ['203.0.113.1'],
     aaaaRecords: ['2001:db8::1'],
+    caaRecords: ['0 issue "letsencrypt.org"'],
     cnameRecords: [],
+    dnskeyRecords: [],
     dsRecords: [{ algorithm: 13, digest: 'ABCD', digestType: 2, keyTag: 100 }],
     lastAttemptedAt: attemptedAt,
     lastAttemptStatus: 'PARTIAL',
@@ -21,11 +23,49 @@ const metadata: DomainMetadataResponse = {
     provenance: 'DNS_RETRIEVED',
     recordErrors: { CNAME: 'DNS_RESOLVER_ERROR' },
     retrievedAt: attemptedAt,
+    rrsigRecords: [],
+    soaRecord: null,
+    srvRecords: [],
     txtRecordCount: 3,
   },
   domainId: '00000000-0000-4000-8000-000000000001',
+  http: {
+    contentType: 'text/html',
+    finalUrl: 'https://example.com/',
+    httpStatus: 200,
+    hstsEnabled: true,
+    lastAttemptedAt: attemptedAt,
+    lastAttemptStatus: 'SUCCESS',
+    lastErrorCode: null,
+    pageTitle: 'Example',
+    provenance: 'HTTP_RETRIEVED',
+    reachable: true,
+    redirectChain: [],
+    responseTimeMs: 120,
+    retrievedAt: attemptedAt,
+    securityHeaders: {},
+    serverHeader: null,
+  },
+  infra: {
+    asn: null,
+    cdnProxy: null,
+    country: null,
+    ipAddresses: ['203.0.113.1'],
+    lastAttemptedAt: attemptedAt,
+    lastAttemptStatus: 'SUCCESS',
+    lastErrorCode: null,
+    network: null,
+    organization: null,
+    provenance: 'INFRA_RETRIEVED',
+    region: null,
+    retrievedAt: attemptedAt,
+    reverseDns: [],
+  },
   rdap: {
+    abuseEmails: [],
+    abusePhones: [],
     changedAt: attemptedAt,
+    events: [],
     expiresAt: '2031-01-02T03:04:05.000Z',
     lastAttemptedAt: attemptedAt,
     lastAttemptStatus: 'SUCCESS',
@@ -35,23 +75,29 @@ const metadata: DomainMetadataResponse = {
     registeredAt: '2020-01-02T03:04:05.000Z',
     registrarIanaId: '999',
     registrarName: 'Example Registrar',
+    registryDomainId: null,
     retrievedAt: attemptedAt,
     secureDnsDelegationSigned: true,
     sourceUrl: 'https://rdap.example/domain/example.com',
     statuses: ['active'],
   },
   tls: {
+    certificateStatus: 'VALID',
+    chain: [],
     fingerprint256: 'AA:BB:CC',
     issuerCommonName: 'Example CA',
     issuerOrganization: 'Example Trust',
+    keyAlgorithm: null,
     lastAttemptedAt: attemptedAt,
     lastAttemptStatus: 'SUCCESS',
     lastErrorCode: null,
     provenance: 'SSL_RETRIEVED',
     retrievedAt: attemptedAt,
     serialNumber: '01AB',
+    signatureAlgorithm: null,
     subjectAltNames: ['example.com', 'www.example.com'],
     subjectCommonName: 'example.com',
+    tlsVersion: 'TLSv1.3',
     validFrom: '2029-01-02T03:04:05.000Z',
     validTo: '2031-01-02T03:04:05.000Z',
   },
@@ -71,7 +117,7 @@ function render(input: Partial<React.ComponentProps<typeof DomainMetadataSection
 }
 
 describe('DomainMetadataSection', () => {
-  it('renders successful and partial RDAP, DNS, and TLS snapshots truthfully', () => {
+  it('renders successful and partial registration, DNS, TLS, website, and infrastructure snapshots truthfully', () => {
     const html = render();
     expect(html).toContain('Example Registrar');
     expect(html).toContain('Delegation signed');
@@ -80,14 +126,18 @@ describe('DomainMetadataSection', () => {
     expect(html).toContain('CNAME: Dns Resolver Error');
     expect(html).toContain('Example CA');
     expect(html).toContain('AA:BB:CC');
+    expect(html).toContain('TLSv1.3');
+    expect(html).toContain('https://example.com/');
+    expect(html).toContain('203.0.113.1');
+    expect(html).toContain('Domain intelligence');
     expect(html).not.toContain('DNSSEC validated');
     expect(html).not.toContain('Healthy');
     expect(html).not.toContain('Online');
   });
 
-  it('shows three never-checked cards without fake data and keeps members read-only', () => {
-    const html = render({ metadata: { canRefresh: false, dns: null, domainId: metadata.domainId, rdap: null, tls: null } });
-    expect(html.match(/Not checked yet/gu)).toHaveLength(3);
+  it('shows five never-checked cards without fake data and keeps members read-only', () => {
+    const html = render({ metadata: { canRefresh: false, dns: null, domainId: metadata.domainId, http: null, infra: null, rdap: null, tls: null } });
+    expect(html.match(/Not checked yet/gu)).toHaveLength(5);
     expect(html).toContain('Read-only access');
     expect(html).not.toContain('Refresh metadata');
     expect(html).not.toContain('Example Registrar');

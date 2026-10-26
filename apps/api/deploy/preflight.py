@@ -12,8 +12,8 @@ CONTAINER = 'domainexp_app_backend'
 POSTGRES = 'domainexp_app_postgres'
 VOLUME = 'domainexp_app_pgdata'
 CENTRAL = 'gymproplus-nginx-1'
-DOMAIN = 'app.domainexp.info'
-TARGET = '/etc/nginx/conf.d/app.domainexp.info.conf'
+DOMAIN = 'app.domainexprt.com'
+TARGET = '/etc/nginx/conf.d/app.domainexprt.com.conf'
 
 
 def run(*args):

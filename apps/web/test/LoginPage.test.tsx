@@ -33,6 +33,7 @@ describe('LoginPage', () => {
 
   beforeEach(() => {
     sessionStorage.clear();
+    localStorage.clear();
     apiRequest.mockReset();
     assignSpy = vi.fn();
     Object.defineProperty(window, 'location', {
@@ -89,5 +90,25 @@ describe('LoginPage', () => {
       body: { email: 'user@example.test', password: 'a-perfectly-fine-password' },
     })));
     expect(assignSpy).not.toHaveBeenCalled();
+  });
+
+  it('offers a landing link and stores a remembered login persistently', async () => {
+    apiRequest.mockResolvedValueOnce({
+      accessToken: 'access-token',
+      accessTokenExpiresAt: new Date().toISOString(),
+      refreshToken: 'refresh-token',
+      session: { expiresAt: new Date().toISOString(), id: 'session-1' },
+      user: { createdAt: '', displayName: 'Test User', email: 'user@example.test', id: 'user-1', updatedAt: '' },
+    });
+    renderLoginPage();
+
+    expect(screen.getByRole('link', { name: /back to website/iu })).toHaveAttribute('href', import.meta.env.VITE_LANDING_URL || '/');
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /remember me on this device/iu }));
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/iu }));
+
+    await waitFor(() => expect(localStorage.getItem('domainpulse.refresh-token')).toBe('refresh-token'));
+    expect(sessionStorage.getItem('domainpulse.refresh-token')).toBeNull();
   });
 });

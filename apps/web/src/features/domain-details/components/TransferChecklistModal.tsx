@@ -78,7 +78,7 @@ export const TransferChecklistModal: React.FC<TransferChecklistModalProps> = ({
                 Admin verification emails routed to <strong className="font-label-mono">{data.registrantEmail}</strong>.
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded bg-[#ecfdf5] text-[#065f46] font-label-md text-caption-xs font-semibold shrink-0">
+            <span className="px-2 py-0.5 rounded bg-healthy-bg text-healthy-text font-label-md text-caption-xs font-semibold shrink-0">
               Verified
             </span>
           </div>
@@ -93,7 +93,7 @@ export const TransferChecklistModal: React.FC<TransferChecklistModalProps> = ({
                 Registered on {data.registeredDateFormatted}. Eligible for transfer.
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded bg-[#ecfdf5] text-[#065f46] font-label-md text-caption-xs font-semibold shrink-0">
+            <span className="px-2 py-0.5 rounded bg-healthy-bg text-healthy-text font-label-md text-caption-xs font-semibold shrink-0">
               Eligible
             </span>
           </div>
