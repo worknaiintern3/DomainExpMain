@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import {
   fetchApplicationsList,
@@ -13,7 +14,12 @@ import {
 } from '@/services/portfolioService';
 
 export const WebsitesPage: React.FC = () => {
-  const [activeSegment, setActiveSegment] = useState<'apps' | 'websites'>('websites');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeSegment, setActiveSegment] = useState<'apps' | 'websites'>(
+    tabParam === 'websites' ? 'websites' : 'apps'
+  );
+
 
   // Apps state
   const [apps, setApps] = useState<ApplicationItem[]>([]);
@@ -64,10 +70,12 @@ export const WebsitesPage: React.FC = () => {
 
   const handleSyncConsole = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    const clean = inputDevName.trim();
+    if (!clean) return;
     setIsSyncingConsole(true);
     try {
-      const res = await syncGooglePlayDeveloper(inputDevName);
-      setConsoleDevName(inputDevName);
+      const res = await syncGooglePlayDeveloper(clean);
+      setConsoleDevName(res.developerName || clean);
       await loadData(true);
       setIsConsoleModalOpen(false);
       setFeedback(res.message);
@@ -77,6 +85,21 @@ export const WebsitesPage: React.FC = () => {
       setIsSyncingConsole(false);
     }
   };
+
+  const handleQuickSync = async () => {
+    setIsSyncingConsole(true);
+    try {
+      const res = await syncGooglePlayDeveloper(consoleDevName);
+      setConsoleDevName(res.developerName || consoleDevName);
+      await loadData(true);
+      setFeedback(res.message);
+    } catch {
+      setFeedback('Failed to synchronize developer apps.');
+    } finally {
+      setIsSyncingConsole(false);
+    }
+  };
+
 
   const handlePingApp = (appId: string) => {
     setPingStatusMap((prev) => ({ ...prev, [appId]: 'checking' }));
@@ -425,7 +448,14 @@ export const WebsitesPage: React.FC = () => {
         <div className="flex items-center gap-2 rounded-2xl border border-outline-variant/60 bg-surface-container-low p-1 shadow-sm">
           <button
             type="button"
-            onClick={() => setActiveSegment('apps')}
+            onClick={() => {
+              setActiveSegment('apps');
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.set('tab', 'apps');
+                return next;
+              }, { replace: true });
+            }}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
               activeSegment === 'apps'
                 ? 'bg-primary text-on-primary shadow-sm'
@@ -437,7 +467,14 @@ export const WebsitesPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveSegment('websites')}
+            onClick={() => {
+              setActiveSegment('websites');
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.set('tab', 'websites');
+                return next;
+              }, { replace: true });
+            }}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
               activeSegment === 'websites'
                 ? 'bg-primary text-on-primary shadow-sm'
@@ -475,23 +512,22 @@ export const WebsitesPage: React.FC = () => {
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => {
-                  setInputDevName(consoleDevName);
-                  setIsConsoleModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant/60 bg-surface-container-high px-3.5 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors shadow-sm"
+                disabled={isSyncingConsole}
+                onClick={handleQuickSync}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant/60 bg-surface-container-high px-3.5 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors shadow-sm disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[16px]">sync</span>
-                <span>Sync Play Store</span>
+                <span className={`material-symbols-outlined text-[16px] ${isSyncingConsole ? 'animate-spin' : ''}`}>sync</span>
+                <span>{isSyncingConsole ? 'Syncing Play Store…' : 'Sync Play Store'}</span>
               </button>
 
               <button
                 type="button"
+                disabled={isSyncingConsole}
                 onClick={() => {
                   setInputDevName('');
                   setIsConsoleModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-on-primary shadow-sm hover:bg-primary/90"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-on-primary shadow-sm hover:bg-primary/90 disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">add_link</span>
                 <span>Change Developer</span>
@@ -545,6 +581,28 @@ export const WebsitesPage: React.FC = () => {
                 progress_activity
               </span>
               <p className="text-body-sm font-medium text-secondary">Loading Google Play apps and web services…</p>
+            </div>
+          ) : filteredApps.length === 0 ? (
+            <div className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-12 text-center shadow-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-container-high text-secondary mb-3 border border-outline-variant/40">
+                <span className="material-symbols-outlined text-[28px]">smartphone</span>
+              </div>
+              <h3 className="text-title-sm font-bold text-on-surface">No Mobile Applications Found</h3>
+              <p className="mt-1 text-body-xs text-secondary max-w-sm mx-auto">
+                No published apps were found for &ldquo;{consoleDevName}&rdquo;. You can connect another Google Play Developer account to load its apps.
+              </p>
+              <button
+                type="button"
+                disabled={isSyncingConsole}
+                onClick={() => {
+                  setInputDevName('');
+                  setIsConsoleModalOpen(true);
+                }}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-on-primary hover:bg-primary/90 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[16px]">add_link</span>
+                <span>Connect Developer Account</span>
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

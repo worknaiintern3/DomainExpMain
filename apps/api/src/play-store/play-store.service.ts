@@ -238,11 +238,6 @@ const KNOWN_ENTERPRISE_APPS: Record<string, EnterpriseAppCatalogItem[]> = {
   ],
 };
 
-const DEV_STOP_WORDS = new Set([
-  'technologies', 'technology', 'india', 'pvt', 'ltd', 'limited',
-  'inc', 'corp', 'corporation', 'llc', 'co', 'the', 'app', 'apps',
-  'services', 'solutions', 'software', 'international', 'global'
-]);
 
 function cleanDevKey(str?: string | null): string {
   return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -250,16 +245,24 @@ function cleanDevKey(str?: string | null): string {
 
 function matchesDeveloper(appDev?: string | null, targetDev?: string | null): boolean {
   if (!appDev || !targetDev) return false;
-  const a = cleanDevKey(appDev);
-  const b = cleanDevKey(targetDev);
+  const a = (appDev || '').trim().toLowerCase();
+  const b = (targetDev || '').trim().toLowerCase();
   if (!a || !b) return false;
   if (a === b) return true;
-  if (a.includes(b) || b.includes(a)) return true;
 
-  const wordsA = (appDev || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !DEV_STOP_WORDS.has(w));
-  const wordsB = (targetDev || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !DEV_STOP_WORDS.has(w));
-  if (wordsA.length === 0 || wordsB.length === 0) return false;
-  return wordsA.some((w) => wordsB.includes(w));
+  const keyA = cleanDevKey(appDev);
+  const keyB = cleanDevKey(targetDev);
+  if (!keyA || !keyB) return false;
+  if (keyA === keyB) return true;
+
+  // Exact developer entity match accounting for standard corporate suffixes (e.g. LLC / Ltd / Inc / Pvt Ltd)
+  const stripSuffix = (s: string) =>
+    s.replace(/(technologiesindiapvtltd|technologiesindia|technologies|technology|indiapvtltd|pvtltd|limited|ltd|corp|corporation|inc|llc|co)$/g, '');
+  const baseA = stripSuffix(keyA);
+  const baseB = stripSuffix(keyB);
+  if (baseA && baseB && baseA === baseB) return true;
+
+  return false;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -448,10 +451,10 @@ export class PlayStoreService {
     const discoveredMap = new Map<string, any>();
     let detectedDevName = devId;
 
-    // 1. Check known enterprise package catalogs first (immediate, 0ms, complete official icons)
+    // 1. Check known enterprise package catalogs first (only if exact match for that organization)
     const cleanQuery = cleanDevKey(devId);
     for (const [key, knownApps] of Object.entries(KNOWN_ENTERPRISE_APPS)) {
-      if (cleanQuery.includes(key) || key.includes(cleanQuery)) {
+      if (cleanQuery === key || matchesDeveloper(devId, 'WorknAi Technologies India Pvt Ltd')) {
         for (const app of knownApps) {
           discoveredMap.set(app.appId, {
             ...app,
@@ -514,8 +517,10 @@ export class PlayStoreService {
                 for (const item of directApps) {
                   const pkg = item.appId || item.id;
                   if (pkg && !discoveredMap.has(pkg)) {
-                    discoveredMap.set(pkg, item);
-                    if (item.developer) detectedDevName = item.developer;
+                    if (matchesDeveloper(item.developer, devId) || matchesDeveloper(item.developer, canonicalDevName) || !item.developer) {
+                      discoveredMap.set(pkg, item);
+                      if (item.developer) detectedDevName = item.developer;
+                    }
                   }
                 }
               }
@@ -557,40 +562,7 @@ export class PlayStoreService {
       )
     );
 
-    // 5. Primary keyword search across regions if different from full string
-    const words = devId.split(/\s+/).filter((w) => w.length > 2);
-    const primaryKeyword = words[0];
-    const keywordPromises =
-      primaryKeyword && primaryKeyword.toLowerCase() !== devId.toLowerCase()
-        ? probeCountries.map((country) =>
-            withTimeout(
-              (async () => {
-                try {
-                  const kwResults = await gplay.search({ term: primaryKeyword, country, num: 60 });
-                  if (Array.isArray(kwResults)) {
-                    for (const item of kwResults) {
-                      if (
-                        matchesDeveloper(item.developer, devId) ||
-                        matchesDeveloper(item.developer, canonicalDevName) ||
-                        matchesDeveloper(item.developer, primaryKeyword)
-                      ) {
-                        const pkg = item.appId || item.id;
-                        if (pkg && !discoveredMap.has(pkg)) {
-                          discoveredMap.set(pkg, item);
-                          if (item.developer) detectedDevName = item.developer;
-                        }
-                      }
-                    }
-                  }
-                } catch {}
-              })(),
-              3000,
-              undefined
-            )
-          )
-        : [];
-
-    await Promise.allSettled([...directPromises, ...searchPromises, ...keywordPromises]);
+    await Promise.allSettled([...directPromises, ...searchPromises]);
 
     // 5. Ensure complete high-resolution details for discovered applications (max 6 items, with timeout)
     const itemsToEnrich = Array.from(discoveredMap.entries())
@@ -613,7 +585,7 @@ export class PlayStoreService {
       );
     }
 
-    const apps: PlayStoreAppItem[] = Array.from(discoveredMap.values()).map((a: any) => {
+    const rawApps: PlayStoreAppItem[] = Array.from(discoveredMap.values()).map((a: any) => {
       const packageId = a.appId || a.id || '';
       return {
         id: `play-${packageId.replace(/[^a-zA-Z0-9]/g, '-')}`,
@@ -631,6 +603,13 @@ export class PlayStoreService {
         currency: a.currency || 'USD',
       };
     });
+
+    // Strictly keep ONLY apps that belong to this particular developer name (no loosely related apps)
+    const apps = rawApps.filter((a) =>
+      matchesDeveloper(a.developerName, devId) ||
+      matchesDeveloper(a.developerName, detectedDevName) ||
+      matchesDeveloper(a.developerName, canonicalDevName)
+    );
 
     const result: DeveloperAppsResponse = {
       developerId: devId,

@@ -60,12 +60,33 @@ export class MongoInventoryRepository implements InventoryStore {
     };
 
     if (command.resource === 'domain') {
-      record.punycode = (
+      const punycode = (
         (command.values as any).punycode ||
         (command.values as any).normalizedDomainName ||
         (command.values as any).domainName ||
         ''
       ).toLowerCase();
+      record.punycode = punycode;
+      record.normalizedDomainName = punycode;
+
+      const existing = await (collection as any).findOne({ workspaceId, punycode });
+      if (existing) {
+        const updated = await (collection as any).findOneAndUpdate(
+          { _id: existing._id },
+          {
+            $set: {
+              ...command.values,
+              inventoryState: 'TRACKED',
+              updatedAt: now,
+            },
+          },
+          { returnDocument: 'after' },
+        );
+        return {
+          resource: command.resource,
+          record: updated || existing,
+        } as InventoryRecordEnvelope;
+      }
     }
 
     try {

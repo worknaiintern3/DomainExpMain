@@ -11,6 +11,7 @@ import {
   type DomainItem,
   PROVIDER_LOGOS,
 } from '@/services/portfolioService';
+import { updateInventory } from '@/api/inventory';
 import { lookupWhois } from '@/api/whois';
 import type { NormalizedWhoisData } from '@/api/whois.types';
 import { WhoisDetailsModal } from '@/components/whois/WhoisDetailsModal';
@@ -24,9 +25,10 @@ export const DomainsPage: React.FC = () => {
   // Add Domain Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newDomainName, setNewDomainName] = useState('');
-  const [newRegistrar, setNewRegistrar] = useState('Hostinger (HOSTINGER)');
+  const [newRegistrar, setNewRegistrar] = useState('Cloudflare');
   const [newAutoRenew, setNewAutoRenew] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
@@ -101,28 +103,41 @@ export const DomainsPage: React.FC = () => {
 
   const handleAddDomain = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDomainName.trim()) return;
+    setAddError(null);
+    const domainInput = newDomainName.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!domainInput || !domainInput.includes('.')) {
+      setAddError('Please enter a valid domain name with extension (e.g. yourcompany.com)');
+      return;
+    }
     setIsSubmitting(true);
-    const domainInput = newDomainName.trim();
     try {
       const created = await createDomain({
         name: domainInput,
         registrar: newRegistrar,
         autoRenew: newAutoRenew,
       });
-      setDomains((prev) => [created, ...prev.filter((d) => d.id !== created.id)]);
+      setDomains((prev) => [created, ...prev.filter((d) => d.id !== created.id && d.name.toLowerCase() !== domainInput)]);
       setIsAddModalOpen(false);
       setNewDomainName('');
 
       // Auto-query live WHOIS in background to populate real registry dates & registrar
-      void lookupWhois(domainInput).then((live) => {
+      void lookupWhois(domainInput).then(async (live) => {
         if (live && live.isRegistered) {
           const synced = updateDomainWithWhois(domainInput, live);
           if (synced) {
-            setDomains((prev) => prev.map((d) => (d.name.toLowerCase() === domainInput.toLowerCase() ? synced : d)));
+            setDomains((prev) => prev.map((d) => (d.name.toLowerCase() === domainInput ? synced : d)));
           }
+          try {
+            await updateInventory('domains', created.id, {
+              registeredAt: live.registeredAt || undefined,
+              expiresAt: live.expiresAt || undefined,
+              notes: `Registrar: ${live.registrar?.name || newRegistrar} | Nameservers: ${(live.nameservers || []).join(', ')}`,
+            });
+          } catch {}
         }
       }).catch(() => {});
+    } catch (err: any) {
+      setAddError(err?.message || 'Failed to add domain to portfolio');
     } finally {
       setIsSubmitting(false);
     }
@@ -206,6 +221,13 @@ export const DomainsPage: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleAddDomain} className="mt-4 flex flex-col gap-4">
+              {addError && (
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-caption-xs text-rose-500 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">error</span>
+                  <span>{addError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
                   Domain Name
@@ -214,7 +236,10 @@ export const DomainsPage: React.FC = () => {
                   type="text"
                   placeholder="e.g. yourcompany.com"
                   value={newDomainName}
-                  onChange={(e) => setNewDomainName(e.target.value)}
+                  onChange={(e) => {
+                    setNewDomainName(e.target.value);
+                    if (addError) setAddError(null);
+                  }}
                   className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
                   required
                 />
@@ -229,12 +254,15 @@ export const DomainsPage: React.FC = () => {
                   onChange={(e) => setNewRegistrar(e.target.value)}
                   className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
                 >
-                  <option value="Hostinger (HOSTINGER)">Hostinger</option>
-                  <option value="Cloudflare (CLOUDFLARE)">Cloudflare</option>
-                  <option value="GoDaddy (GODADDY)">GoDaddy</option>
-                  <option value="Namecheap (NAMECHEAP)">Namecheap</option>
-                  <option value="AWS Route 53 (AWS)">AWS Route 53</option>
-                  <option value="Hetzner (HETZNER)">Hetzner</option>
+                  <option value="Cloudflare">Cloudflare</option>
+                  <option value="Hostinger">Hostinger</option>
+                  <option value="GoDaddy">GoDaddy</option>
+                  <option value="Namecheap">Namecheap</option>
+                  <option value="AWS Route 53">AWS Route 53</option>
+                  <option value="Hetzner">Hetzner</option>
+                  <option value="Porkbun">Porkbun</option>
+                  <option value="Google Domains">Google Domains</option>
+                  <option value="Other">Other / Custom Registrar</option>
                 </select>
               </div>
 
@@ -254,7 +282,10 @@ export const DomainsPage: React.FC = () => {
               <div className="mt-4 flex justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setAddError(null);
+                  }}
                   className="rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-secondary hover:bg-surface-container"
                 >
                   Cancel

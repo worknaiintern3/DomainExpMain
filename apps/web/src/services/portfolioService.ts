@@ -1,6 +1,11 @@
 import { listInventory, createInventory, updateInventory, archiveInventory } from '../api/inventory';
+import {
+  syncPlayStoreDeveloper,
+  getPlayStoreDeveloperApps,
+} from '../api/play-store';
 import { listAlerts } from '../api/monitoring';
 import type { NormalizedWhoisData } from '../api/whois.types';
+
 
 export interface DomainItem {
   id: string;
@@ -970,6 +975,26 @@ export function setConsoleDeveloperName(name: string): void {
   } catch {}
 }
 
+export function isMatchingConsoleDeveloper(appDev?: string | null, activeDev?: string | null): boolean {
+  if (!appDev || !activeDev) return false;
+  const a = appDev.trim().toLowerCase();
+  const b = activeDev.trim().toLowerCase();
+  if (!a || !b) return false;
+  if (a === b) return true;
+
+  const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const keyA = clean(a);
+  const keyB = clean(b);
+  if (!keyA || !keyB) return false;
+  if (keyA === keyB) return true;
+
+  const stripSuffix = (s: string) =>
+    s.replace(/(technologiesindiapvtltd|technologiesindia|technologies|technology|indiapvtltd|pvtltd|limited|ltd|corp|corporation|inc|llc|co)$/g, '');
+  const baseA = stripSuffix(keyA);
+  const baseB = stripSuffix(keyB);
+  return Boolean(baseA && baseB && baseA === baseB);
+}
+
 export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Promise<DomainItem[]> {
   const cacheKey = 'domains_list';
   if (!options?.forceRefresh) {
@@ -999,21 +1024,36 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
           const status: 'critical' | 'warning' | 'safe' =
             daysRemaining <= 14 ? 'critical' : daysRemaining <= 30 ? 'warning' : 'safe';
 
-          const extractedRegistrar = b.notes?.startsWith('Registrar: ')
-            ? b.notes.replace(/^Registrar:\s*/, '').split('|')[0].trim()
-            : (b.notes?.includes('Hostinger') ? 'Hostinger' : null);
+          let extractedRegistrar = 'Hostinger';
+          if (b.notes?.startsWith('Registrar: ')) {
+            extractedRegistrar = b.notes.replace(/^Registrar:\s*/, '').split('|')[0].trim();
+          } else if (b.notes?.toLowerCase().includes('cloudflare')) {
+            extractedRegistrar = 'Cloudflare';
+          } else if (b.notes?.toLowerCase().includes('godaddy')) {
+            extractedRegistrar = 'GoDaddy';
+          } else if (b.notes?.toLowerCase().includes('namecheap')) {
+            extractedRegistrar = 'Namecheap';
+          } else if (b.notes?.toLowerCase().includes('aws')) {
+            extractedRegistrar = 'AWS';
+          } else if (b.notes?.toLowerCase().includes('hostinger')) {
+            extractedRegistrar = 'Hostinger';
+          }
 
-          let nameservers = ['ns1.dns-parking.com', 'ns2.dns-parking.com'];
+          let nameservers = extractedRegistrar.toLowerCase().includes('cloudflare')
+            ? ['ns1.cloudflare.com', 'ns2.cloudflare.com']
+            : ['ns1.dns-parking.com', 'ns2.dns-parking.com'];
           if (b.notes?.includes('Nameservers: ')) {
             const nsPart = b.notes.split('Nameservers: ')[1];
             if (nsPart) nameservers = nsPart.split(',').map((s) => s.trim()).filter(Boolean);
           }
 
+          const isHostingerVps = Boolean(b.notes?.includes('srv') || (extractedRegistrar === 'Hostinger' && !b.notes?.includes('Registered via DomainPulse web')));
+
           map.set(cleanName, {
             id: b.id,
             name: cleanName,
             tld: ext,
-            registrar: extractedRegistrar || 'Hostinger',
+            registrar: extractedRegistrar,
             autoRenew: b.autoRenew !== null ? Boolean(b.autoRenew) : true,
             registrationDate: b.registeredAt ? b.registeredAt.split('T')[0] : '2026-01-21',
             expiresAt: expDate,
@@ -1021,18 +1061,20 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
             renewalPrice: ext === '.in' ? 499 : ext === '.online' ? 299 : 899,
             currency: '₹',
             status,
-            dnsProvider: b.dnsProviderAccountId ? `DNS (${b.dnsProviderAccountId})` : (nameservers[0]?.includes('linode') ? 'Linode DNS' : 'Hostinger DNS'),
+            dnsProvider: b.dnsProviderAccountId ? `DNS (${b.dnsProviderAccountId})` : (nameservers[0]?.includes('cloudflare') ? 'Cloudflare DNS' : `${extractedRegistrar} DNS`),
             sslStatus: 'active',
             httpStatus: '200 OK',
             rdapStatus: 'Synchronized',
             nameservers,
-            tags: ['Live', 'Hostinger Portfolio', 'Production'],
+            tags: ['Live', `${extractedRegistrar} Portfolio`],
             notes: b.notes || undefined,
             logoUrl: `https://www.google.com/s2/favicons?domain=${cleanName}&sz=128`,
-            providerLabel: 'Hostinger',
-            serverName: 'srv1357339.hstgr.cloud',
-            serverIp: '76.13.185.120',
-            serverProvider: 'Hostinger',
+            providerLabel: extractedRegistrar,
+            ...(isHostingerVps ? {
+              serverName: 'srv1357339.hstgr.cloud',
+              serverIp: '76.13.185.120',
+              serverProvider: 'Hostinger',
+            } : {}),
           });
         }
         const merged = Array.from(map.values());
@@ -1209,16 +1251,33 @@ export async function fetchApplicationsList(options?: { forceRefresh?: boolean }
   }
 
   const promise = (async () => {
+    const activeDev = getConsoleDeveloperName();
     const local = getLocal<ApplicationItem[]>(STORAGE_KEYS.APPLICATIONS, []);
-    const cleanLocal = local.filter((a) => a?.id && !a.id.startsWith('play-worknai') && !a.id.startsWith('play-chess') && !a.id.startsWith('play-onlinego') && !a.id.startsWith('play-logistics') && !a.id.startsWith('play-pginfo') && !a.id.startsWith('play-hrms'));
+    const cleanLocal = local.filter((a) => {
+      if (!a?.id) return false;
+      const dev = a.developerName || activeDev;
+      return isMatchingConsoleDeveloper(dev, activeDev);
+    });
 
     try {
       const response = await listInventory('applications', { limit: 100 });
       if (response?.items && Array.isArray(response.items)) {
+        // Filter out items that are pure websites
+        const mobileApps = response.items.filter((b: any) => b.kind !== 'WEBSITE');
         const map = new Map<string, ApplicationItem>();
-        for (const b of response.items) {
+        for (const b of mobileApps) {
           const pkg = (b.notes || '').trim();
           const k = (pkg || b.name).toLowerCase().trim();
+          const devName = (b as any).developerName;
+
+          // STRICT CHECK: Only include mobile apps belonging to the active developer account!
+          if (devName && !isMatchingConsoleDeveloper(devName, activeDev)) {
+            continue;
+          }
+          if (!devName && !isMatchingConsoleDeveloper('WorknAi Technologies India Pvt Ltd', activeDev)) {
+            continue;
+          }
+
           map.set(k, {
             id: b.id,
             name: b.name,
@@ -1226,20 +1285,28 @@ export async function fetchApplicationsList(options?: { forceRefresh?: boolean }
             environment: 'Production',
             status: 'healthy',
             version: 'v1.0.0',
-            serverName: 'srv1357339.hstgr.cloud',
-            developerName: getConsoleDeveloperName(),
+            serverName: 'Google Play Console',
+            developerName: devName || activeDev,
             releaseTrack: 'Production',
             playStoreUrl: b.primaryUrl || (pkg ? `https://play.google.com/store/apps/details?id=${pkg}` : undefined),
             url: b.primaryUrl || undefined,
+            iconUrl: (b as any).iconUrl,
             updatedAt: b.updatedAt,
           });
         }
-        const merged = Array.from(map.values());
+
+        // If backend inventory has apps for activeDev, use them, otherwise use cleanLocal
+        let merged = Array.from(map.values());
+        if (merged.length === 0 && cleanLocal.length > 0) {
+          merged = cleanLocal;
+        }
+
         setLocal(STORAGE_KEYS.APPLICATIONS, merged);
         setMemoryCache(cacheKey, merged);
         return merged;
       }
     } catch {}
+
     setMemoryCache(cacheKey, cleanLocal);
     return cleanLocal;
   })().finally(() => {
@@ -1275,6 +1342,7 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
 
       if (appRes?.items && Array.isArray(appRes.items)) {
         for (const app of appRes.items) {
+          if ((app as any).kind === 'MOBILE_APPLICATION' || (app as any).provenance === 'PLAY_STORE_SYNC') continue;
           const dom = ((app as any).domainId || app.name || '').toLowerCase().trim();
           if (!dom) continue;
           map.set(dom, {
@@ -1501,18 +1569,81 @@ export async function syncSingleProvider(accountId: string): Promise<{
 
 export async function syncGooglePlayDeveloper(developerName: string): Promise<{
   totalApps: number;
+  developerName?: string;
   message: string;
 }> {
-  const cleanDev = developerName.trim() || 'WorknAi Technologies India Pvt Ltd';
-  setConsoleDeveloperName(cleanDev);
-  const currentApps = await fetchApplicationsList({ forceRefresh: true });
+  const cleanDev = (developerName || '').trim();
+  if (!cleanDev) {
+    throw new Error('Please enter a valid Google Play developer account name');
+  }
+
+  // 1. Fetch live applications from Google Play Console using the exact same public API as mobile:
+  // GET /api/v1/play-store/developers/:developerId/apps?limit=100
+  const publicRes = await getPlayStoreDeveloperApps(cleanDev, 100);
+  const finalDev = publicRes.developerName || cleanDev;
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.CONSOLE_DEV, finalDev);
+  } catch {}
+
+  // 2. Strict developer matching: ONLY keep apps belonging to this particular developer name
+  const rawApps = publicRes.apps || [];
+  const matchingPlayApps = rawApps.filter(
+    (app) =>
+      isMatchingConsoleDeveloper(app.developerName, finalDev) ||
+      isMatchingConsoleDeveloper(app.developerName, cleanDev)
+  );
+
+  const newApps: ApplicationItem[] = matchingPlayApps.map((app) => ({
+    id: app.id || `play-${app.packageId.replace(/[^a-zA-Z0-9]/g, '-')}`,
+    name: app.name,
+    packageId: app.packageId,
+    environment: 'Production',
+    status: 'healthy',
+    version: 'v1.0.0',
+    serverName: 'Google Play Console',
+    developerName: finalDev,
+    releaseTrack: 'Production',
+    playStoreUrl: app.playStoreUrl,
+    url: app.playStoreUrl,
+    iconUrl: app.iconUrl,
+    updatedAt: new Date().toISOString(),
+  }));
+
+  // 3. Vanish previous apps: completely replace local cache so previous apps disappear immediately
+  setLocal(STORAGE_KEYS.APPLICATIONS, newApps);
+  setMemoryCache('applications_list', newApps);
+
+  // 4. Archive previous mobile applications from backend inventory (mirroring mobile app providerSync)
+  try {
+    const existingBackend = await listInventory('applications', { limit: 100 });
+    if (existingBackend?.items && Array.isArray(existingBackend.items)) {
+      const newPkgSet = new Set(newApps.map((a) => (a.packageId || '').toLowerCase()));
+      const toDelete = existingBackend.items.filter((b: any) => {
+        const isMobile =
+          b.kind === 'MOBILE_APPLICATION' ||
+          (b.primaryUrl && b.primaryUrl.includes('play.google.com')) ||
+          (b.notes && b.notes.includes('.'));
+        return isMobile && !newPkgSet.has((b.notes || '').toLowerCase());
+      });
+      await Promise.allSettled(toDelete.map((b: any) => archiveInventory('applications', b.id).catch(() => {})));
+    }
+  } catch {}
+
+  // 5. In background, inform backend play-store sync endpoint
+  try {
+    await syncPlayStoreDeveloper(finalDev).catch(() => {});
+  } catch {}
+
   notifyPortfolioUpdated();
 
   return {
-    totalApps: currentApps.length,
-    message: `Successfully synchronized Google Play Console for "${cleanDev}"! Portfolio now has ${currentApps.length} applications.`,
+    totalApps: newApps.length,
+    developerName: finalDev,
+    message: `Successfully synchronized ${newApps.length} applications for "${finalDev}". Previous apps replaced.`,
   };
 }
+
 
 export async function createDomain(data: {
   name: string;
@@ -1521,36 +1652,55 @@ export async function createDomain(data: {
 }): Promise<DomainItem> {
   const cleanName = data.name.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
   const ext = cleanName.includes('.') ? `.${cleanName.split('.').pop()}` : '.com';
+  const selectedRegistrar = data.registrar?.split(' ')[0] || data.registrar || 'Cloudflare';
   let backendId = `dom-${Date.now()}`;
 
   try {
     const res = await createInventory('domains', {
       domainName: cleanName,
       autoRenew: data.autoRenew ?? true,
-      notes: `Registered via DomainPulse web`,
+      notes: `Registrar: ${selectedRegistrar}`,
     });
     if (res?.id) backendId = res.id;
-  } catch {}
+  } catch (err) {
+    console.warn('Backend createInventory failed, falling back to local item:', err);
+  }
+
+  const renewalPrice =
+    ext === '.com' ? 899 :
+    ext === '.in' ? 499 :
+    ext === '.online' ? 299 :
+    ext === '.net' ? 1199 :
+    ext === '.org' ? 1099 :
+    ext === '.io' ? 3200 :
+    ext === '.ai' ? 5800 :
+    ext === '.tech' ? 399 :
+    ext === '.co' ? 2199 : 899;
+
+  const nameservers = selectedRegistrar.toLowerCase().includes('cloudflare')
+    ? ['ns1.cloudflare.com', 'ns2.cloudflare.com']
+    : ['ns1.dns-parking.com', 'ns2.dns-parking.com'];
 
   const newDomain: DomainItem = {
     id: backendId,
     name: cleanName,
     tld: ext,
-    registrar: data.registrar || 'Hostinger (HOSTINGER)',
+    registrar: selectedRegistrar,
     autoRenew: data.autoRenew ?? true,
     registrationDate: new Date().toISOString().split('T')[0],
     expiresAt: new Date(Date.now() + 365 * 86400000).toISOString(),
     daysRemaining: 365,
-    renewalPrice: ext === '.ai' ? 5800 : ext === '.io' ? 3200 : ext === '.in' ? 499 : 899,
+    renewalPrice,
     currency: '₹',
     status: 'safe',
-    dnsProvider: `${data.registrar || 'Hostinger'} DNS`,
+    dnsProvider: `${selectedRegistrar} DNS`,
     sslStatus: 'active',
     httpStatus: '200 OK',
     rdapStatus: 'Synchronized',
-    nameservers: ['ns1.cloudflare.com', 'ns2.cloudflare.com'],
-    tags: ['Live', 'Manual Add'],
+    nameservers,
+    tags: ['Live', `${selectedRegistrar} Portfolio`],
     logoUrl: `https://www.google.com/s2/favicons?domain=${cleanName}&sz=128`,
+    providerLabel: selectedRegistrar,
   };
 
   const list = await fetchDomainsList();

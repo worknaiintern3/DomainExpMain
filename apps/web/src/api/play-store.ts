@@ -88,3 +88,33 @@ export function getPlayStoreDeveloperAppsByQuery(
     authenticated: false,
   });
 }
+
+export interface PlayStoreSyncResponse {
+  success: boolean;
+  developerName: string;
+  total: number;
+  apps: PlayStoreAppItem[];
+  message: string;
+}
+
+export function syncPlayStoreDeveloper(
+  developerName: string,
+  signal?: AbortSignal,
+): Promise<PlayStoreSyncResponse> {
+  return apiRequest<PlayStoreSyncResponse>('/play-store/sync', {
+    method: 'POST',
+    body: { developerName },
+    signal,
+    authenticated: true,
+  });
+}
+
+export function getConnectedPlayStoreAccount(
+  signal?: AbortSignal,
+): Promise<{ developerName: string | null }> {
+  return apiRequest<{ developerName: string | null }>('/play-store/connected-account', {
+    signal,
+    authenticated: true,
+  });
+}
+
