@@ -99,16 +99,61 @@ export class WhoisService {
       return this.lookupFromRdapAndDns(domainName, workspaceId, domainId);
     }
 
+    const regData = ((responseJson as any).registry_data as any) || {};
+    const effectiveRegistrar = responseJson.domain_registrar || regData.domain_registrar;
+
+    let registrarName = effectiveRegistrar?.registrar_name || null;
+    if (!registrarName) {
+      const rawText = responseJson.whois_raw_domain || regData.whois_raw_registery || '';
+      const match = rawText.match(/Registrar:\s*([^\r\n]+)/i);
+      if (match && match[1]) {
+        registrarName = match[1].trim();
+      }
+    }
+
+    if (!registrarName && (domainName.endsWith('.com') || domainName.endsWith('.net'))) {
+      try {
+        const vRes = await fetch(`https://rdap.verisign.com/com/v1/domain/${encodeURIComponent(domainName)}`, {
+          headers: { Accept: 'application/rdap+json, application/json' },
+          signal: AbortSignal.timeout(2500),
+        });
+        if (vRes.ok) {
+          const vData = (await vRes.json()) as any;
+          const regEnt = vData.entities?.find((e: any) => Array.isArray(e.roles) && e.roles.includes('registrar'));
+          if (regEnt?.vcardArray?.[1]) {
+            const fn = regEnt.vcardArray[1].find((x: any) => x && x[0] === 'fn');
+            if (fn && fn[3]) {
+              registrarName = String(fn[3]).trim();
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const registrarIanaId = effectiveRegistrar?.iana_id || null;
+    const registrarWebsite = effectiveRegistrar?.website_url || null;
+    const registrarEmail = effectiveRegistrar?.email_address || null;
+    const registrarPhone = effectiveRegistrar?.phone_number || null;
+
+    const rawCreate = responseJson.create_date || regData.create_date;
+    const rawExpiry = responseJson.expiry_date || regData.expiry_date;
+    const rawUpdate = responseJson.update_date || regData.update_date;
+
     const isRegistered =
       responseJson.status === true &&
       (responseJson.domain_registered === 'yes' ||
         responseJson.domain_registered === 'true' ||
-        Boolean(responseJson.expiry_date));
+        regData.domain_registered === 'yes' ||
+        Boolean(rawExpiry));
 
-    const regDate = this.parseDate(responseJson.create_date);
-    const expDate = this.parseDate(responseJson.expiry_date);
-    const updDate = this.parseDate(responseJson.update_date);
-    const daysRemaining = this.calculateDaysRemaining(responseJson.expiry_date);
+    const regDate = this.parseDate(rawCreate);
+    const expDate = this.parseDate(rawExpiry);
+    const updDate = this.parseDate(rawUpdate);
+    const daysRemaining = this.calculateDaysRemaining(rawExpiry);
+
+    const nameservers: string[] = (responseJson.name_servers && responseJson.name_servers.length > 0)
+      ? responseJson.name_servers
+      : (regData.name_servers || []);
 
     let recordId: string | null = null;
     let savedToDatabase = false;
@@ -125,28 +170,29 @@ export class WhoisService {
           domainName,
           normalizedDomainName: domainName,
           isRegistered,
-          queryTime: responseJson.query_time || new Date().toISOString(),
+          queryTime: responseJson.query_time || regData.query_time || new Date().toISOString(),
           registeredAt: regDate,
           expiresAt: expDate,
           updatedDate: updDate,
-          registrarName: responseJson.domain_registrar?.registrar_name || null,
-          registrarIanaId: responseJson.domain_registrar?.iana_id || null,
-          registrarWebsite: responseJson.domain_registrar?.website_url || null,
-          registrarEmail: responseJson.domain_registrar?.email_address || null,
-          registrarPhone: responseJson.domain_registrar?.phone_number || null,
-          registrantContact: responseJson.registrant_contact || null,
-          technicalContact: responseJson.technical_contact || null,
-          administrativeContact: responseJson.administrative_contact || null,
-          nameservers: responseJson.name_servers || [],
-          statuses: responseJson.domain_status || [],
-          rawWhois: responseJson.whois_raw_domain || null,
+          registrarName,
+          registrarIanaId,
+          registrarWebsite,
+          registrarEmail,
+          registrarPhone,
+          registrantContact: responseJson.registrant_contact || regData.registrant_contact || null,
+          technicalContact: responseJson.technical_contact || regData.technical_contact || null,
+          administrativeContact: responseJson.administrative_contact || regData.administrative_contact || null,
+          nameservers,
+          statuses: (responseJson.domain_status && responseJson.domain_status.length > 0)
+            ? responseJson.domain_status
+            : (regData.domain_status || []),
+          rawWhois: responseJson.whois_raw_domain || regData.whois_raw_registery || null,
           rawResponse: responseJson,
           retrievedAt: new Date(),
         });
         recordId = newId;
         savedToDatabase = true;
 
-        const registrarName = responseJson.domain_registrar?.registrar_name || null;
         const domainFilter: any = {
           $or: [
             ...(domainId ? [{ id: domainId }] : []),
@@ -156,13 +202,17 @@ export class WhoisService {
         };
         if (workspaceId) domainFilter.workspaceId = workspaceId;
 
+        const notesStr = registrarName
+          ? `Registrar: ${registrarName}${nameservers.length ? ` | Nameservers: ${nameservers.join(', ')}` : ''}`
+          : undefined;
+
         await (cols.domains as any).updateMany(
           domainFilter,
           {
             $set: {
               ...(regDate ? { registeredAt: regDate } : {}),
               ...(expDate ? { expiresAt: expDate } : {}),
-              ...(registrarName ? { notes: `Registrar: ${registrarName}` } : {}),
+              ...(notesStr ? { notes: notesStr } : {}),
               updatedAt: new Date(),
             },
           },
@@ -176,24 +226,26 @@ export class WhoisService {
       id: recordId,
       domainName,
       isRegistered,
-      queryTime: responseJson.query_time || new Date().toISOString(),
-      registeredAt: responseJson.create_date || null,
-      expiresAt: responseJson.expiry_date || null,
-      updatedDate: responseJson.update_date || null,
+      queryTime: responseJson.query_time || regData.query_time || new Date().toISOString(),
+      registeredAt: rawCreate || null,
+      expiresAt: rawExpiry || null,
+      updatedDate: rawUpdate || null,
       daysRemaining,
       registrar: {
-        name: responseJson.domain_registrar?.registrar_name || null,
-        ianaId: responseJson.domain_registrar?.iana_id || null,
-        websiteUrl: responseJson.domain_registrar?.website_url || null,
-        email: responseJson.domain_registrar?.email_address || null,
-        phone: responseJson.domain_registrar?.phone_number || null,
+        name: registrarName,
+        ianaId: registrarIanaId,
+        websiteUrl: registrarWebsite,
+        email: registrarEmail,
+        phone: registrarPhone,
       },
-      registrant: (responseJson.registrant_contact as any) || null,
-      technicalContact: (responseJson.technical_contact as any) || null,
-      administrativeContact: (responseJson.administrative_contact as any) || null,
-      nameservers: responseJson.name_servers || [],
-      statuses: responseJson.domain_status || [],
-      rawWhois: responseJson.whois_raw_domain || null,
+      registrant: (responseJson.registrant_contact as any) || (regData.registrant_contact as any) || null,
+      technicalContact: (responseJson.technical_contact as any) || (regData.technical_contact as any) || null,
+      administrativeContact: (responseJson.administrative_contact as any) || (regData.administrative_contact as any) || null,
+      nameservers,
+      statuses: (responseJson.domain_status && responseJson.domain_status.length > 0)
+        ? responseJson.domain_status
+        : (regData.domain_status || []),
+      rawWhois: responseJson.whois_raw_domain || regData.whois_raw_registery || null,
       rawResponse: responseJson,
       savedToDatabase,
       retrievedAt: new Date().toISOString(),
@@ -253,6 +305,22 @@ export class WhoisService {
     const daysRemaining = this.calculateDaysRemaining(
       row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
     );
+    const regData = row.rawResponse?.registry_data || {};
+    const effectiveRegistrar = row.rawResponse?.domain_registrar || regData.domain_registrar;
+
+    let registrarName = row.registrarName || effectiveRegistrar?.registrar_name || null;
+    if (!registrarName) {
+      const rawText = row.rawWhois || row.rawResponse?.whois_raw_domain || regData.whois_raw_registery || '';
+      const match = rawText.match(/Registrar:\s*([^\r\n]+)/i);
+      if (match && match[1]) {
+        registrarName = match[1].trim();
+      }
+    }
+
+    const nameservers: string[] = (Array.isArray(row.nameservers) && row.nameservers.length > 0)
+      ? row.nameservers
+      : (regData.name_servers || []);
+
     return {
       id: row.id,
       domainName: row.domainName,
@@ -272,18 +340,18 @@ export class WhoisService {
           : row.updatedDate || null,
       daysRemaining,
       registrar: {
-        name: row.registrarName,
-        ianaId: row.registrarIanaId,
-        websiteUrl: row.registrarWebsite,
-        email: row.registrarEmail,
-        phone: row.registrarPhone,
+        name: registrarName,
+        ianaId: row.registrarIanaId || effectiveRegistrar?.iana_id || null,
+        websiteUrl: row.registrarWebsite || effectiveRegistrar?.website_url || null,
+        email: row.registrarEmail || effectiveRegistrar?.email_address || null,
+        phone: row.registrarPhone || effectiveRegistrar?.phone_number || null,
       },
-      registrant: (row.registrantContact as any) || null,
-      technicalContact: (row.technicalContact as any) || null,
-      administrativeContact: (row.administrativeContact as any) || null,
-      nameservers: row.nameservers,
-      statuses: row.statuses,
-      rawWhois: row.rawWhois,
+      registrant: (row.registrantContact as any) || (regData.registrant_contact as any) || null,
+      technicalContact: (row.technicalContact as any) || (regData.technical_contact as any) || null,
+      administrativeContact: (row.administrativeContact as any) || (regData.administrative_contact as any) || null,
+      nameservers,
+      statuses: row.statuses || regData.domain_status || [],
+      rawWhois: row.rawWhois || regData.whois_raw_registery || null,
       rawResponse: (row.rawResponse as any) || undefined,
       savedToDatabase: true,
       retrievedAt:

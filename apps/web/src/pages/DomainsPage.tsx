@@ -10,6 +10,8 @@ import {
   syncAllProviders,
   type DomainItem,
   PROVIDER_LOGOS,
+  formatRegistrarName,
+  getRegistrarLogo,
 } from '@/services/portfolioService';
 import { updateInventory } from '@/api/inventory';
 import { lookupWhois } from '@/api/whois';
@@ -25,7 +27,10 @@ export const DomainsPage: React.FC = () => {
   // Add Domain Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newDomainName, setNewDomainName] = useState('');
-  const [newRegistrar, setNewRegistrar] = useState('Cloudflare');
+  const [detectedRegistrar, setDetectedRegistrar] = useState<string>('');
+  const [isDetectingRegistrar, setIsDetectingRegistrar] = useState(false);
+  const [registrarDetectionSource, setRegistrarDetectionSource] = useState<string | null>(null);
+  const [detectedWhois, setDetectedWhois] = useState<NormalizedWhoisData | null>(null);
   const [newAutoRenew, setNewAutoRenew] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -101,6 +106,85 @@ export const DomainsPage: React.FC = () => {
     }
   };
 
+  // Auto-detect registrar as the user types a domain name
+  useEffect(() => {
+    if (!isAddModalOpen) {
+      setDetectedRegistrar('');
+      setIsDetectingRegistrar(false);
+      setRegistrarDetectionSource(null);
+      setDetectedWhois(null);
+      return;
+    }
+
+    const domainInput = newDomainName.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!domainInput || !domainInput.includes('.') || domainInput.endsWith('.')) {
+      setDetectedRegistrar('');
+      setIsDetectingRegistrar(false);
+      setRegistrarDetectionSource(null);
+      setDetectedWhois(null);
+      return;
+    }
+
+    const parts = domainInput.split('.');
+    const tld = parts[parts.length - 1];
+    if (!tld || tld.length < 2) return;
+
+    setIsDetectingRegistrar(true);
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      try {
+        const live = await lookupWhois(domainInput);
+        if (cancelled) return;
+        setDetectedWhois(live);
+
+        let registrarName = '';
+        let source = '';
+
+        if (live?.registrar?.name) {
+          registrarName = formatRegistrarName(live.registrar.name);
+          source = 'Live Registry / RDAP';
+        } else if (live?.nameservers && live.nameservers.length > 0) {
+          const nsStr = live.nameservers.join(' ').toLowerCase();
+          if (nsStr.includes('domaincontrol') || nsStr.includes('godaddy')) {
+            registrarName = 'GoDaddy';
+          } else if (nsStr.includes('dns-parking') || nsStr.includes('hostinger')) {
+            registrarName = 'Hostinger';
+          } else if (nsStr.includes('cloudflare')) {
+            registrarName = 'Cloudflare';
+          } else if (nsStr.includes('registrar-servers') || nsStr.includes('namecheap')) {
+            registrarName = 'Namecheap';
+          } else if (nsStr.includes('awsdns')) {
+            registrarName = 'AWS Route 53';
+          } else {
+            registrarName = 'Custom Registrar';
+          }
+          source = 'Nameserver Fingerprint';
+        } else {
+          registrarName = 'Hostinger';
+          source = 'Default Provider';
+        }
+
+        setDetectedRegistrar(registrarName);
+        setRegistrarDetectionSource(source);
+      } catch {
+        if (!cancelled) {
+          setDetectedRegistrar('Hostinger');
+          setRegistrarDetectionSource('Default Provider');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsDetectingRegistrar(false);
+        }
+      }
+    }, 380);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [newDomainName, isAddModalOpen]);
+
   const handleAddDomain = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddError(null);
@@ -111,31 +195,81 @@ export const DomainsPage: React.FC = () => {
     }
     setIsSubmitting(true);
     try {
+      let finalRegistrar = detectedRegistrar;
+      let live = detectedWhois;
+
+      // If user submits while auto-detection is still running, await live lookup
+      if (!finalRegistrar || isDetectingRegistrar) {
+        try {
+          const fetched = await lookupWhois(domainInput);
+          live = fetched;
+          if (fetched?.registrar?.name) {
+            finalRegistrar = formatRegistrarName(fetched.registrar.name);
+          } else if (fetched?.nameservers && fetched.nameservers.length > 0) {
+            const nsStr = fetched.nameservers.join(' ').toLowerCase();
+            if (nsStr.includes('domaincontrol') || nsStr.includes('godaddy')) {
+              finalRegistrar = 'GoDaddy';
+            } else if (nsStr.includes('dns-parking') || nsStr.includes('hostinger')) {
+              finalRegistrar = 'Hostinger';
+            } else if (nsStr.includes('cloudflare')) {
+              finalRegistrar = 'Cloudflare';
+            } else if (nsStr.includes('registrar-servers') || nsStr.includes('namecheap')) {
+              finalRegistrar = 'Namecheap';
+            } else if (nsStr.includes('awsdns')) {
+              finalRegistrar = 'AWS Route 53';
+            }
+          }
+        } catch {}
+      }
+
+      finalRegistrar = finalRegistrar || 'Hostinger';
+
       const created = await createDomain({
         name: domainInput,
-        registrar: newRegistrar,
+        registrar: finalRegistrar,
         autoRenew: newAutoRenew,
       });
-      setDomains((prev) => [created, ...prev.filter((d) => d.id !== created.id && d.name.toLowerCase() !== domainInput)]);
+
+      let initialItem = created;
+      if (live && live.isRegistered) {
+        const synced = updateDomainWithWhois(domainInput, live);
+        if (synced) {
+          initialItem = synced;
+        }
+      }
+
+      setDomains((prev) => [initialItem, ...prev.filter((d) => d.id !== created.id && d.name.toLowerCase() !== domainInput)]);
       setIsAddModalOpen(false);
       setNewDomainName('');
+      setDetectedRegistrar('');
+      setDetectedWhois(null);
 
-      // Auto-query live WHOIS in background to populate real registry dates & registrar
-      void lookupWhois(domainInput).then(async (live) => {
-        if (live && live.isRegistered) {
-          const synced = updateDomainWithWhois(domainInput, live);
-          if (synced) {
-            setDomains((prev) => prev.map((d) => (d.name.toLowerCase() === domainInput ? synced : d)));
+      // Persist to backend inventory / fetch fresh WHOIS if not yet registered
+      if (!live || !live.isRegistered) {
+        void lookupWhois(domainInput).then(async (fresh) => {
+          if (fresh && fresh.isRegistered) {
+            const synced = updateDomainWithWhois(domainInput, fresh);
+            if (synced) {
+              setDomains((prev) => prev.map((d) => (d.name.toLowerCase() === domainInput ? synced : d)));
+            }
+            try {
+              await updateInventory('domains', created.id, {
+                registeredAt: fresh.registeredAt || undefined,
+                expiresAt: fresh.expiresAt || undefined,
+                notes: `Registrar: ${fresh.registrar?.name || finalRegistrar} | Nameservers: ${(fresh.nameservers || []).join(', ')}`,
+              });
+            } catch {}
           }
-          try {
-            await updateInventory('domains', created.id, {
-              registeredAt: live.registeredAt || undefined,
-              expiresAt: live.expiresAt || undefined,
-              notes: `Registrar: ${live.registrar?.name || newRegistrar} | Nameservers: ${(live.nameservers || []).join(', ')}`,
-            });
-          } catch {}
-        }
-      }).catch(() => {});
+        }).catch(() => {});
+      } else {
+        try {
+          await updateInventory('domains', created.id, {
+            registeredAt: live.registeredAt || undefined,
+            expiresAt: live.expiresAt || undefined,
+            notes: `Registrar: ${live.registrar?.name || finalRegistrar} | Nameservers: ${(live.nameservers || []).join(', ')}`,
+          });
+        } catch {}
+      }
     } catch (err: any) {
       setAddError(err?.message || 'Failed to add domain to portfolio');
     } finally {
@@ -214,7 +348,13 @@ export const DomainsPage: React.FC = () => {
               <h3 className="text-title-md font-bold text-on-surface">Add Domain to Portfolio</h3>
               <button
                 type="button"
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setNewDomainName('');
+                  setDetectedRegistrar('');
+                  setDetectedWhois(null);
+                  setAddError(null);
+                }}
                 className="text-secondary hover:text-on-surface"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
@@ -232,38 +372,86 @@ export const DomainsPage: React.FC = () => {
                 <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
                   Domain Name
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. yourcompany.com"
-                  value={newDomainName}
-                  onChange={(e) => {
-                    setNewDomainName(e.target.value);
-                    if (addError) setAddError(null);
-                  }}
-                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="e.g. yourcompany.com"
+                    value={newDomainName}
+                    onChange={(e) => {
+                      setNewDomainName(e.target.value);
+                      if (addError) setAddError(null);
+                    }}
+                    className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none pr-10"
+                    required
+                    autoFocus
+                  />
+                  {isDetectingRegistrar && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                      <span className="material-symbols-outlined text-[18px] text-primary animate-spin">
+                        progress_activity
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
-                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
-                  Registrar Provider
-                </label>
-                <select
-                  value={newRegistrar}
-                  onChange={(e) => setNewRegistrar(e.target.value)}
-                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
-                >
-                  <option value="Cloudflare">Cloudflare</option>
-                  <option value="Hostinger">Hostinger</option>
-                  <option value="GoDaddy">GoDaddy</option>
-                  <option value="Namecheap">Namecheap</option>
-                  <option value="AWS Route 53">AWS Route 53</option>
-                  <option value="Hetzner">Hetzner</option>
-                  <option value="Porkbun">Porkbun</option>
-                  <option value="Google Domains">Google Domains</option>
-                  <option value="Other">Other / Custom Registrar</option>
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider">
+                    Registrar Provider
+                  </label>
+                  {detectedRegistrar && !isDetectingRegistrar && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span className="material-symbols-outlined text-[12px]">verified</span>
+                      Auto-Fetched
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-outline-variant/60 bg-surface-container-low px-4 py-2.5 min-h-[46px] transition-all">
+                  {isDetectingRegistrar ? (
+                    <div className="flex items-center gap-2.5 text-secondary">
+                      <span className="material-symbols-outlined text-[18px] text-primary animate-spin">
+                        progress_activity
+                      </span>
+                      <span className="text-body-sm font-medium animate-pulse text-on-surface/80">
+                        Auto-fetching registrar from live WHOIS…
+                      </span>
+                    </div>
+                  ) : detectedRegistrar ? (
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={getRegistrarLogo(detectedRegistrar)}
+                          alt={detectedRegistrar}
+                          className="h-5 w-5 object-contain"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = '/images/providers/hostinger.png';
+                          }}
+                        />
+                        <span className="text-body-sm font-bold text-on-surface">
+                          {detectedRegistrar}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-medium text-secondary">
+                        {registrarDetectionSource || 'Live Registry'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-secondary/60">
+                      <span className="material-symbols-outlined text-[18px]">travel_explore</span>
+                      <span className="text-body-sm italic">
+                        Enter domain name above to auto-detect registrar
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {detectedRegistrar && !isDetectingRegistrar && (
+                  <p className="mt-1 text-[11px] text-secondary flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px] text-emerald-500">check_circle</span>
+                    <span>Provider detected automatically. No manual selection required.</span>
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center justify-between rounded-xl border border-outline-variant/60 bg-surface-container-low p-3.5">
@@ -284,6 +472,9 @@ export const DomainsPage: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setIsAddModalOpen(false);
+                    setNewDomainName('');
+                    setDetectedRegistrar('');
+                    setDetectedWhois(null);
                     setAddError(null);
                   }}
                   className="rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-secondary hover:bg-surface-container"
@@ -485,7 +676,7 @@ export const DomainsPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <img src={logo} alt="Registrar" className="h-5 w-5 object-contain" />
                         <span className="text-body-sm font-medium text-on-surface">
-                          {d.registrar.split(' ')[0]}
+                          {formatRegistrarName(d.registrar)}
                         </span>
                       </div>
                     </td>

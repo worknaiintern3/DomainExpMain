@@ -522,9 +522,15 @@ export class MongoProviderConnectionsRepository
 
     if (authType === 'HOSTINGER_API_TOKEN') {
       try {
-        const res = await fetch('https://developers.hostinger.com/api/domains/v1/portfolio', {
+        let res = await fetch('https://developers.hostinger.com/api/domains/v1/portfolio', {
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         });
+        if (res.status === 429) {
+          await new Promise((r) => setTimeout(r, 1500));
+          res = await fetch('https://developers.hostinger.com/api/domains/v1/portfolio', {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          });
+        }
         if (res.ok) {
           const raw = (await res.json()) as any;
           const portfolio = Array.isArray(raw) ? raw : (raw?.data || raw?.domains || []);
@@ -533,11 +539,20 @@ export class MongoProviderConnectionsRepository
             if (!domainName) continue;
             discovered++;
 
+            // Brief delay to prevent exhausting Hostinger rate limits
+            await new Promise((r) => setTimeout(r, 200));
+
             let nameservers: string[] = [];
             try {
-              const detailRes = await fetch(`https://developers.hostinger.com/api/domains/v1/portfolio/${domainName}`, {
+              let detailRes = await fetch(`https://developers.hostinger.com/api/domains/v1/portfolio/${domainName}`, {
                 headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
               });
+              if (detailRes.status === 429) {
+                await new Promise((r) => setTimeout(r, 1500));
+                detailRes = await fetch(`https://developers.hostinger.com/api/domains/v1/portfolio/${domainName}`, {
+                  headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                });
+              }
               if (detailRes.ok) {
                 const detail = (await detailRes.json()) as any;
                 if (detail?.name_servers) {
@@ -550,9 +565,15 @@ export class MongoProviderConnectionsRepository
 
             let dnsA = '';
             try {
-              const dnsRes = await fetch(`https://developers.hostinger.com/api/dns/v1/zones/${domainName}`, {
+              let dnsRes = await fetch(`https://developers.hostinger.com/api/dns/v1/zones/${domainName}`, {
                 headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
               });
+              if (dnsRes.status === 429) {
+                await new Promise((r) => setTimeout(r, 1500));
+                dnsRes = await fetch(`https://developers.hostinger.com/api/dns/v1/zones/${domainName}`, {
+                  headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                });
+              }
               if (dnsRes.ok) {
                 const dns = (await dnsRes.json()) as any;
                 if (Array.isArray(dns)) {
@@ -651,9 +672,15 @@ export class MongoProviderConnectionsRepository
 
       // 2. VPS Virtual Machines
       try {
-        const vpsRes = await fetch('https://developers.hostinger.com/api/vps/v1/virtual-machines', {
+        let vpsRes = await fetch('https://developers.hostinger.com/api/vps/v1/virtual-machines', {
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         });
+        if (vpsRes.status === 429) {
+          await new Promise((r) => setTimeout(r, 1500));
+          vpsRes = await fetch('https://developers.hostinger.com/api/vps/v1/virtual-machines', {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          });
+        }
         if (vpsRes.ok) {
           const rawVps = (await vpsRes.json()) as any;
           const vpsList = Array.isArray(rawVps) ? rawVps : (rawVps?.data || []);

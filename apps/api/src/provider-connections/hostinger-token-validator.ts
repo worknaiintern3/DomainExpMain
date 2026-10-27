@@ -87,12 +87,13 @@ export class HostingerTokenValidator {
       return false;
     }
 
-    // If the domain portfolio check was rejected as forbidden (e.g. VPS-only token)
-    // or failed schema/resource-not-found, attempt verification via the VPS endpoint.
+    // If the domain portfolio check was rejected as forbidden (e.g. VPS-only token),
+    // rate limited, or failed schema/resource-not-found, attempt verification via the VPS endpoint.
     if (
       domainsResult.status === 'FORBIDDEN'
       || domainsResult.status === 'BAD_RESPONSE'
       || domainsResult.status === 'NOT_FOUND'
+      || (domainsResult.status === 'HTTP_ERROR' && domainsResult.code === 'RATE_LIMITED')
     ) {
       const vpsResult = await this.tryCheckEndpoint(
         token,

@@ -203,30 +203,50 @@ function calculateDaysRemaining(expiryStr?: string | null): number | null {
 
 function normalizeRawWhoisResponse(domain: string, raw: any): NormalizedWhoisData {
   const isRegistered = raw.domain_registered === 'yes';
-  const daysRemaining = calculateDaysRemaining(raw.expiry_date);
+  const regData = raw.registry_data || {};
+  const effectiveRegistrar = raw.domain_registrar || regData.domain_registrar;
+
+  let regName = effectiveRegistrar?.registrar_name || null;
+  if (!regName) {
+    const rawText = raw.whois_raw_domain || regData.whois_raw_registery || '';
+    const match = rawText.match(/Registrar:\s*([^\r\n]+)/i);
+    if (match && match[1]) {
+      regName = match[1].trim();
+    }
+  }
+
+  const rawCreate = raw.create_date || regData.create_date || null;
+  const rawExpiry = raw.expiry_date || regData.expiry_date || null;
+  const rawUpdate = raw.update_date || regData.update_date || null;
+  const daysRemaining = calculateDaysRemaining(rawExpiry);
+  const nameservers = (raw.name_servers && raw.name_servers.length > 0)
+    ? raw.name_servers
+    : (regData.name_servers || []);
 
   return {
     id: null,
     domainName: raw.domain_name || domain,
     isRegistered,
-    queryTime: raw.query_time || new Date().toISOString(),
-    registeredAt: raw.create_date || null,
-    expiresAt: raw.expiry_date || null,
-    updatedDate: raw.update_date || null,
+    queryTime: raw.query_time || regData.query_time || new Date().toISOString(),
+    registeredAt: rawCreate,
+    expiresAt: rawExpiry,
+    updatedDate: rawUpdate,
     daysRemaining,
     registrar: {
-      name: raw.domain_registrar?.registrar_name || null,
-      ianaId: raw.domain_registrar?.iana_id || null,
-      websiteUrl: raw.domain_registrar?.website_url || null,
-      email: raw.domain_registrar?.email_address || null,
-      phone: raw.domain_registrar?.phone_number || null,
+      name: regName,
+      ianaId: effectiveRegistrar?.iana_id || null,
+      websiteUrl: effectiveRegistrar?.website_url || null,
+      email: effectiveRegistrar?.email_address || null,
+      phone: effectiveRegistrar?.phone_number || null,
     },
-    registrant: raw.registrant_contact || null,
-    technicalContact: raw.technical_contact || null,
-    administrativeContact: raw.administrative_contact || null,
-    nameservers: raw.name_servers || [],
-    statuses: raw.domain_status || [],
-    rawWhois: raw.whois_raw_domain || null,
+    registrant: raw.registrant_contact || regData.registrant_contact || null,
+    technicalContact: raw.technical_contact || regData.technical_contact || null,
+    administrativeContact: raw.administrative_contact || regData.administrative_contact || null,
+    nameservers,
+    statuses: (raw.domain_status && raw.domain_status.length > 0)
+      ? raw.domain_status
+      : (regData.domain_status || []),
+    rawWhois: raw.whois_raw_domain || regData.whois_raw_registery || null,
     rawResponse: raw,
     savedToDatabase: false,
     retrievedAt: new Date().toISOString(),

@@ -13,6 +13,7 @@ import {
   type ApplicationItem,
   type PortfolioSummary,
   PROVIDER_LOGOS,
+  formatRegistrarName,
 } from '@/services/portfolioService';
 
 export const OverviewPage: React.FC = () => {
@@ -341,7 +342,7 @@ export const OverviewPage: React.FC = () => {
                         </td>
                         <td className="py-3.5 px-4 text-body-sm text-secondary">
                           <span className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-medium text-on-surface">
-                            {d.registrar.split(' ')[0]}
+                            {formatRegistrarName(d.registrar)}
                           </span>
                         </td>
                         <td className="py-3.5 px-4">

@@ -410,7 +410,14 @@ export class ProviderConnectionsService {
     try {
       active = await validator.isTokenActive(credential);
     } catch (error) {
-      throw new ProviderCredentialValidationFailedError(getProviderValidationErrorCode(error));
+      const code = getProviderValidationErrorCode(error);
+      if (code === 'RATE_LIMITED') {
+        // When the upstream provider returns HTTP 429 (rate-limited / throttled),
+        // the bearer token has been authenticated (invalid credentials receive 401).
+        // Accept the connection so users are not blocked by transient provider throttling.
+        return;
+      }
+      throw new ProviderCredentialValidationFailedError(code);
     }
     if (!active) {
       throw new ProviderCredentialValidationFailedError('AUTH_INVALID');

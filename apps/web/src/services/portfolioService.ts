@@ -4,6 +4,7 @@ import {
   getPlayStoreDeveloperApps,
 } from '../api/play-store';
 import { listAlerts } from '../api/monitoring';
+import { lookupWhois } from '../api/whois';
 import type { NormalizedWhoisData } from '../api/whois.types';
 
 
@@ -132,7 +133,49 @@ export const PROVIDER_LOGOS: Record<string, string> = {
   squarespace: 'https://www.google.com/s2/favicons?domain=squarespace.com&sz=128',
   google: '/images/providers/gcp.png',
   googledomains: '/images/providers/gcp.png',
+  'google domains': '/images/providers/gcp.png',
+  porkbun: 'https://www.google.com/s2/favicons?domain=porkbun.com&sz=128',
+  dynadot: 'https://www.google.com/s2/favicons?domain=dynadot.com&sz=128',
+  namesilo: 'https://www.google.com/s2/favicons?domain=namesilo.com&sz=128',
+  ionos: 'https://www.google.com/s2/favicons?domain=ionos.com&sz=128',
+  tucows: 'https://www.google.com/s2/favicons?domain=tucows.com&sz=128',
+  gandi: 'https://www.google.com/s2/favicons?domain=gandi.net&sz=128',
+  'network solutions': 'https://www.google.com/s2/favicons?domain=networksolutions.com&sz=128',
+  ovhcloud: 'https://www.google.com/s2/favicons?domain=ovhcloud.com&sz=128',
+  markmonitor: 'https://www.google.com/s2/favicons?domain=markmonitor.com&sz=128',
 };
+
+export function getRegistrarLogo(registrar?: string | null): string {
+  if (!registrar) return '/images/providers/hostinger.png';
+  const lower = registrar.toLowerCase();
+  const matched = Object.keys(PROVIDER_LOGOS).find((k) => lower.includes(k));
+  if (matched) return PROVIDER_LOGOS[matched];
+  return '/images/providers/hostinger.png';
+}
+
+export function formatRegistrarName(name?: string | null): string {
+  if (!name) return 'Hostinger';
+  const lower = name.toLowerCase();
+  if (lower.includes('godaddy') || lower.includes('domaincontrol')) return 'GoDaddy';
+  if (lower.includes('namecheap') || lower.includes('registrar-servers')) return 'Namecheap';
+  if (lower.includes('cloudflare')) return 'Cloudflare';
+  if (lower.includes('squarespace')) return 'Squarespace';
+  if (lower.includes('google')) return 'Google Domains';
+  if (lower.includes('hostinger') || lower.includes('dns-parking')) return 'Hostinger';
+  if (lower.includes('aws') || lower.includes('amazon') || lower.includes('route 53') || lower.includes('awsdns')) return 'AWS Route 53';
+  if (lower.includes('porkbun')) return 'Porkbun';
+  if (lower.includes('dynadot')) return 'Dynadot';
+  if (lower.includes('namesilo')) return 'NameSilo';
+  if (lower.includes('ionos') || lower.includes('1&1') || lower.includes('1and1')) return 'IONOS';
+  if (lower.includes('tucows') || lower.includes('enom')) return 'Tucows';
+  if (lower.includes('gandi')) return 'Gandi';
+  if (lower.includes('network solutions')) return 'Network Solutions';
+  if (lower.includes('ovh')) return 'OVHcloud';
+  if (lower.includes('hetzner')) return 'Hetzner';
+
+  const clean = name.replace(/,.*$/, '').replace(/\.(com|net|org|inc|llc).*$/i, '').trim();
+  return clean || name;
+}
 
 export const REAL_APP_ICONS: Record<string, string> = {
   'com.aitourism': '/images/app-icons/com_aitourism.png',
@@ -1029,14 +1072,23 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
             extractedRegistrar = b.notes.replace(/^Registrar:\s*/, '').split('|')[0].trim();
           } else if (b.notes?.toLowerCase().includes('cloudflare')) {
             extractedRegistrar = 'Cloudflare';
-          } else if (b.notes?.toLowerCase().includes('godaddy')) {
+          } else if (b.notes?.toLowerCase().includes('godaddy') || b.notes?.toLowerCase().includes('domaincontrol')) {
             extractedRegistrar = 'GoDaddy';
-          } else if (b.notes?.toLowerCase().includes('namecheap')) {
+          } else if (b.notes?.toLowerCase().includes('namecheap') || b.notes?.toLowerCase().includes('registrar-servers')) {
             extractedRegistrar = 'Namecheap';
-          } else if (b.notes?.toLowerCase().includes('aws')) {
-            extractedRegistrar = 'AWS';
-          } else if (b.notes?.toLowerCase().includes('hostinger')) {
+          } else if (b.notes?.toLowerCase().includes('aws') || b.notes?.toLowerCase().includes('awsdns')) {
+            extractedRegistrar = 'AWS Route 53';
+          } else if (b.notes?.toLowerCase().includes('squarespace')) {
+            extractedRegistrar = 'Squarespace';
+          } else if (b.notes?.toLowerCase().includes('google')) {
+            extractedRegistrar = 'Google Domains';
+          } else if (b.notes?.toLowerCase().includes('hostinger') || b.notes?.toLowerCase().includes('dns-parking')) {
             extractedRegistrar = 'Hostinger';
+          } else {
+            const existing = cleanLocal.find((d) => d.name.toLowerCase() === cleanName);
+            if (existing && existing.registrar && existing.registrar !== 'Hostinger') {
+              extractedRegistrar = existing.registrar;
+            }
           }
 
           let nameservers = extractedRegistrar.toLowerCase().includes('cloudflare')
@@ -1044,7 +1096,26 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
             : ['ns1.dns-parking.com', 'ns2.dns-parking.com'];
           if (b.notes?.includes('Nameservers: ')) {
             const nsPart = b.notes.split('Nameservers: ')[1];
-            if (nsPart) nameservers = nsPart.split(',').map((s) => s.trim()).filter(Boolean);
+            if (nsPart) {
+              nameservers = nsPart.split(',').map((s) => s.trim()).filter(Boolean);
+              if (extractedRegistrar === 'Hostinger') {
+                const nsStr = nameservers.join(' ').toLowerCase();
+                if (nsStr.includes('domaincontrol') || nsStr.includes('godaddy')) extractedRegistrar = 'GoDaddy';
+                else if (nsStr.includes('registrar-servers') || nsStr.includes('namecheap')) extractedRegistrar = 'Namecheap';
+                else if (nsStr.includes('cloudflare')) extractedRegistrar = 'Cloudflare';
+                else if (nsStr.includes('awsdns')) extractedRegistrar = 'AWS Route 53';
+                else if (nsStr.includes('googledomains') || nsStr.includes('google')) extractedRegistrar = 'Google Domains';
+                else if (nsStr.includes('squarespace')) extractedRegistrar = 'Squarespace';
+              }
+            }
+          }
+
+          if (!b.notes?.startsWith('Registrar: ')) {
+            void lookupWhois(cleanName).then((live) => {
+              if (live?.isRegistered && live.registrar?.name) {
+                updateDomainWithWhois(cleanName, live);
+              }
+            }).catch(() => {});
           }
 
           const isHostingerVps = Boolean(b.notes?.includes('srv') || (extractedRegistrar === 'Hostinger' && !b.notes?.includes('Registered via DomainPulse web')));
@@ -1652,7 +1723,7 @@ export async function createDomain(data: {
 }): Promise<DomainItem> {
   const cleanName = data.name.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
   const ext = cleanName.includes('.') ? `.${cleanName.split('.').pop()}` : '.com';
-  const selectedRegistrar = data.registrar?.split(' ')[0] || data.registrar || 'Cloudflare';
+  const selectedRegistrar = data.registrar ? formatRegistrarName(data.registrar) : 'Hostinger';
   let backendId = `dom-${Date.now()}`;
 
   try {
@@ -1677,8 +1748,15 @@ export async function createDomain(data: {
     ext === '.tech' ? 399 :
     ext === '.co' ? 2199 : 899;
 
-  const nameservers = selectedRegistrar.toLowerCase().includes('cloudflare')
+  const regLower = selectedRegistrar.toLowerCase();
+  const nameservers = regLower.includes('cloudflare')
     ? ['ns1.cloudflare.com', 'ns2.cloudflare.com']
+    : regLower.includes('godaddy')
+    ? ['ns1.domaincontrol.com', 'ns2.domaincontrol.com']
+    : regLower.includes('namecheap')
+    ? ['dns1.registrar-servers.com', 'dns2.registrar-servers.com']
+    : regLower.includes('aws')
+    ? ['ns-1.awsdns-01.org', 'ns-2.awsdns-02.co.uk']
     : ['ns1.dns-parking.com', 'ns2.dns-parking.com'];
 
   const newDomain: DomainItem = {
