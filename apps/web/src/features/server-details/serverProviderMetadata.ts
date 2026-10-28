@@ -57,3 +57,26 @@ export function hasProviderMetadata(
 ): metadata is ServerProviderMetadata {
   return metadata !== null && metadata !== undefined;
 }
+
+export function extractProviderMetadataFromNotes(
+  notes: string | null | undefined,
+): ServerProviderMetadata | null {
+  if (!notes) return null;
+  const ramMatch = notes.match(/RAM:\s*(\d+)\s*MB/i);
+  const diskMatch = notes.match(/Disk:\s*(\d+)\s*GB/i);
+  const cpuMatch = notes.match(/CPU:\s*(\d+)\s*vCPU/i);
+  const statusMatch = notes.match(/Status:\s*([a-zA-Z0-9_-]+)/i);
+
+  if (!ramMatch && !diskMatch && !cpuMatch && !statusMatch) return null;
+
+  return {
+    operatingSystemDetail: null,
+    providerCreatedAt: null,
+    providerStatus: statusMatch ? statusMatch[1] : null,
+    specs: {
+      cpuCount: cpuMatch ? parseInt(cpuMatch[1], 10) : null,
+      diskGb: diskMatch ? parseInt(diskMatch[1], 10) : null,
+      memoryMb: ramMatch ? parseInt(ramMatch[1], 10) : null,
+    },
+  };
+}

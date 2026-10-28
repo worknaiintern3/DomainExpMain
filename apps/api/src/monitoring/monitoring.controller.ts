@@ -64,7 +64,10 @@ import type {
   MonitoringTarget,
 } from './monitoring.types';
 
-const DomainIdParamsSchema = z.object({ domainId: z.uuid() });
+const DomainIdParamsSchema = z.object({
+  domainId: z.string().min(1).optional(),
+  id: z.string().min(1).optional(),
+});
 const AlertIdParamsSchema = z.object({ id: z.uuid() });
 const AlertRuleKeyParamsSchema = z.object({ key: AlertRuleKeySchema });
 
@@ -202,17 +205,20 @@ function presentAlertRule(rule: AlertRule): AlertRuleResponse {
   return AlertRuleResponseSchema.parse(presented);
 }
 
-@Controller('domains/:domainId/monitoring')
+@Controller('domains')
 @UseGuards(AccessTokenGuard, WorkspaceContextGuard)
 export class MonitoringController {
   constructor(@Inject(MonitoringService) private readonly service: MonitoringService) {}
 
-  @Get()
+  @Get(':domainId/monitoring')
   async getTarget(
     @Req() request: WorkspaceContextRequest,
+    @Param('domainId') domainIdParam: string | undefined,
     @Param() params: unknown,
   ): Promise<MonitoringTargetApiResponse> {
-    const { domainId } = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
+    const parsed = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
+    const domainId = domainIdParam || parsed.domainId || parsed.id;
+    if (!domainId) throw new BadRequestException('Invalid domain identifier');
     const result = await executeMonitoringOperation(() =>
       this.service.getTarget(getPrincipal(request), domainId),
     );
@@ -223,13 +229,16 @@ export class MonitoringController {
     return { configured: true, target: MonitoringTargetResponseSchema.parse(target) };
   }
 
-  @Put()
+  @Put(':domainId/monitoring')
   async configureTarget(
     @Req() request: WorkspaceContextRequest,
+    @Param('domainId') domainIdParam: string | undefined,
     @Param() params: unknown,
     @Body() body: unknown,
   ): Promise<MonitoringTargetApiResponse> {
-    const { domainId } = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
+    const parsed = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
+    const domainId = domainIdParam || parsed.domainId || parsed.id;
+    if (!domainId) throw new BadRequestException('Invalid domain identifier');
     const parsedBody = parseOrBadRequest(UpdateMonitoringTargetRequestSchema, body, 'Invalid monitoring target request');
     const input = stripUndefined(parsedBody);
     const target = await executeMonitoringOperation(() =>
@@ -243,13 +252,16 @@ export class MonitoringController {
     return { configured: true, target: MonitoringTargetResponseSchema.parse(presented) };
   }
 
-  @Get('runs')
+  @Get(':domainId/monitoring/runs')
   async listRuns(
     @Req() request: WorkspaceContextRequest,
+    @Param('domainId') domainIdParam: string | undefined,
     @Param() params: unknown,
     @Query() query: unknown,
   ): Promise<{ items: MonitoringRunResponse[]; nextCursor: string | null }> {
-    const { domainId } = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
+    const parsed = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
+    const domainId = domainIdParam || parsed.domainId || parsed.id;
+    if (!domainId) throw new BadRequestException('Invalid domain identifier');
     const parsedQuery = parseOrBadRequest(MonitoringRunsListQuerySchema, query, 'Invalid monitoring runs query');
     const cleaned = stripUndefined(parsedQuery);
     const page = await executeMonitoringOperation(() =>
@@ -265,13 +277,16 @@ export class MonitoringController {
     };
   }
 
-  @Post('runs')
+  @Post(':domainId/monitoring/runs')
   @HttpCode(HttpStatus.ACCEPTED)
   async enqueueManualRun(
     @Req() request: WorkspaceContextRequest,
+    @Param('domainId') domainIdParam: string | undefined,
     @Param() params: unknown,
   ): Promise<ManualMonitoringRunResponse> {
-    const { domainId } = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
+    const parsed = parseOrBadRequest(DomainIdParamsSchema, params, 'Invalid domain identifier');
+    const domainId = domainIdParam || parsed.domainId || parsed.id;
+    if (!domainId) throw new BadRequestException('Invalid domain identifier');
     const rawHeader = request.headers['idempotency-key'];
     const headerValue = typeof rawHeader === 'string' ? rawHeader : rawHeader?.[0];
     const { idempotencyKey } = parseOrBadRequest(

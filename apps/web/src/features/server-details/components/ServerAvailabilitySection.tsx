@@ -129,6 +129,10 @@ export const ServerAvailabilitySection: React.FC<Props> = ({ serverId, inventory
       }
     } catch (error) {
       if (generation !== targetGeneration.current || controller.signal.aborted) return;
+      if (error instanceof ApiError && error.status === 404) {
+        setResponse({ configured: false, serverId, currentStatus: 'UNKNOWN' });
+        return;
+      }
       setLoadError(errorMessage(error, 'Network availability could not be loaded.'));
     } finally {
       if (generation === targetGeneration.current) setLoading(false);

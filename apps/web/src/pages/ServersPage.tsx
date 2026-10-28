@@ -8,6 +8,10 @@ import {
   syncAllProviders,
   type ServerItem,
   PROVIDER_LOGOS,
+  assignDomainToServer,
+  removeDomainFromServer,
+  fetchDomainsList,
+  type DomainItem,
 } from '@/services/portfolioService';
 
 export const ServersPage: React.FC = () => {
@@ -27,6 +31,13 @@ export const ServersPage: React.FC = () => {
   const [memory, setMemory] = useState('8 GB');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Connect Domain Modal
+  const [connectModalServer, setConnectModalServer] = useState<ServerItem | null>(null);
+  const [portfolioDomains, setPortfolioDomains] = useState<DomainItem[]>([]);
+  const [selectedDomainToConnect, setSelectedDomainToConnect] = useState('');
+  const [customDomainToConnect, setCustomDomainToConnect] = useState('');
+  const [isConnectingDomain, setIsConnectingDomain] = useState(false);
+
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
@@ -45,6 +56,9 @@ export const ServersPage: React.FC = () => {
 
   useEffect(() => {
     void loadData();
+    const handleUpdate = () => void loadData();
+    window.addEventListener('domainpulse:portfolio-updated', handleUpdate);
+    return () => window.removeEventListener('domainpulse:portfolio-updated', handleUpdate);
   }, []);
 
   const handleSyncAll = async () => {
@@ -87,6 +101,37 @@ export const ServersPage: React.FC = () => {
     if (!confirm(`Are you sure you want to remove ${sName} from tracked servers?`)) return;
     setServers((prev) => prev.filter((s) => s.id !== id));
     await deleteServer(id);
+  };
+
+  const handleOpenConnectModal = async (server: ServerItem) => {
+    setConnectModalServer(server);
+    setSelectedDomainToConnect('');
+    setCustomDomainToConnect('');
+    try {
+      const list = await fetchDomainsList();
+      setPortfolioDomains(list);
+    } catch {}
+  };
+
+  const handleConfirmConnectDomain = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!connectModalServer) return;
+    const dom = (selectedDomainToConnect || customDomainToConnect).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!dom) return;
+    setIsConnectingDomain(true);
+    try {
+      assignDomainToServer(connectModalServer.id, dom);
+      setConnectModalServer(null);
+      void loadData(true);
+    } finally {
+      setIsConnectingDomain(false);
+    }
+  };
+
+  const handleRemoveDomain = (serverId: string, domainName: string) => {
+    if (!confirm(`Unlink ${domainName} from this server?`)) return;
+    removeDomainFromServer(serverId, domainName);
+    void loadData(true);
   };
 
   const handleCopy = (text: string, key: string) => {
@@ -507,55 +552,127 @@ export const ServersPage: React.FC = () => {
                 </div>
 
                 {/* Live Telemetry Progress */}
-                <div className="mt-4 grid grid-cols-3 gap-3 border-t border-outline-variant/30 pt-3">
-                  <div>
-                    <div className="flex justify-between text-[11px] text-secondary font-medium">
-                      <span>CPU</span>
-                      <span className="text-on-surface font-bold">{s.cpuUsagePercent || 22}%</span>
+                {(() => {
+                  const cpuVal = s.cpuUsagePercent ?? 0;
+                  const ramVal = s.memoryUsagePercent ?? 0;
+                  const diskVal = s.diskUsagePercent ?? 0;
+                  const isSuspended = s.status === 'warning' || s.status === 'offline' || (cpuVal === 0 && ramVal === 0);
+
+                  const getBarColor = (val: number, defaultColor: string) => {
+                    if (isSuspended) return 'bg-outline-variant/60';
+                    if (val >= 85) return 'bg-rose-500';
+                    if (val >= 70) return 'bg-amber-500';
+                    return defaultColor;
+                  };
+
+                  return (
+                    <div className="mt-4 grid grid-cols-3 gap-3 border-t border-outline-variant/30 pt-3">
+                      <div>
+                        <div className="flex justify-between text-[11px] text-secondary font-medium">
+                          <span>CPU</span>
+                          <span className="text-on-surface font-bold">
+                            {cpuVal}%{isSuspended ? ' (Idle)' : ''}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${getBarColor(cpuVal, 'bg-primary')}`}
+                            style={{ width: `${Math.min(100, Math.max(0, cpuVal))}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-[11px] text-secondary font-medium">
+                          <span>RAM</span>
+                          <span className="text-on-surface font-bold">{ramVal}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${getBarColor(ramVal, 'bg-sky-500')}`}
+                            style={{ width: `${Math.min(100, Math.max(0, ramVal))}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-[11px] text-secondary font-medium">
+                          <span>Disk</span>
+                          <span className="text-on-surface font-bold">{diskVal}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${getBarColor(diskVal, 'bg-indigo-500')}`}
+                            style={{ width: `${Math.min(100, Math.max(0, diskVal))}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${s.cpuUsagePercent || 22}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-[11px] text-secondary font-medium">
-                      <span>RAM</span>
-                      <span className="text-on-surface font-bold">{s.memoryUsagePercent || 44}%</span>
-                    </div>
-                    <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
-                      <div className="h-full rounded-full bg-sky-500" style={{ width: `${s.memoryUsagePercent || 44}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-[11px] text-secondary font-medium">
-                      <span>Disk</span>
-                      <span className="text-on-surface font-bold">{s.diskUsagePercent || 28}%</span>
-                    </div>
-                    <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
-                      <div className="h-full rounded-full bg-indigo-500" style={{ width: `${s.diskUsagePercent || 28}%` }} />
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Connected Domains */}
-                {s.connectedDomains && s.connectedDomains.length > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <span className="text-caption-xs text-secondary">Domains:</span>
-                    {s.connectedDomains.map((dom) => (
-                      <span key={dom} className="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary font-medium">
-                        {dom}
+                <div className="mt-3 flex flex-wrap items-center gap-1.5 min-h-[26px]">
+                  <span className="text-caption-xs font-semibold text-secondary flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px] text-primary">dns</span>
+                    Domains:
+                  </span>
+                  {s.connectedDomains && s.connectedDomains.length > 0 ? (
+                    s.connectedDomains.map((dom) => (
+                      <span
+                        key={dom}
+                        className="group inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 font-mono text-[11px] text-primary font-medium hover:bg-primary/15 transition-colors"
+                      >
+                        <Link
+                          to={`/domains?search=${encodeURIComponent(dom)}`}
+                          className="hover:underline flex items-center gap-0.5"
+                          title={`Filter ${dom} in Domains`}
+                        >
+                          {dom}
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveDomain(s.id, dom);
+                          }}
+                          className="ml-0.5 text-primary/60 hover:text-error transition-colors"
+                          title={`Unlink ${dom} from this server`}
+                        >
+                          <span className="material-symbols-outlined text-[12px] leading-none">close</span>
+                        </button>
                       </span>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-secondary italic">No domains routed</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenConnectModal(s)}
+                    className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-outline-variant/80 hover:border-primary px-1.5 py-0.5 text-[11px] text-secondary hover:text-primary transition-colors"
+                    title="Connect domain to this server"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">add</span>
+                    <span className="text-[10px] font-semibold">Connect</span>
+                  </button>
+                </div>
               </div>
 
               {/* Card Footer Actions */}
               <div className="mt-5 flex items-center justify-between border-t border-outline-variant/30 pt-3">
-                <span className="text-caption-xs text-secondary flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px] text-emerald-500">lock</span>
-                  SSH Port 22 Protected
-                </span>
+                {s.status === 'warning' || s.sshStatus === 'suspended' ? (
+                  <span
+                    className="text-caption-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium"
+                    title="Server is suspended or offline"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">shield_lock</span>
+                    SSH Suspended (Inactive)
+                  </span>
+                ) : (
+                  <span className="text-caption-xs text-secondary flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px] text-emerald-500">lock</span>
+                    SSH Port {s.sshPort || 22} Protected
+                  </span>
+                )}
 
                 <div className="flex items-center gap-2">
                   <Link
@@ -579,6 +696,101 @@ export const ServersPage: React.FC = () => {
           );
         })}
       </div>
+      )}
+
+      {/* Connect Domain Modal */}
+      {connectModalServer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
+              <div>
+                <h3 className="text-title-md font-bold text-on-surface">Route Domain to Server</h3>
+                <p className="text-caption-xs text-secondary mt-0.5">
+                  Server: <span className="font-mono font-medium text-primary">{connectModalServer.name}</span> (
+                  {connectModalServer.ipAddress})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConnectModalServer(null)}
+                className="rounded-lg p-1 text-secondary hover:bg-surface-container hover:text-on-surface"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmConnectDomain} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Select Portfolio Domain
+                </label>
+                <select
+                  value={selectedDomainToConnect}
+                  onChange={(e) => {
+                    setSelectedDomainToConnect(e.target.value);
+                    if (e.target.value) setCustomDomainToConnect('');
+                  }}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-xs text-on-surface focus:border-primary focus:outline-none"
+                >
+                  <option value="">-- Choose from portfolio ({portfolioDomains.length} domains) --</option>
+                  {portfolioDomains
+                    .filter((d) => !connectModalServer.connectedDomains?.includes(d.name))
+                    .map((d) => (
+                      <option key={d.id} value={d.name}>
+                        {d.name} ({d.registrar || 'Custom'})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 text-caption-xs text-secondary font-medium">
+                <div className="h-px flex-1 bg-outline-variant/30" />
+                <span>OR ENTER CUSTOM DOMAIN / HOSTNAME</span>
+                <div className="h-px flex-1 bg-outline-variant/30" />
+              </div>
+
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Custom Domain / Hostname
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. api.worknai.com or app.custom.org"
+                  value={customDomainToConnect}
+                  onChange={(e) => {
+                    setCustomDomainToConnect(e.target.value);
+                    if (e.target.value) setSelectedDomainToConnect('');
+                  }}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-xs text-on-surface placeholder:text-secondary/50 focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="rounded-xl border border-outline-variant/30 bg-surface-container-low p-3 text-caption-xs text-secondary flex items-start gap-2">
+                <span className="material-symbols-outlined text-[16px] text-primary mt-0.5">info</span>
+                <span>
+                  Connecting this domain will link its DNS and health monitoring to {connectModalServer.ipAddress}.
+                </span>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setConnectModalServer(null)}
+                  className="rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-secondary hover:bg-surface-container"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isConnectingDomain || (!selectedDomainToConnect && !customDomainToConnect.trim())}
+                  className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isConnectingDomain ? 'Connecting…' : 'Connect Domain'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

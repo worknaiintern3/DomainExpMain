@@ -211,8 +211,13 @@ export interface RefreshDomainMetadataQueuedRun {
 export interface RefreshDomainMetadataResponse {
   domainId: string;
   metadata: DomainMetadataResponse;
-  requestedSources: DomainMetadataSource[];
-  run: RefreshDomainMetadataQueuedRun;
+  requestedSources?: DomainMetadataSource[];
+  results?: {
+    dns?: { errorCode: string | null; status: string };
+    rdap?: { errorCode: string | null; status: string };
+    tls?: { errorCode: string | null; status: string };
+  };
+  run?: RefreshDomainMetadataQueuedRun;
 }
 
 export interface ServerProviderSpecs {

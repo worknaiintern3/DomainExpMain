@@ -702,6 +702,17 @@ export class MongoProviderConnectionsRepository
               ],
             });
 
+            const providerMetadata = {
+              operatingSystemDetail: { distribution: os },
+              providerCreatedAt: vps.created_at || now.toISOString(),
+              providerStatus: vps.state || 'suspended',
+              specs: {
+                cpuCount: vps.cpus || 1,
+                memoryMb: vps.memory || 4096,
+                diskGb: Math.round((vps.disk || 51200) / 1024),
+              },
+            };
+
             if (existingServer) {
               await (cols.servers as any).updateOne(
                 { _id: existingServer._id },
@@ -716,6 +727,7 @@ export class MongoProviderConnectionsRepository
                     serverKind: 'hostinger',
                     region,
                     notes,
+                    providerMetadata,
                     updatedAt: now,
                   },
                 },
@@ -735,6 +747,7 @@ export class MongoProviderConnectionsRepository
                 provenance: 'USER_ADDED',
                 region,
                 notes,
+                providerMetadata,
                 createdAt: now,
                 updatedAt: now,
               });

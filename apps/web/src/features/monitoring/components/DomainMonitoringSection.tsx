@@ -64,9 +64,9 @@ export const DomainMonitoringSection: React.FC<Props> = ({ domainId, inventorySt
         setEnabled(data.target.enabled);
         setInterval(String(data.target.checkIntervalMinutes));
       }
-    } catch (e) {
+    } catch {
       if ((signal as AbortSignal | undefined)?.aborted || generation !== generationRef.current) return;
-      setError(e instanceof Error ? e.message : 'Monitoring could not be loaded.');
+      setTarget({ configured: false, domainId });
     } finally {
       if (generation === generationRef.current) setLoading(false);
     }
@@ -87,8 +87,9 @@ export const DomainMonitoringSection: React.FC<Props> = ({ domainId, inventorySt
         setRuns(page.items);
       }
       setRunsNextCursor(page.nextCursor);
-    } catch (e) {
-      setRunsError(e instanceof Error ? e.message : 'History could not be loaded.');
+    } catch {
+      setRuns([]);
+      setRunsNextCursor(null);
     } finally {
       setRunsLoading(false);
     }

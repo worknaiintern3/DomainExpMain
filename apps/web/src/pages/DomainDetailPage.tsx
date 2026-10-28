@@ -216,12 +216,19 @@ export const DomainDetailPage: React.FC = () => {
     setMetadataError(null);
     setMetadataNotice(null);
     try {
-      // Async refresh: enqueue a monitoring/enrichment run and return fast
-      // (202). Then poll GET /metadata until the requested sources settle.
       const response = await refreshDomainMetadata(domainId, sources);
-      setMetadata(response.metadata);
-      setMetadataNotice(`Refresh queued (run ${response.run.id.slice(0, 8)}). Updating results automatically…`);
-      pollMetadata(response.requestedSources);
+      if (response.metadata) {
+        setMetadata(response.metadata);
+      }
+      if (response.run?.id) {
+        setMetadataNotice(`Refresh queued (run ${response.run.id.slice(0, 8)}). Updating results automatically…`);
+        pollMetadata(response.requestedSources);
+      } else {
+        setMetadataNotice('Metadata refreshed successfully.');
+        setRefreshingMetadata(false);
+        setRefreshingSource(null);
+        setTimeout(() => setMetadataNotice(null), 4000);
+      }
     } catch (requestError) {
       setMetadataError(requestError instanceof Error ? requestError.message : 'Metadata could not be refreshed.');
       setRefreshingMetadata(false);

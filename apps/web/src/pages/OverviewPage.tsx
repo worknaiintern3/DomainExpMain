@@ -431,32 +431,75 @@ export const OverviewPage: React.FC = () => {
                         <p className="text-caption-xs font-mono text-secondary">{s.ipAddress}</p>
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 border border-emerald-500/20">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      {s.uptime || '99.9%'}
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border ${
+                        s.status === 'warning'
+                          ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                          : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${s.status === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                      {s.status === 'warning' ? 'Suspended' : s.uptime || '99.9%'}
                     </span>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-3 gap-2 border-t border-outline-variant/30 pt-3 text-caption-xs text-secondary">
-                    <div>
-                      <p className="font-medium text-on-surface text-[11px]">CPU {s.cpuUsagePercent || 22}%</p>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
-                        <div className="h-full rounded-full bg-primary" style={{ width: `${s.cpuUsagePercent || 22}%` }} />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="font-medium text-on-surface text-[11px]">RAM {s.memoryUsagePercent || 44}%</p>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
-                        <div className="h-full rounded-full bg-sky-500" style={{ width: `${s.memoryUsagePercent || 44}%` }} />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="font-medium text-on-surface text-[11px]">Disk {s.diskUsagePercent || 28}%</p>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
-                        <div className="h-full rounded-full bg-indigo-500" style={{ width: `${s.diskUsagePercent || 28}%` }} />
-                      </div>
-                    </div>
-                  </div>
+                  {(() => {
+                    const cpuVal = s.cpuUsagePercent ?? 0;
+                    const ramVal = s.memoryUsagePercent ?? 0;
+                    const diskVal = s.diskUsagePercent ?? 0;
+                    const isSuspended = s.status === 'warning' || s.status === 'offline' || (cpuVal === 0 && ramVal === 0);
+
+                    const getBarColor = (val: number, defaultColor: string) => {
+                      if (isSuspended) return 'bg-outline-variant/60';
+                      if (val >= 85) return 'bg-rose-500';
+                      if (val >= 70) return 'bg-amber-500';
+                      return defaultColor;
+                    };
+
+                    return (
+                      <>
+                        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-outline-variant/30 pt-3 text-caption-xs text-secondary">
+                          <div>
+                            <p className="font-medium text-on-surface text-[11px]">CPU {cpuVal}%</p>
+                            <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${getBarColor(cpuVal, 'bg-primary')}`}
+                                style={{ width: `${Math.min(100, Math.max(0, cpuVal))}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-medium text-on-surface text-[11px]">RAM {ramVal}%</p>
+                            <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${getBarColor(ramVal, 'bg-sky-500')}`}
+                                style={{ width: `${Math.min(100, Math.max(0, ramVal))}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-medium text-on-surface text-[11px]">Disk {diskVal}%</p>
+                            <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${getBarColor(diskVal, 'bg-indigo-500')}`}
+                                style={{ width: `${Math.min(100, Math.max(0, diskVal))}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {s.connectedDomains && s.connectedDomains.length > 0 && (
+                          <div className="mt-2.5 flex items-center gap-1.5 overflow-hidden text-caption-xs text-secondary border-t border-outline-variant/20 pt-2">
+                            <span className="material-symbols-outlined text-[13px] text-primary">dns</span>
+                            <span className="font-mono text-[11px] truncate text-on-surface/80">
+                              {s.connectedDomains.slice(0, 2).join(', ')}
+                              {s.connectedDomains.length > 2 ? ` +${s.connectedDomains.length - 2} more` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               );
             })}

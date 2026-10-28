@@ -123,7 +123,18 @@ export class MonitoringService {
     workspaceId: string,
     domainId: string,
   ): Promise<{ inventoryState: string } | undefined> {
+    if (typeof this.store.findDomain === 'function') {
+      return this.store.findDomain(workspaceId, domainId);
+    }
     return this.store.withWorkspaceContext(workspaceId, async (transaction) => {
+      if (typeof (transaction as any)?.select !== 'function') {
+        const cols = (transaction as any)?.collections;
+        if (cols?.domains) {
+          const doc = await (cols.domains as any).findOne({ workspaceId, id: domainId });
+          return doc ? { inventoryState: doc.inventoryState } : undefined;
+        }
+        return undefined;
+      }
       const [domain] = await transaction
         .select({ inventoryState: domains.inventoryState })
         .from(domains)

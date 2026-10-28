@@ -137,6 +137,10 @@ export interface Page<T> {
 }
 
 export interface MonitoringStore {
+  findDomain?(
+    workspaceId: string,
+    domainId: string,
+  ): Promise<{ inventoryState: string } | undefined>;
   findTargetByDomainId(
     workspaceId: string,
     domainId: string,

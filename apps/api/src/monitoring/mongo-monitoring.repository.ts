@@ -24,6 +24,24 @@ import type { DatabaseService } from '../database/database.service';
 export class MongoMonitoringRepository implements MonitoringStore {
   constructor(private readonly database: DatabaseService) {}
 
+  async findDomain(
+    workspaceId: string,
+    domainId: string,
+  ): Promise<{ inventoryState: string } | undefined> {
+    const cols = this.database.collections;
+    if (!cols) throw new MonitoringPersistenceError('Database not initialized');
+
+    const domain = await (cols.domains as any).findOne({
+      workspaceId,
+      id: domainId,
+    });
+    if (!domain) return undefined;
+
+    return {
+      inventoryState: domain.inventoryState,
+    };
+  }
+
   async findTargetByDomainId(
     workspaceId: string,
     domainId: string,
@@ -31,13 +49,16 @@ export class MongoMonitoringRepository implements MonitoringStore {
     const cols = this.database.collections;
     if (!cols) throw new MonitoringPersistenceError('Database not initialized');
 
-    const target = await cols.monitoringTargets.findOne({ workspaceId, targetId: domainId } as any);
+    const target = await cols.monitoringTargets.findOne({
+      workspaceId,
+      $or: [{ targetId: domainId }, { domainId: domainId }],
+    } as any);
     if (!target) return undefined;
 
     return {
       id: target.id,
       workspaceId: target.workspaceId,
-      domainId: (target as any).targetId ?? domainId,
+      domainId: (target as any).targetId ?? (target as any).domainId ?? domainId,
       enabled: target.enabled,
       checkIntervalMinutes: Math.round(((target as any).checkIntervalSeconds ?? 3600) / 60),
       nextRunAt: null,
