@@ -54,7 +54,13 @@ jobs:
           docker run --rm domainexp-web-check nginx -t
           trap 'docker rm -f domainexp-web-check >/dev/null 2>&1 || true' EXIT
           docker run -d --name domainexp-web-check -p 127.0.0.1:8089:80 domainexp-web-check
-          curl --fail --silent --show-error --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:8089/login -o /tmp/frontend-login.html
+          ready=0
+          for attempt in {1..30}; do
+            if [[ "$(docker inspect -f '{{.State.Health.Status}}' domainexp-web-check)" == healthy ]]; then ready=1; break; fi
+            sleep 1
+          done
+          [[ "$ready" == 1 ]] || { docker logs domainexp-web-check; exit 1; }
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 http://127.0.0.1:8089/login -o /tmp/frontend-login.html
           cmp apps/web/dist/index.html /tmp/frontend-login.html
           curl --fail --silent --show-error http://127.0.0.1:8089/domains -o /tmp/frontend-route.html
           cmp apps/web/dist/index.html /tmp/frontend-route.html
