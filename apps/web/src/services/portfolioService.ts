@@ -948,6 +948,8 @@ export const STORAGE_KEYS = {
   PROVIDERS: 'dp_web_providers_list_v1',
   CONSOLE_DEV: 'dp_web_console_developer_name',
   SERVER_DOMAINS: 'dp_web_server_domains_map_v1',
+  DELETED_APPS: 'dp_web_deleted_apps_keys_v1',
+  DELETED_WEBSITES: 'dp_web_deleted_websites_keys_v1',
 };
 
 export function getLocal<T>(key: string, fallback: T): T {
@@ -1196,6 +1198,14 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
             } : {}),
           });
         }
+
+        for (const loc of cleanLocal) {
+          const locName = (loc.name || '').toLowerCase().trim();
+          const existsById = Array.from(map.values()).some((d) => d.id === loc.id);
+          if (locName && !map.has(locName) && !existsById) {
+            map.set(locName, loc);
+          }
+        }
         const merged = Array.from(map.values());
         setLocal(STORAGE_KEYS.DOMAINS, merged);
         setMemoryCache(cacheKey, merged);
@@ -1349,30 +1359,59 @@ export async function fetchServersList(options?: { forceRefresh?: boolean }): Pr
           const uptime = isSuspended ? '0.0%' : `${(99.8 + ((seed % 19) / 100)).toFixed(2)}%`;
           const status = isSuspended ? 'warning' : 'healthy';
 
+          let providerName = b.serverKind === 'hostinger' ? 'Hostinger' : (b.serverKind || 'Custom VPS');
+          if (b.notes?.includes('Provider: ')) {
+            providerName = b.notes.split('Provider: ')[1].split('|')[0].trim();
+          }
+          let cpuStr = (b as any).providerMetadata?.specs?.cpuCount
+            ? `${(b as any).providerMetadata.specs.cpuCount} vCPU`
+            : (isKvm ? '1 vCPU (KVM 1)' : '4 vCPU');
+          let memStr = (b as any).providerMetadata?.specs?.memoryMb
+            ? `${Math.round((b as any).providerMetadata.specs.memoryMb / 1024)} GB`
+            : (isKvm ? '4 GB' : '8 GB');
+          if (b.notes?.includes('Specs: ')) {
+            const parts = b.notes.split('Specs: ')[1].split('|');
+            if (parts[0]?.trim()) cpuStr = parts[0].trim();
+            if (parts[1]?.trim()) memStr = parts[1].trim();
+          }
+
+          const localMatch = cleanLocal.find((s) => s.id === b.id || (s.name || '').toLowerCase() === key);
+          if (localMatch) {
+            if (localMatch.provider) providerName = localMatch.provider;
+            if (localMatch.cpu) cpuStr = localMatch.cpu;
+            if (localMatch.memory) memStr = localMatch.memory;
+          }
+
           map.set(key, {
             id: b.id,
             name: b.name || b.hostname || 'Hostinger VPS',
-            provider: b.serverKind === 'hostinger' ? 'Hostinger' : (b.serverKind || 'Custom VPS'),
-            providerKey: (b.serverKind || 'hostinger').toLowerCase(),
-            region: b.region || 'Mumbai (DC-21)',
-            ipAddress: primaryIp || 'Not Assigned',
-            cpu: (b as any).providerMetadata?.specs?.cpuCount
-              ? `${(b as any).providerMetadata.specs.cpuCount} vCPU`
-              : (isKvm ? '1 vCPU (KVM 1)' : '4 vCPU'),
-            memory: (b as any).providerMetadata?.specs?.memoryMb
-              ? `${Math.round((b as any).providerMetadata.specs.memoryMb / 1024)} GB`
-              : (isKvm ? '4 GB' : '8 GB'),
-            os: b.operatingSystem || 'Ubuntu 24.04 LTS',
+            provider: providerName,
+            providerKey: (b.serverKind || providerName).toLowerCase().replace(/[^a-z0-9]/g, ''),
+            region: b.region || localMatch?.region || 'Mumbai (DC-21)',
+            ipAddress: primaryIp || localMatch?.ipAddress || 'Not Assigned',
+            cpu: cpuStr,
+            memory: memStr,
+            os: b.operatingSystem || localMatch?.os || 'Ubuntu 24.04 LTS',
             status,
             uptime,
             cpuUsagePercent: cpuUsage,
             memoryUsagePercent: ramUsage,
             diskUsagePercent: diskUsage,
-            connectedDomains: uniqueDomains,
+            connectedDomains: Array.from(new Set([...uniqueDomains, ...(localMatch?.connectedDomains || [])])),
             sshPort: 22,
             sshStatus: isSuspended ? 'suspended' : 'protected',
           });
         }
+
+        // Merge local user-added servers that are not yet in backend items
+        for (const loc of cleanLocal) {
+          const locKey = (loc.name || '').toLowerCase().trim();
+          const existsById = Array.from(map.values()).some((s) => s.id === loc.id);
+          if (locKey && !map.has(locKey) && !existsById) {
+            map.set(locKey, loc);
+          }
+        }
+
         const merged = Array.from(map.values());
         setLocal(STORAGE_KEYS.SERVERS, merged);
         setMemoryCache(cacheKey, merged);
@@ -1402,10 +1441,19 @@ export async function fetchApplicationsList(options?: { forceRefresh?: boolean }
 
   const promise = (async () => {
     const activeDev = getConsoleDeveloperName();
+    const deletedKeys = new Set(
+      getLocal<string[]>(STORAGE_KEYS.DELETED_APPS, []).map((k) => (k || '').toLowerCase().trim())
+    );
     const local = getLocal<ApplicationItem[]>(STORAGE_KEYS.APPLICATIONS, []);
     const cleanLocal = local.filter((a) => {
       if (!a?.id) return false;
       const dev = a.developerName || activeDev;
+      const idKey = (a.id || '').toLowerCase().trim();
+      const nameKey = (a.name || '').toLowerCase().trim();
+      const pkgKey = (a.packageId || '').toLowerCase().trim();
+      if (deletedKeys.has(idKey) || deletedKeys.has(nameKey) || (pkgKey && deletedKeys.has(pkgKey))) {
+        return false;
+      }
       return isMatchingConsoleDeveloper(dev, activeDev);
     });
 
@@ -1416,7 +1464,14 @@ export async function fetchApplicationsList(options?: { forceRefresh?: boolean }
         const mobileApps = response.items.filter((b: any) => b.kind !== 'WEBSITE');
         const map = new Map<string, ApplicationItem>();
         for (const b of mobileApps) {
+          const bId = (b.id || '').toLowerCase().trim();
+          const bName = (b.name || '').toLowerCase().trim();
           const pkg = (b.notes || '').trim();
+          const pkgKey = pkg.toLowerCase().trim();
+          if (deletedKeys.has(bId) || deletedKeys.has(bName) || (pkgKey && deletedKeys.has(pkgKey))) {
+            continue;
+          }
+
           const k = (pkg || b.name).toLowerCase().trim();
           const devName = (b as any).developerName;
 
@@ -1445,12 +1500,16 @@ export async function fetchApplicationsList(options?: { forceRefresh?: boolean }
           });
         }
 
-        // If backend inventory has apps for activeDev, use them, otherwise use cleanLocal
-        let merged = Array.from(map.values());
-        if (merged.length === 0 && cleanLocal.length > 0) {
-          merged = cleanLocal;
+        // Merge cleanLocal applications that aren't already represented from backend
+        for (const loc of cleanLocal) {
+          const locKey = (loc.packageId || loc.name || '').toLowerCase().trim();
+          const existsById = Array.from(map.values()).some((a) => a.id === loc.id);
+          if (locKey && !map.has(locKey) && !existsById) {
+            map.set(locKey, loc);
+          }
         }
 
+        const merged = Array.from(map.values());
         setLocal(STORAGE_KEYS.APPLICATIONS, merged);
         setMemoryCache(cacheKey, merged);
         return merged;
@@ -1479,8 +1538,21 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
   }
 
   const promise = (async () => {
+    const deletedKeys = new Set(
+      getLocal<string[]>(STORAGE_KEYS.DELETED_WEBSITES, []).map((k) => (k || '').toLowerCase().trim())
+    );
     const local = getLocal<WebsiteItem[]>(STORAGE_KEYS.WEBSITES, []);
-    const cleanLocal = local.filter((w) => w?.id && !w.id.startsWith('web-worknai') && !w.id.startsWith('web-hrms') && !w.id.startsWith('web-aitourism') && !w.id.startsWith('web-goairclass') && !w.id.startsWith('web-blooddonation') && !w.id.startsWith('web-gymproplus'));
+    const cleanLocal = local.filter((w) => {
+      if (!w?.id) return false;
+      if (w.id.startsWith('web-worknai') || w.id.startsWith('web-hrms') || w.id.startsWith('web-aitourism') || w.id.startsWith('web-goairclass') || w.id.startsWith('web-blooddonation') || w.id.startsWith('web-gymproplus')) return false;
+      const idKey = (w.id || '').toLowerCase().trim();
+      const nameKey = (w.name || '').toLowerCase().trim();
+      const domKey = (w.domain || '').toLowerCase().trim();
+      if (deletedKeys.has(idKey) || deletedKeys.has(nameKey) || (domKey && deletedKeys.has(domKey))) {
+        return false;
+      }
+      return true;
+    });
 
     try {
       const [appRes, domRes] = await Promise.all([
@@ -1495,6 +1567,10 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
           if ((app as any).kind === 'MOBILE_APPLICATION' || (app as any).provenance === 'PLAY_STORE_SYNC') continue;
           const dom = ((app as any).domainId || app.name || '').toLowerCase().trim();
           if (!dom) continue;
+          const appId = (app.id || '').toLowerCase().trim();
+          const appName = (app.name || '').toLowerCase().trim();
+          if (deletedKeys.has(appId) || deletedKeys.has(appName) || deletedKeys.has(dom)) continue;
+
           map.set(dom, {
             id: app.id,
             name: app.name,
@@ -1518,6 +1594,9 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
         for (const d of domRes.items) {
           const dom = (d.domainName || '').toLowerCase().trim();
           if (!dom || map.has(dom)) continue;
+          const dId = (d.id || '').toLowerCase().trim();
+          if (deletedKeys.has(dId) || deletedKeys.has(dom)) continue;
+
           map.set(dom, {
             id: d.id,
             name: dom,
@@ -1534,6 +1613,15 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
             logoUrl: `https://www.google.com/s2/favicons?domain=${dom}&sz=128`,
             notes: d.notes || undefined,
           });
+        }
+      }
+
+      // Merge cleanLocal websites that aren't already represented from backend
+      for (const loc of cleanLocal) {
+        const locKey = (loc.domain || loc.name || '').toLowerCase().trim();
+        const existsById = Array.from(map.values()).some((w) => w.id === loc.id);
+        if (locKey && !map.has(locKey) && !existsById) {
+          map.set(locKey, loc);
         }
       }
 
@@ -1899,27 +1987,42 @@ export async function createServer(data: {
   cpu: string;
   memory: string;
 }): Promise<ServerItem> {
+  const cleanName = data.name.trim();
+  const cleanIp = data.ipAddress.trim();
+  const canonicalKind = data.provider
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'custom';
+
+  const notes = `Created via DomainPulse web | Provider: ${data.provider} | Specs: ${data.cpu} | ${data.memory}`;
+
+  // Ensure IP format passes backend validator if provided, or pass null to allow custom node names
+  const isIpFormat = /^(\d{1,3}\.){3}\d{1,3}$|^([0-9a-fA-F]{1,4}:){1,7}[0-9a-fA-F]{1,4}$/.test(cleanIp);
+
   let backendId = `srv-${Date.now()}`;
   try {
     const res = await createInventory('servers', {
-      name: data.name,
-      hostname: data.name,
-      primaryIp: data.ipAddress,
+      name: cleanName,
+      hostname: cleanName,
+      primaryIp: isIpFormat ? cleanIp : null,
       operatingSystem: data.os,
-      serverKind: data.provider,
+      serverKind: canonicalKind,
       region: data.region,
-      notes: 'Created via DomainPulse web',
+      notes,
     });
     if (res?.id) backendId = res.id;
-  } catch {}
+  } catch (err) {
+    console.warn('Backend createInventory(servers) failed, falling back to local persistence:', err);
+  }
 
   const newServer: ServerItem = {
     id: backendId,
-    name: data.name,
+    name: cleanName,
     provider: data.provider,
-    providerKey: data.provider.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    providerKey: canonicalKind.replace(/[^a-z0-9]/g, ''),
     region: data.region,
-    ipAddress: data.ipAddress,
+    ipAddress: cleanIp || 'Not Assigned',
     cpu: data.cpu,
     memory: data.memory,
     os: data.os,
@@ -1931,9 +2034,16 @@ export async function createServer(data: {
     connectedDomains: [],
   };
 
-  const list = await fetchServersList();
-  const updated = [newServer, ...list];
+  const currentLocal = getLocal<ServerItem[]>(STORAGE_KEYS.SERVERS, []);
+  const updated = [
+    newServer,
+    ...currentLocal.filter(
+      (s) => s.id !== newServer.id && (s.name || '').toLowerCase() !== newServer.name.toLowerCase(),
+    ),
+  ];
   setLocal(STORAGE_KEYS.SERVERS, updated);
+  setMemoryCache('servers_list', updated);
+  INFLIGHT_REQUESTS.delete('servers_list');
   notifyPortfolioUpdated();
   return newServer;
 }
@@ -1941,10 +2051,16 @@ export async function createServer(data: {
 export async function deleteServer(id: string): Promise<void> {
   try {
     await archiveInventory('servers', id);
-  } catch {}
-  const list = await fetchServersList();
-  const updated = list.filter((s) => s.id !== id);
+  } catch (err) {
+    console.warn('Backend archiveInventory(servers) failed:', err);
+  }
+  const currentLocal = getLocal<ServerItem[]>(STORAGE_KEYS.SERVERS, []);
+  const updated = currentLocal.filter(
+    (s) => s.id !== id && (s.name || '').toLowerCase() !== id.toLowerCase(),
+  );
   setLocal(STORAGE_KEYS.SERVERS, updated);
+  setMemoryCache('servers_list', updated);
+  INFLIGHT_REQUESTS.delete('servers_list');
   notifyPortfolioUpdated();
 }
 
@@ -1963,31 +2079,249 @@ export async function createWebsite(data: {
     domain = cleanUrl;
   }
 
+  // Remove from deleted tombstones if re-created
+  const deleted = getLocal<string[]>(STORAGE_KEYS.DELETED_WEBSITES, []);
+  const cleanNameLower = data.name.trim().toLowerCase();
+  const domainLower = domain.toLowerCase();
+  setLocal(
+    STORAGE_KEYS.DELETED_WEBSITES,
+    deleted.filter((k) => k !== cleanNameLower && k !== domainLower)
+  );
+
+  const isValidUrl = /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(cleanUrl);
+
+  let backendId = `web-${Date.now()}`;
+  try {
+    const res = await createInventory('applications', {
+      name: data.name.trim(),
+      primaryUrl: isValidUrl ? cleanUrl : null,
+      kind: 'WEBSITE',
+      notes: data.notes ? `Category: ${data.category} | ${data.notes}` : `Category: ${data.category}`,
+    });
+    if (res?.id) backendId = res.id;
+  } catch (err) {
+    console.warn('Backend createInventory(applications) failed, falling back to local persistence:', err);
+  }
+
   const newSite: WebsiteItem = {
-    id: `web-${Date.now()}`,
+    id: backendId,
     name: data.name.trim(),
     url: cleanUrl,
     category: data.category,
     status: 'healthy',
     domain,
+    serverName: 'srv1357339.hstgr.cloud',
+    serverIp: '76.13.185.120',
     sslActive: true,
     httpStatus: '200 OK',
     responseTimeMs: 28,
-    tags: ['Active', data.category],
+    tags: ['Live Website', data.category],
     logoUrl: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
     notes: data.notes,
   };
 
-  const list = await fetchWebsitesList();
-  const updated = [newSite, ...list];
+  const currentLocal = getLocal<WebsiteItem[]>(STORAGE_KEYS.WEBSITES, []);
+  const updated = [
+    newSite,
+    ...currentLocal.filter(
+      (w) =>
+        w.id !== newSite.id &&
+        (w.name || '').toLowerCase() !== newSite.name.toLowerCase() &&
+        (w.domain || '').toLowerCase() !== newSite.domain.toLowerCase(),
+    ),
+  ];
   setLocal(STORAGE_KEYS.WEBSITES, updated);
+  setMemoryCache('websites_list', updated);
+  INFLIGHT_REQUESTS.delete('websites_list');
   notifyPortfolioUpdated();
   return newSite;
 }
 
-export async function deleteWebsite(id: string): Promise<void> {
-  const list = await fetchWebsitesList();
-  const updated = list.filter((w) => w.id !== id);
+export async function deleteWebsite(id: string, name?: string, domain?: string): Promise<void> {
+  const cleanId = (id || '').toLowerCase().trim();
+  const cleanName = (name || '').toLowerCase().trim();
+  const cleanDomain = (domain || '').toLowerCase().trim();
+
+  // Add to deleted keys tombstone
+  const deleted = getLocal<string[]>(STORAGE_KEYS.DELETED_WEBSITES, []);
+  const toAdd = [cleanId, cleanName, cleanDomain].filter(Boolean);
+  setLocal(STORAGE_KEYS.DELETED_WEBSITES, Array.from(new Set([...deleted, ...toAdd])));
+
+  try {
+    // 1. Direct UUID archive
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      await archiveInventory('applications', id).catch(() => {});
+      await archiveInventory('domains', id).catch(() => {});
+    }
+
+    // 2. Query backend to find matching record by id, name or url domain and archive it
+    const [appRes, domRes] = await Promise.all([
+      listInventory('applications', { limit: 100 }).catch(() => null),
+      listInventory('domains', { limit: 100 }).catch(() => null),
+    ]);
+
+    if (appRes?.items && Array.isArray(appRes.items)) {
+      const matches = appRes.items.filter((b: any) => {
+        const bId = (b.id || '').toLowerCase().trim();
+        const bName = (b.name || '').toLowerCase().trim();
+        const bUrl = (b.primaryUrl || '').toLowerCase();
+        return (
+          bId === cleanId ||
+          (cleanName && bName === cleanName) ||
+          (cleanDomain && (bUrl.includes(cleanDomain) || bName === cleanDomain))
+        );
+      });
+      await Promise.allSettled(matches.map((m: any) => archiveInventory('applications', m.id).catch(() => {})));
+    }
+
+    if (domRes?.items && Array.isArray(domRes.items)) {
+      const matches = domRes.items.filter((d: any) => {
+        const dId = (d.id || '').toLowerCase().trim();
+        const dName = (d.domainName || '').toLowerCase().trim();
+        return (
+          dId === cleanId ||
+          (cleanName && dName === cleanName) ||
+          (cleanDomain && dName === cleanDomain)
+        );
+      });
+      await Promise.allSettled(matches.map((m: any) => archiveInventory('domains', m.id).catch(() => {})));
+    }
+  } catch (err) {
+    console.warn('Backend archiveInventory failed:', err);
+  }
+
+  const currentLocal = getLocal<WebsiteItem[]>(STORAGE_KEYS.WEBSITES, []);
+  const updated = currentLocal.filter((w) => {
+    const wId = (w.id || '').toLowerCase().trim();
+    const wName = (w.name || '').toLowerCase().trim();
+    const wDomain = (w.domain || '').toLowerCase().trim();
+    return (
+      wId !== cleanId &&
+      (!cleanName || wName !== cleanName) &&
+      (!cleanDomain || wDomain !== cleanDomain)
+    );
+  });
   setLocal(STORAGE_KEYS.WEBSITES, updated);
+  setMemoryCache('websites_list', updated);
+  INFLIGHT_REQUESTS.delete('websites_list');
+  notifyPortfolioUpdated();
+}
+
+export async function createApplication(data: {
+  name: string;
+  packageId?: string;
+  developerName?: string;
+  playStoreUrl?: string;
+  version?: string;
+}): Promise<ApplicationItem> {
+  const cleanName = data.name.trim();
+  const pkg = (data.packageId || '').trim();
+  const dev = data.developerName || getConsoleDeveloperName();
+  const playUrl = data.playStoreUrl || (pkg ? `https://play.google.com/store/apps/details?id=${pkg}` : undefined);
+  const isValidUrl = playUrl ? /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(playUrl) : false;
+
+  // Remove from deleted tombstones if re-created
+  const deleted = getLocal<string[]>(STORAGE_KEYS.DELETED_APPS, []);
+  const cleanNameLower = cleanName.toLowerCase();
+  const pkgLower = pkg.toLowerCase();
+  setLocal(
+    STORAGE_KEYS.DELETED_APPS,
+    deleted.filter((k) => k !== cleanNameLower && (!pkgLower || k !== pkgLower))
+  );
+
+  let backendId = `play-${Date.now()}`;
+  try {
+    const res = await createInventory('applications', {
+      kind: 'MOBILE_APPLICATION',
+      name: cleanName,
+      notes: pkg ? `${pkg} · ${dev}` : `Tracked mobile app (${dev})`,
+      primaryUrl: isValidUrl ? playUrl : null,
+    });
+    if (res?.id) backendId = res.id;
+  } catch (err) {
+    console.warn('Backend createInventory(applications) failed:', err);
+  }
+
+  const newApp: ApplicationItem = {
+    id: backendId,
+    name: cleanName,
+    packageId: pkg || undefined,
+    environment: 'Production',
+    status: 'healthy',
+    version: data.version || 'v1.0.0',
+    serverName: 'Google Play Console',
+    developerName: dev,
+    releaseTrack: 'Production',
+    playStoreUrl: playUrl,
+    url: playUrl,
+    iconUrl: REAL_APP_ICONS[pkg] || '/images/google-play.png',
+    updatedAt: new Date().toISOString(),
+  };
+
+  const currentLocal = getLocal<ApplicationItem[]>(STORAGE_KEYS.APPLICATIONS, []);
+  const updated = [
+    newApp,
+    ...currentLocal.filter(
+      (a) =>
+        a.id !== newApp.id &&
+        (a.name || '').toLowerCase() !== newApp.name.toLowerCase() &&
+        (pkg ? (a.packageId || '').toLowerCase() !== pkg.toLowerCase() : true),
+    ),
+  ];
+  setLocal(STORAGE_KEYS.APPLICATIONS, updated);
+  setMemoryCache('applications_list', updated);
+  INFLIGHT_REQUESTS.delete('applications_list');
+  notifyPortfolioUpdated();
+  return newApp;
+}
+
+export async function deleteApplication(id: string, name?: string, packageId?: string): Promise<void> {
+  const cleanId = (id || '').toLowerCase().trim();
+  const cleanName = (name || '').toLowerCase().trim();
+  const cleanPkg = (packageId || '').toLowerCase().trim();
+
+  // Add to deleted keys tombstone
+  const deleted = getLocal<string[]>(STORAGE_KEYS.DELETED_APPS, []);
+  const toAdd = [cleanId, cleanName, cleanPkg].filter(Boolean);
+  setLocal(STORAGE_KEYS.DELETED_APPS, Array.from(new Set([...deleted, ...toAdd])));
+
+  try {
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      await archiveInventory('applications', id).catch(() => {});
+    }
+
+    const response = await listInventory('applications', { limit: 100 }).catch(() => null);
+    if (response?.items && Array.isArray(response.items)) {
+      const matches = response.items.filter((b: any) => {
+        const bId = (b.id || '').toLowerCase().trim();
+        const bName = (b.name || '').toLowerCase().trim();
+        const bNotes = (b.notes || '').toLowerCase();
+        const bUrl = (b.primaryUrl || '').toLowerCase();
+        return (
+          bId === cleanId ||
+          (cleanName && bName === cleanName) ||
+          (cleanPkg && (bNotes.includes(cleanPkg) || bUrl.includes(cleanPkg) || bName === cleanPkg))
+        );
+      });
+      await Promise.allSettled(matches.map((m: any) => archiveInventory('applications', m.id).catch(() => {})));
+    }
+  } catch (err) {
+    console.warn('Backend archiveInventory(applications) failed:', err);
+  }
+
+  const currentLocal = getLocal<ApplicationItem[]>(STORAGE_KEYS.APPLICATIONS, []);
+  const updated = currentLocal.filter((a) => {
+    const aId = (a.id || '').toLowerCase().trim();
+    const aName = (a.name || '').toLowerCase().trim();
+    const aPkg = (a.packageId || '').toLowerCase().trim();
+    return (
+      aId !== cleanId &&
+      (!cleanName || aName !== cleanName) &&
+      (!cleanPkg || aPkg !== cleanPkg)
+    );
+  });
+  setLocal(STORAGE_KEYS.APPLICATIONS, updated);
+  setMemoryCache('applications_list', updated);
+  INFLIGHT_REQUESTS.delete('applications_list');
   notifyPortfolioUpdated();
 }

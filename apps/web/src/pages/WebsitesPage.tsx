@@ -6,6 +6,8 @@ import {
   fetchWebsitesList,
   createWebsite,
   deleteWebsite,
+  createApplication,
+  deleteApplication,
   getConsoleDeveloperName,
   syncGooglePlayDeveloper,
   type ApplicationItem,
@@ -20,7 +22,6 @@ export const WebsitesPage: React.FC = () => {
     tabParam === 'websites' ? 'websites' : 'apps'
   );
 
-
   // Apps state
   const [apps, setApps] = useState<ApplicationItem[]>([]);
   const [appFilter, setAppFilter] = useState<'All' | 'Production' | 'Review' | 'Issues'>('All');
@@ -29,6 +30,13 @@ export const WebsitesPage: React.FC = () => {
   const [isConsoleModalOpen, setIsConsoleModalOpen] = useState(false);
   const [inputDevName, setInputDevName] = useState(getConsoleDeveloperName());
   const [isSyncingConsole, setIsSyncingConsole] = useState(false);
+
+  // Add App state
+  const [isAddAppModalOpen, setIsAddAppModalOpen] = useState(false);
+  const [newAppName, setNewAppName] = useState('');
+  const [newAppPackageId, setNewAppPackageId] = useState('');
+  const [newAppPlayUrl, setNewAppPlayUrl] = useState('');
+  const [newAppVersion, setNewAppVersion] = useState('v1.0.0');
 
   // Websites state
   const [websites, setWebsites] = useState<WebsiteItem[]>([]);
@@ -50,6 +58,15 @@ export const WebsitesPage: React.FC = () => {
   // Feedback modal
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  // Delete Confirmation Modal state
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'app' | 'website';
+    id: string;
+    name: string;
+    extra?: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const loadData = async (force = false) => {
     try {
       const [appList, webList] = await Promise.all([
@@ -66,6 +83,9 @@ export const WebsitesPage: React.FC = () => {
 
   useEffect(() => {
     void loadData();
+    const handleUpdate = () => void loadData();
+    window.addEventListener('domainpulse:portfolio-updated', handleUpdate);
+    return () => window.removeEventListener('domainpulse:portfolio-updated', handleUpdate);
   }, []);
 
   const handleSyncConsole = async (e?: React.FormEvent) => {
@@ -100,7 +120,6 @@ export const WebsitesPage: React.FC = () => {
     }
   };
 
-
   const handlePingApp = (appId: string) => {
     setPingStatusMap((prev) => ({ ...prev, [appId]: 'checking' }));
     setTimeout(() => {
@@ -122,12 +141,63 @@ export const WebsitesPage: React.FC = () => {
     setNewWebName('');
     setNewWebUrl('');
     setNewWebNotes('');
+    setFeedback(`Website "${created.name}" was successfully added to your portfolio and database.`);
   };
 
-  const handleDeleteWebsite = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to remove website ${name}?`)) return;
-    setWebsites((prev) => prev.filter((w) => w.id !== id));
-    await deleteWebsite(id);
+  const handleDeleteWebsite = (id: string, name: string, domain?: string) => {
+    setDeleteTarget({ type: 'website', id, name, extra: domain });
+  };
+
+  const handleDeleteApp = (id: string, name: string, packageId?: string) => {
+    setDeleteTarget({ type: 'app', id, name, extra: packageId });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      if (deleteTarget.type === 'app') {
+        setApps((prev) =>
+          prev.filter(
+            (a) =>
+              a.id !== deleteTarget.id &&
+              a.name !== deleteTarget.name &&
+              (!deleteTarget.extra || a.packageId !== deleteTarget.extra)
+          )
+        );
+        if (selectedApp?.id === deleteTarget.id || selectedApp?.name === deleteTarget.name) {
+          setSelectedApp(null);
+        }
+        await deleteApplication(deleteTarget.id, deleteTarget.name, deleteTarget.extra);
+        setFeedback(`Application "${deleteTarget.name}" was successfully deleted from your portfolio and database.`);
+      } else {
+        setWebsites((prev) => prev.filter((w) => w.id !== deleteTarget.id && w.name !== deleteTarget.name));
+        await deleteWebsite(deleteTarget.id, deleteTarget.name, deleteTarget.extra);
+        setFeedback(`Website "${deleteTarget.name}" was successfully deleted from your portfolio and database.`);
+      }
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
+  const handleCreateApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAppName.trim()) return;
+    const created = await createApplication({
+      name: newAppName.trim(),
+      packageId: newAppPackageId.trim() || undefined,
+      playStoreUrl: newAppPlayUrl.trim() || undefined,
+      version: newAppVersion.trim() || 'v1.0.0',
+      developerName: consoleDevName,
+    });
+    setApps((prev) => [created, ...prev.filter((a) => a.id !== created.id)]);
+    setIsAddAppModalOpen(false);
+    setNewAppName('');
+    setNewAppPackageId('');
+    setNewAppPlayUrl('');
+    setNewAppVersion('v1.0.0');
+    setFeedback(`Application "${created.name}" was successfully added to your portfolio and database.`);
   };
 
   // Filtered Apps
@@ -187,6 +257,60 @@ export const WebsitesPage: React.FC = () => {
                 className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:bg-primary/90 shadow-sm"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-error/30 bg-surface-container-lowest p-6 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-error/15 text-error">
+                <span className="material-symbols-outlined text-[24px]">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="text-title-md font-bold text-on-surface">
+                  Delete {deleteTarget.type === 'app' ? 'Application' : 'Website'}
+                </h3>
+                <p className="text-caption-xs text-secondary">
+                  Remove from portfolio &amp; database
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-4 text-body-sm text-secondary leading-relaxed">
+              Are you sure you want to delete <strong className="text-on-surface font-semibold">&ldquo;{deleteTarget.name}&rdquo;</strong>?
+              This will immediately remove it from your active dashboard and archive it in the backend inventory database.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-secondary hover:bg-surface-container disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-error px-5 py-2 text-sm font-semibold text-on-error hover:bg-error/90 shadow-sm disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                    <span>Deleting…</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    <span>Confirm Delete</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -349,6 +473,97 @@ export const WebsitesPage: React.FC = () => {
         </div>
       )}
 
+      {/* Add Mobile App Modal */}
+      {isAddAppModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-outline-variant/40 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[22px]">smartphone</span>
+                <h3 className="text-title-md font-bold text-on-surface">Add Mobile Application</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddAppModalOpen(false)}
+                className="text-secondary hover:text-on-surface"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleCreateApp} className="mt-4 flex flex-col gap-4">
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Application Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. WorknAi Client Portal"
+                  value={newAppName}
+                  onChange={(e) => setNewAppName(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Package ID (Android / Play Store)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. com.worknai.app"
+                  value={newAppPackageId}
+                  onChange={(e) => setNewAppPackageId(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface font-mono focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Play Store or Download URL
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://play.google.com/store/apps/details?id=..."
+                  value={newAppPlayUrl}
+                  onChange={(e) => setNewAppPlayUrl(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Release Version
+                </label>
+                <input
+                  type="text"
+                  placeholder="v1.0.0"
+                  value={newAppVersion}
+                  onChange={(e) => setNewAppVersion(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAddAppModalOpen(false)}
+                  className="rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-secondary hover:bg-surface-container"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90 shadow-sm"
+                >
+                  Add Application
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Selected App Modal */}
       {selectedApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
@@ -401,7 +616,15 @@ export const WebsitesPage: React.FC = () => {
                 Updated {selectedApp.updatedAt ? new Date(selectedApp.updatedAt).toLocaleDateString() : 'Sep 2026'}
               </span>
 
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteApp(selectedApp.id, selectedApp.name, selectedApp.packageId)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-xs font-semibold text-error hover:bg-error/20 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[15px]">delete</span>
+                  <span>Delete</span>
+                </button>
                 {selectedApp.playStoreUrl && (
                   <a
                     href={selectedApp.playStoreUrl}
@@ -512,6 +735,15 @@ export const WebsitesPage: React.FC = () => {
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
+                onClick={() => setIsAddAppModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-on-primary shadow-sm hover:bg-primary/90"
+              >
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                <span>Add App</span>
+              </button>
+
+              <button
+                type="button"
                 disabled={isSyncingConsole}
                 onClick={handleQuickSync}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant/60 bg-surface-container-high px-3.5 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors shadow-sm disabled:opacity-50"
@@ -527,7 +759,7 @@ export const WebsitesPage: React.FC = () => {
                   setInputDevName('');
                   setIsConsoleModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-on-primary shadow-sm hover:bg-primary/90 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant/60 bg-surface-container-high px-3.5 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors shadow-sm disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">add_link</span>
                 <span>Change Developer</span>
@@ -668,7 +900,7 @@ export const WebsitesPage: React.FC = () => {
                       <span>{pingResult ? pingResult : 'Ping Store'}</span>
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setSelectedApp(a)}
@@ -676,6 +908,15 @@ export const WebsitesPage: React.FC = () => {
                         title="App Details"
                       >
                         <span className="material-symbols-outlined text-[18px]">info</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteApp(a.id, a.name, a.packageId)}
+                        className="rounded-lg p-1.5 text-secondary hover:bg-error/10 hover:text-error transition-colors"
+                        title="Delete App"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
                       </button>
 
                       {a.playStoreUrl && (
@@ -836,7 +1077,7 @@ export const WebsitesPage: React.FC = () => {
                           </a>
                           <button
                             type="button"
-                            onClick={() => handleDeleteWebsite(w.id, w.name)}
+                            onClick={() => handleDeleteWebsite(w.id, w.name, w.domain)}
                             className="rounded-lg p-1.5 text-secondary hover:bg-error/10 hover:text-error transition-colors"
                             title="Delete Website"
                           >

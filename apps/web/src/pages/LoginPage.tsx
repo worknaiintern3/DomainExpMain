@@ -107,8 +107,8 @@ export const AuthCard: React.FC<React.PropsWithChildren<{ title: string; subtitl
         <div className="relative hidden min-h-[620px] flex-col justify-between overflow-hidden bg-primary px-10 py-10 text-on-primary lg:flex">
           <div aria-hidden="true" className="absolute -right-32 -top-24 h-80 w-80 rounded-full border border-white/15 bg-white/5" />
           <div aria-hidden="true" className="absolute -bottom-28 -left-32 h-96 w-96 rounded-full border border-white/15 bg-white/5" />
-          <a href={landingUrl} className="relative z-10 inline-flex w-fit items-center gap-2 rounded-lg text-lg font-bold tracking-tight text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15"><span className="material-symbols-outlined">pulse_alert</span></span>
+          <a href={landingUrl} className="relative z-10 inline-flex w-fit items-center gap-2.5 rounded-lg text-lg font-bold tracking-tight text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+            <img src="/logo.png" alt="DomainPulse" className="h-9 w-9 rounded-xl object-cover shadow-micro border border-white/20" />
             DomainPulse
           </a>
           <div className="relative z-10">
@@ -135,7 +135,7 @@ export const AuthCard: React.FC<React.PropsWithChildren<{ title: string; subtitl
         <div className="flex min-w-0 flex-col px-6 py-7 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
           <div className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-2 text-body-sm font-bold tracking-tight text-on-surface lg:hidden">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white"><span className="material-symbols-outlined text-[18px]">pulse_alert</span></span>
+              <img src="/logo.png" alt="DomainPulse" className="h-8 w-8 rounded-lg object-cover shadow-micro border border-outline-variant/30" />
               DomainPulse
             </span>
             <a href={landingUrl} className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-body-sm font-semibold text-primary transition-colors hover:bg-primary-fixed/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">

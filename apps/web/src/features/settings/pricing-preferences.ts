@@ -86,6 +86,13 @@ export function loadPricingPreferences(): PricingCurrencySettings {
 
 export function savePricingPreferences(prefs: PricingCurrencySettings): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  if (prefs.defaultCurrency && typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('domainpulse:currency-change', {
+        detail: { currency: prefs.defaultCurrency },
+      }),
+    );
+  }
 }
 
 /** Settings horizon label -> OwnershipCostBenchmark years. */

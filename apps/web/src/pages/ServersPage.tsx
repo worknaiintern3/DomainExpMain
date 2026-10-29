@@ -45,6 +45,10 @@ export const ServersPage: React.FC = () => {
   // Copy feedback
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Expandable domains per server card
+  const [expandedServers, setExpandedServers] = useState<Record<string, boolean>>({});
+  const [domainFilterQuery, setDomainFilterQuery] = useState<Record<string, string>>({});
+
   const loadData = async (force = false) => {
     try {
       const list = await fetchServersList({ forceRefresh: force });
@@ -88,7 +92,12 @@ export const ServersPage: React.FC = () => {
         cpu,
         memory,
       });
-      setServers((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
+      setServers((prev) => [
+        created,
+        ...prev.filter(
+          (s) => s.id !== created.id && s.name.toLowerCase() !== created.name.toLowerCase(),
+        ),
+      ]);
       setIsAddModalOpen(false);
       setName('');
       setIpAddress('');
@@ -467,12 +476,13 @@ export const ServersPage: React.FC = () => {
           <p className="text-body-sm font-medium text-secondary">No servers match the selected filter.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 items-start">
           {filteredServers.map((s) => {
             const provKey = (s.providerKey || s.provider || 'hostinger').toLowerCase();
             const matchedLogo = Object.keys(PROVIDER_LOGOS).find((k) => provKey.includes(k));
             const logo = matchedLogo ? PROVIDER_LOGOS[matchedLogo] : '/images/providers/hostinger.png';
             const isOffline = s.status === 'offline';
+            const isSuspended = s.status === 'warning' || s.sshStatus === 'suspended' || s.uptime === '0.0%';
             const sshCmd = `ssh root@${s.ipAddress}`;
 
             return (
@@ -508,11 +518,13 @@ export const ServersPage: React.FC = () => {
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                       isOffline
                         ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                        : isSuspended
+                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
                         : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                     }`}
                   >
                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {isOffline ? 'Offline' : `${s.uptime || '99.9%'} Uptime`}
+                    {isOffline ? 'Offline' : isSuspended ? 'Suspended (0% Uptime)' : `${s.uptime || '99.9%'} Uptime`}
                   </span>
                 </div>
 
@@ -556,10 +568,10 @@ export const ServersPage: React.FC = () => {
                   const cpuVal = s.cpuUsagePercent ?? 0;
                   const ramVal = s.memoryUsagePercent ?? 0;
                   const diskVal = s.diskUsagePercent ?? 0;
-                  const isSuspended = s.status === 'warning' || s.status === 'offline' || (cpuVal === 0 && ramVal === 0);
+                  const isSusp = s.status === 'warning' || s.status === 'offline' || (cpuVal === 0 && ramVal === 0);
 
                   const getBarColor = (val: number, defaultColor: string) => {
-                    if (isSuspended) return 'bg-outline-variant/60';
+                    if (isSusp) return 'bg-outline-variant/60';
                     if (val >= 85) return 'bg-rose-500';
                     if (val >= 70) return 'bg-amber-500';
                     return defaultColor;
@@ -571,7 +583,7 @@ export const ServersPage: React.FC = () => {
                         <div className="flex justify-between text-[11px] text-secondary font-medium">
                           <span>CPU</span>
                           <span className="text-on-surface font-bold">
-                            {cpuVal}%{isSuspended ? ' (Idle)' : ''}
+                            {cpuVal}%{isSusp ? ' (Idle)' : ''}
                           </span>
                         </div>
                         <div className="mt-1 h-1.5 w-full rounded-full bg-surface-container-high overflow-hidden">
@@ -610,50 +622,155 @@ export const ServersPage: React.FC = () => {
                 })()}
 
                 {/* Connected Domains */}
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 min-h-[26px]">
-                  <span className="text-caption-xs font-semibold text-secondary flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[13px] text-primary">dns</span>
-                    Domains:
-                  </span>
-                  {s.connectedDomains && s.connectedDomains.length > 0 ? (
-                    s.connectedDomains.map((dom) => (
-                      <span
-                        key={dom}
-                        className="group inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 font-mono text-[11px] text-primary font-medium hover:bg-primary/15 transition-colors"
-                      >
-                        <Link
-                          to={`/domains?search=${encodeURIComponent(dom)}`}
-                          className="hover:underline flex items-center gap-0.5"
-                          title={`Filter ${dom} in Domains`}
-                        >
-                          {dom}
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleRemoveDomain(s.id, dom);
-                          }}
-                          className="ml-0.5 text-primary/60 hover:text-error transition-colors"
-                          title={`Unlink ${dom} from this server`}
-                        >
-                          <span className="material-symbols-outlined text-[12px] leading-none">close</span>
-                        </button>
+                <div className="mt-3.5 border-t border-outline-variant/30 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-caption-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[14px] text-primary">dns</span>
+                      Connected Domains
+                      <span className="rounded-full bg-surface-container-high px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary">
+                        {s.connectedDomains?.length || 0}
                       </span>
-                    ))
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal(s)}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                      title="Connect a domain to this server"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">add_circle</span>
+                      <span>Connect</span>
+                    </button>
+                  </div>
+
+                  {s.connectedDomains && s.connectedDomains.length > 0 ? (
+                    <div>
+                      {/* Visible Domain Chips */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {s.connectedDomains.slice(0, 3).map((dom) => (
+                          <span
+                            key={dom}
+                            className="group inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 font-mono text-[11px] text-primary font-medium hover:bg-primary/15 transition-colors"
+                          >
+                            <Link
+                              to={`/domains?search=${encodeURIComponent(dom)}`}
+                              className="hover:underline truncate max-w-[150px]"
+                              title={`Filter ${dom} in Domains`}
+                            >
+                              {dom}
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleRemoveDomain(s.id, dom);
+                              }}
+                              className="ml-0.5 text-primary/60 hover:text-error transition-colors"
+                              title={`Unlink ${dom} from this server`}
+                            >
+                              <span className="material-symbols-outlined text-[12px] leading-none">close</span>
+                            </button>
+                          </span>
+                        ))}
+
+                        {s.connectedDomains.length > 3 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedServers((prev) => ({ ...prev, [s.id]: !prev[s.id] }))
+                            }
+                            className="inline-flex items-center gap-1 rounded-md bg-surface-container-high border border-outline-variant/40 px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary/15 transition-colors"
+                          >
+                            <span>
+                              {expandedServers[s.id]
+                                ? 'Hide'
+                                : `+${s.connectedDomains.length - 3} more`}
+                            </span>
+                            <span className="material-symbols-outlined text-[13px]">
+                              {expandedServers[s.id] ? 'expand_less' : 'expand_more'}
+                            </span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Expandable Scrollable Panel with Search for large domain lists */}
+                      {expandedServers[s.id] && s.connectedDomains.length > 3 && (
+                        <div className="mt-2.5 flex flex-col gap-1.5 rounded-xl border border-outline-variant/40 bg-surface-container-low/70 p-2.5 shadow-inner">
+                          {s.connectedDomains.length > 6 && (
+                            <div className="relative">
+                              <span className="material-symbols-outlined absolute left-2 top-1.5 text-[14px] text-secondary">
+                                search
+                              </span>
+                              <input
+                                type="text"
+                                placeholder={`Filter ${s.connectedDomains.length} domains...`}
+                                value={domainFilterQuery[s.id] || ''}
+                                onChange={(e) =>
+                                  setDomainFilterQuery((prev) => ({
+                                    ...prev,
+                                    [s.id]: e.target.value,
+                                  }))
+                                }
+                                className="h-7 w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest pl-7 pr-2 text-[11px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                          )}
+
+                          <div className="max-h-36 overflow-y-auto flex flex-wrap gap-1.5 pr-1">
+                            {s.connectedDomains
+                              .filter(
+                                (dom) =>
+                                  !domainFilterQuery[s.id] ||
+                                  dom.toLowerCase().includes(domainFilterQuery[s.id].toLowerCase()),
+                              )
+                              .map((dom) => (
+                                <span
+                                  key={dom}
+                                  className="group inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 font-mono text-[11px] text-primary font-medium hover:bg-primary/15 transition-colors"
+                                >
+                                  <Link
+                                    to={`/domains?search=${encodeURIComponent(dom)}`}
+                                    className="hover:underline truncate max-w-[160px]"
+                                    title={`Filter ${dom} in Domains`}
+                                  >
+                                    {dom}
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleRemoveDomain(s.id, dom);
+                                    }}
+                                    className="ml-0.5 text-primary/60 hover:text-error transition-colors"
+                                    title={`Unlink ${dom} from this server`}
+                                  >
+                                    <span className="material-symbols-outlined text-[12px] leading-none">close</span>
+                                  </button>
+                                </span>
+                              ))}
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 border-t border-outline-variant/20 text-[10px] text-secondary">
+                            <span>Showing {s.connectedDomains.length} routed domains</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedServers((prev) => ({ ...prev, [s.id]: false }))
+                              }
+                              className="font-semibold text-primary hover:underline"
+                            >
+                              Collapse
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <span className="text-[11px] text-secondary italic">No domains routed</span>
+                    <div className="flex items-center justify-between rounded-lg bg-surface-container-low/40 px-2.5 py-1.5 text-[11px] text-secondary">
+                      <span className="italic">No domains currently routed to this IP</span>
+                    </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenConnectModal(s)}
-                    className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-outline-variant/80 hover:border-primary px-1.5 py-0.5 text-[11px] text-secondary hover:text-primary transition-colors"
-                    title="Connect domain to this server"
-                  >
-                    <span className="material-symbols-outlined text-[12px]">add</span>
-                    <span className="text-[10px] font-semibold">Connect</span>
-                  </button>
                 </div>
               </div>
 

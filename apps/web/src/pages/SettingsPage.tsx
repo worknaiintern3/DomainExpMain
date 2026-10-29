@@ -379,6 +379,7 @@ export const SettingsPage: React.FC = () => {
           {activeCategory === 'alerts' && (
             <AlertsTab
               role={preferences.role}
+              onNotify={(message, description, type) => showToast(message, description, type)}
             />
           )}
 

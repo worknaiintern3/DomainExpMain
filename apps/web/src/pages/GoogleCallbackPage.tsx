@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { readAndClearGoogleOAuthIntent, useAuth, type GoogleOAuthIntent } from '@/auth/AuthContext';
+import { completeGooglePlayOAuth } from '@/api/google-play';
 
 import { AuthCard } from './LoginPage';
 
@@ -19,28 +20,19 @@ interface ParsedCallback {
  * once, scrubs them from the visible URL/history immediately, and forwards
  * only `code`/`state` to the backend over a POST body, never a URL.
  *
- * It serves TWO distinct flows: an unauthenticated LOGIN (from the sign-in
- * page) and an authenticated LINK/Connect-Google return (from the Security
- * page). Which one applies is read from a non-secret sessionStorage intent
- * marker written just before the redirect to Google -- that marker is UX
- * routing only, never security authority; the backend's own
- * `oauth_transactions.flow` is what actually enforces which action a given
- * `state` may complete. Because this page must be reachable by both a
- * signed-out caller (login) and a signed-in caller (link), it is
- * deliberately routed OUTSIDE both `GuestRoute` and `ProtectedRoute`.
+ * It serves three distinct flows: an unauthenticated LOGIN (from the sign-in
+ * page), an authenticated LINK/Connect-Google return (from the Security
+ * page), and a Google Play Console connection return (from the Google Play page).
  */
 export const GoogleCallbackPage: React.FC = () => {
   const auth = useAuth();
   const navigate = useNavigate();
   const [callbackState, setCallbackState] = useState<CallbackState>('processing');
-  // `intentRef.current` can legitimately end up `null` (no/corrupt marker),
-  // so a separate `attemptedRef` -- not "is intentRef still null?" -- is
-  // what guards against a second run (e.g. React StrictMode's dev-only
-  // double-invoke of effects).
   const attemptedRef = useRef(false);
   const intentRef = useRef<GoogleOAuthIntent | null>(null);
   const parsedRef = useRef<ParsedCallback | null>(null);
   const linkAttemptedRef = useRef(false);
+  const playConsoleAttemptedRef = useRef(false);
 
   // Runs once: parse + immediately scrub the URL, read (and clear) the
   // intent marker, and handle the LOGIN path -- which never needs to wait
@@ -74,7 +66,7 @@ export const GoogleCallbackPage: React.FC = () => {
       return;
     }
 
-    if (intent !== 'login' && intent !== 'link') {
+    if (intent !== 'login' && intent !== 'link' && intent !== 'play_console') {
       // No (or a corrupted) intent marker -- this page was reached without
       // ever going through `startGoogleLogin`/`startGoogleLink` in this
       // browser. Fail closed rather than guessing: never call either
@@ -95,15 +87,11 @@ export const GoogleCallbackPage: React.FC = () => {
         }
       })();
     }
-    // For 'link', the effect below waits for session restoration first.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handles the LINK return once the existing DomainPulse session has had a
   // chance to restore from the refresh token already in sessionStorage
-  // (which survives the top-level navigation to and from Google). Never
-  // attempts the authenticated link call while a session might still be
-  // restoring, and never attempts it at all if restoration fails.
   useEffect(() => {
     if (intentRef.current !== 'link') return;
     if (linkAttemptedRef.current) return;
@@ -129,9 +117,41 @@ export const GoogleCallbackPage: React.FC = () => {
     })();
   }, [auth, auth.status, navigate]);
 
+  // Handles the Google Play Console connection return.
+  useEffect(() => {
+    if (intentRef.current !== 'play_console') return;
+    if (playConsoleAttemptedRef.current) return;
+    if (auth.status === 'booting') return;
+
+    const parsed = parsedRef.current;
+    if (!parsed) return;
+
+    playConsoleAttemptedRef.current = true;
+    void (async () => {
+      try {
+        await completeGooglePlayOAuth(parsed.code, parsed.state);
+        if (window.opener && !window.opener.closed) {
+          try {
+            window.opener.postMessage({ type: 'GOOGLE_PLAY_CONNECTED' }, window.location.origin);
+            window.close();
+            return;
+          } catch {
+            // popup close blocked or cross-origin; navigate instead
+          }
+        }
+        navigate('/google-play', {
+          replace: true,
+          state: { notice: 'Google Play Console connected successfully!' },
+        });
+      } catch {
+        setCallbackState('failed');
+      }
+    })();
+  }, [auth.status, navigate]);
+
   if (callbackState === 'processing') {
     return (
-      <AuthCard title="Signing you in" subtitle="Completing sign-in with Google…">
+      <AuthCard title="Connecting Google Play" subtitle="Completing connection with Google…">
         <div className="flex items-center justify-center py-4">
           <span className="material-symbols-outlined text-primary animate-spin">progress_activity</span>
         </div>
@@ -141,8 +161,8 @@ export const GoogleCallbackPage: React.FC = () => {
 
   if (callbackState === 'cancelled') {
     return (
-      <AuthCard title="Sign-in cancelled" subtitle="You cancelled Google sign-in.">
-        <ReturnToLogin />
+      <AuthCard title="Connection cancelled" subtitle="You cancelled Google sign-in.">
+        <ReturnButton intent={intentRef.current} />
       </AuthCard>
     );
   }
@@ -153,20 +173,32 @@ export const GoogleCallbackPage: React.FC = () => {
         title="Please sign in again"
         subtitle="Your session couldn't be restored, so we didn't connect Google. Sign in and try again."
       >
-        <ReturnToLogin />
+        <ReturnButton intent={intentRef.current} />
       </AuthCard>
     );
   }
 
   return (
-    <AuthCard title="Sign-in failed" subtitle="We couldn't complete Google sign-in. Please try again.">
-      <ReturnToLogin />
+    <AuthCard title="Connection failed" subtitle="We couldn't complete the Google connection. Please try again.">
+      <ReturnButton intent={intentRef.current} />
     </AuthCard>
   );
 };
 
-const ReturnToLogin: React.FC = () => {
+const ReturnButton: React.FC<{ intent: GoogleOAuthIntent | null }> = ({ intent }) => {
   const navigate = useNavigate();
+  if (intent === 'play_console') {
+    return (
+      <button
+        type="button"
+        className="w-full h-11 rounded-lg bg-primary text-white font-semibold text-body-md"
+        onClick={() => navigate('/google-play', { replace: true })}
+      >
+        Back to Google Play Console
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"

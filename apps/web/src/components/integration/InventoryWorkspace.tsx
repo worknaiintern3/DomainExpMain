@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { archiveInventory, createInventory, listInventory, updateInventory } from '@/api/inventory';
-import type { CursorPage, EmailAccount, InventoryMetadata, InventoryResource, InventoryResourceMap } from '@/api/types';
+import type { CursorPage, EmailAccount, InventoryMetadata, InventoryResource, InventoryResourceMap, ProviderAccount } from '@/api/types';
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useCursorInventory } from '@/hooks/useCursorInventory';
@@ -12,7 +12,7 @@ import { usePreferences } from '@/preferences/PreferencesContext';
 export interface ResourceField {
   create?: boolean;
   helpText?: string;
-  input?: 'text' | 'textarea' | 'select' | 'email-account-select';
+  input?: 'text' | 'textarea' | 'select' | 'email-account-select' | 'provider-account-select';
   key: string;
   label: string;
   list?: boolean;
@@ -137,6 +137,80 @@ const EmailAccountSelect: React.FC<{
   );
 };
 
+const ProviderAccountSelect: React.FC<{
+  onChange(value: string): void;
+  value: string;
+}> = ({ onChange, value }) => {
+  const [accounts, setAccounts] = useState<ProviderAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const byId = new Map<string, ProviderAccount>();
+        let cursor: string | null = null;
+        do {
+          const page: CursorPage<ProviderAccount> = await listInventory('provider-accounts', {
+            ...(cursor ? { cursor } : {}),
+            includeArchived: true,
+            limit: 100,
+            signal: controller.signal,
+          });
+          for (const account of page.items) byId.set(account.id, account);
+          cursor = page.nextCursor;
+        } while (cursor && !controller.signal.aborted);
+        if (!controller.signal.aborted) {
+          const loaded = [...byId.values()];
+          setAccounts(loaded);
+          if (!value && loaded.length > 0) {
+            const first = loaded.find((a) => a.inventoryState === 'TRACKED') || loaded[0];
+            if (first) {
+              onChange(first.id);
+            }
+          }
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setLoadError(error instanceof Error ? error.message : 'Provider accounts could not be loaded.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [onChange, value]);
+
+  const available = accounts.filter((account) => account.inventoryState === 'TRACKED' || account.id === value);
+  const hasCurrent = available.some((account) => account.id === value);
+  return (
+    <>
+      <select
+        className="h-10 rounded-lg border border-outline-variant px-3"
+        disabled={loading || loadError !== null}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">
+          {!loading && !loadError && available.length === 0
+            ? 'Default Provider (auto-created on save)'
+            : 'Select provider account (or auto-assigned)'}
+        </option>
+        {value && !hasCurrent && <option value={value}>Current provider account</option>}
+        {available.map((account) => (
+          <option key={account.id} value={account.id}>
+            {account.label} ({account.providerKey})
+            {account.inventoryState === 'ARCHIVED' ? ' (archived)' : ''}
+          </option>
+        ))}
+      </select>
+      {loadError && <span className="text-caption-xs font-normal text-error">{loadError}</span>}
+    </>
+  );
+};
+
 export const ResourceFormModal = <R extends InventoryResource>({
   config,
   onClose,
@@ -185,6 +259,13 @@ export const ResourceFormModal = <R extends InventoryResource>({
       onClose();
       return;
     }
+    if (config.resource === 'cloud-resources') {
+      if (typeof input.resourceType === 'string') {
+        input.resourceType =
+          input.resourceType.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') ||
+          'compute';
+      }
+    }
     setSaving(true);
     setError(null);
     try {
@@ -215,10 +296,15 @@ export const ResourceFormModal = <R extends InventoryResource>({
                 <textarea className="min-h-24 rounded-lg border border-outline-variant p-3" maxLength={field.maxLength} value={form[field.key] ?? ''} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} />
               ) : field.input === 'email-account-select' ? (
                 <EmailAccountSelect value={form[field.key] ?? ''} onChange={(value) => { setError(null); setForm((current) => ({ ...current, [field.key]: value })); }} />
+              ) : field.input === 'provider-account-select' ? (
+                <ProviderAccountSelect value={form[field.key] ?? ''} onChange={(value) => { setError(null); setForm((current) => ({ ...current, [field.key]: value })); }} />
               ) : field.input === 'select' ? (
                 <select className="h-10 rounded-lg border border-outline-variant px-3" required={field.required} value={form[field.key] ?? ''} onChange={(event) => { if (field.key === 'autoRenew') setAutoRenewEdited(true); setForm((current) => ({ ...current, [field.key]: event.target.value })); }}>
                   {field.nullable && <option value="">Not recorded</option>}
                   {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  {form[field.key] && !field.options?.some((opt) => opt.value === form[field.key]) && (
+                    <option value={form[field.key]}>{form[field.key]}</option>
+                  )}
                 </select>
               ) : (
                 <input className="h-10 rounded-lg border border-outline-variant px-3 font-body-sm" maxLength={field.maxLength} pattern={field.pattern} placeholder={field.placeholder} required={field.required} title={field.helpText} value={form[field.key] ?? ''} onBlur={field.trimOnBlur ? (event) => setForm((current) => ({ ...current, [field.key]: event.target.value.trim() })) : undefined} onChange={(event) => { setError(null); setForm((current) => ({ ...current, [field.key]: event.target.value })); }} />

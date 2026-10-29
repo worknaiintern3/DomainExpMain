@@ -19,6 +19,7 @@ import { WhoisModule } from './whois/whois.module';
 import { GooglePlayModule } from './google-play/google-play.module';
 import { PrivacyModule } from './privacy/privacy.module';
 import { PlayStoreModule } from './play-store/play-store.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { PlayStoreModule } from './play-store/play-store.module';
     GooglePlayModule,
     PrivacyModule,
     PlayStoreModule,
+    SettingsModule,
   ],
   providers: [
     {

@@ -1,4 +1,5 @@
 import { apiRequest } from './client';
+import { convertMinorUnits, getActiveCurrency } from '@/lib/currency';
 
 export type DomainAvailabilityProvider =
   | 'godaddy'
@@ -205,16 +206,22 @@ function toDomainSearchResponse(check: WhoisAvailability): DomainSearchResponse 
     { provider: 'godaddy', quote: pricing.godaddy, nature: 'INDICATIVE' },
   ];
 
+  const preferredCurrency = getActiveCurrency();
+
   const results: DomainAvailabilityResult[] = registrars.map(({ provider, quote, nature }) => ({
     provider,
     domain: normalized,
     state,
     available: isAvail,
     definitive: true,
-    currency: 'USD',
-    registrationPriceMinorUnits: isAvail ? quote.registration : null,
-    renewalPriceMinorUnits: isAvail ? quote.renewal : null,
-    transferPriceMinorUnits: quote.transfer,
+    currency: preferredCurrency,
+    registrationPriceMinorUnits: isAvail
+      ? convertMinorUnits(quote.registration, 'USD', preferredCurrency)
+      : null,
+    renewalPriceMinorUnits: isAvail
+      ? convertMinorUnits(quote.renewal, 'USD', preferredCurrency)
+      : null,
+    transferPriceMinorUnits: convertMinorUnits(quote.transfer, 'USD', preferredCurrency),
     pricingNature: isAvail ? nature : 'UNKNOWN',
     premium: false,
     tier: null,
@@ -289,27 +296,39 @@ function minorUnitsToDecimalString(minorUnits: number, fractionDigits: number): 
 }
 
 /**
- * Formats integer minor units in the result's own currency, or null when the
- * price or currency is absent/invalid. Never converts between currencies.
+ * Formats integer minor units in the result's own currency (or target currency if specified),
+ * or null when the price or currency is absent/invalid.
  */
 export function formatMinorUnits(
   minorUnits: number | null,
   currency: string | null,
+  targetCurrency?: string | null,
 ): string | null {
   if (minorUnits === null || currency === null) return null;
   if (!Number.isSafeInteger(minorUnits) || minorUnits < 0) return null;
-  const fractionDigits = currencyFractionDigits(currency);
+
+  let finalUnits = minorUnits;
+  let finalCurrency = currency;
+  if (targetCurrency && targetCurrency !== currency) {
+    const converted = convertMinorUnits(minorUnits, currency, targetCurrency);
+    if (converted !== null) {
+      finalUnits = converted;
+      finalCurrency = targetCurrency;
+    }
+  }
+
+  const fractionDigits = currencyFractionDigits(finalCurrency);
   if (fractionDigits === null) return null;
   try {
     // Intl.NumberFormat (v3) formats a decimal string exactly; the runtime
     // type only declares number/bigint, hence the cast. Engines without v3
     // coerce the string to a number, which still rounds to the same digits.
     return new Intl.NumberFormat('en-US', {
-      currency,
+      currency: finalCurrency,
       maximumFractionDigits: fractionDigits,
       minimumFractionDigits: fractionDigits,
       style: 'currency',
-    }).format(minorUnitsToDecimalString(minorUnits, fractionDigits) as unknown as number);
+    }).format(minorUnitsToDecimalString(finalUnits, fractionDigits) as unknown as number);
   } catch {
     return null;
   }

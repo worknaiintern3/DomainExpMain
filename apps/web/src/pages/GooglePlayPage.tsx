@@ -8,6 +8,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { ApiError } from '@/api/client';
 import {
@@ -22,7 +23,7 @@ import {
 } from '@/api/google-play';
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
-import { useAuth } from '@/auth/AuthContext';
+import { useAuth, writeGoogleOAuthIntent } from '@/auth/AuthContext';
 import { syncGooglePlayApps } from '@/features/google-play/sync-apps';
 
 type StatusState = 'loading' | 'ready' | 'error';
@@ -55,6 +56,8 @@ function StatusPill({ connected }: { connected: boolean }): React.ReactElement {
 
 export const GooglePlayPage: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [connection, setConnection] = useState<GooglePlayStatusResponse | null>(null);
   const [statusState, setStatusState] = useState<StatusState>('loading');
@@ -121,12 +124,20 @@ export const GooglePlayPage: React.FC = () => {
     };
   }, [load]);
 
-  // Connecting happens in a second tab (Google's consent screen). When the user
+  // Handle return notices from Google OAuth callback
+  useEffect(() => {
+    const locState = location.state as { notice?: string; playConnected?: boolean } | null;
+    if (locState?.notice) {
+      setNotice(locState.notice);
+      navigate(location.pathname, { replace: true, state: {} });
+      void load();
+    }
+  }, [location, navigate, load]);
+
+  // Connecting happens via Google's consent screen. When the user
   // comes back, re-read the status so the card switches to "Connected".
   useEffect(() => {
     const handleReturn = () => {
-      // `visibilitychange` also fires when the tab is hidden, so only react to
-      // the transition back to a visible window.
       if (document.visibilityState !== 'visible') return;
       if (!awaitingOAuthRef.current) return;
       awaitingOAuthRef.current = false;
@@ -145,25 +156,18 @@ export const GooglePlayPage: React.FC = () => {
     setActionError(null);
     setNotice(null);
     try {
+      writeGoogleOAuthIntent('play_console');
       const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
-      const redirectUri = env?.VITE_GOOGLE_PLAY_REDIRECT_URI?.trim();
-      const { authUrl } = await startGooglePlayAuth(redirectUri ? { redirectUri } : {});
-      awaitingOAuthRef.current = true;
-      const popup = window.open(authUrl, '_blank');
-      if (!popup) {
-        // Popup blocked: fall back to a full-page navigation.
-        window.location.assign(authUrl);
-        return;
-      }
-      try {
-        popup.opener = null;
-      } catch {
-        // Cross-origin window handles can reject this; the tab still works.
-      }
+      const configuredUri = env?.VITE_GOOGLE_PLAY_REDIRECT_URI?.trim();
+      const redirectUri =
+        configuredUri && !configuredUri.includes('/api/v1/google-play/callback')
+          ? configuredUri
+          : `${window.location.origin}/auth/google/callback`;
+
+      const { authUrl } = await startGooglePlayAuth({ redirectUri });
+      window.location.assign(authUrl);
     } catch (error) {
-      awaitingOAuthRef.current = false;
       setActionError(toErrorMessage(error, 'Google sign-in could not be started.'));
-    } finally {
       setPendingAction(null);
     }
   }, []);

@@ -205,11 +205,19 @@ export class GooglePlayController {
 
   @Get('callback')
   async callback(
+    @Req() request: AuthenticatedRequest,
     @Query() query: unknown,
     @Res() reply: FastifyReply,
   ) {
+    const isJson = Boolean(request.headers.accept?.includes('application/json'));
     const parsed = CallbackQuerySchema.safeParse(query);
     if (!parsed.success) {
+      if (isJson) {
+        return reply.status(400).send({
+          success: false,
+          message: 'Invalid callback parameters received from Google.',
+        });
+      }
       return this.renderHtmlResult(
         reply,
         false,
@@ -220,28 +228,27 @@ export class GooglePlayController {
     const { code, state, error, error_description } = parsed.data;
 
     if (error) {
-      if (error === 'access_denied') {
-        return this.renderHtmlResult(
-          reply,
-          false,
-          'Google sign-in was cancelled.',
-          'OAuth cancellation',
-        );
+      const isDenied = error === 'access_denied';
+      const msg = isDenied
+        ? 'Google sign-in was cancelled.'
+        : error_description || `Google authorization failed: ${error}`;
+      if (isJson) {
+        return reply.status(400).send({ success: false, message: msg });
       }
       return this.renderHtmlResult(
         reply,
         false,
-        error_description || `Google authorization failed: ${error}`,
-        'OAuth failure',
+        msg,
+        isDenied ? 'OAuth cancellation' : 'OAuth failure',
       );
     }
 
     if (!code || !state) {
-      return this.renderHtmlResult(
-        reply,
-        false,
-        'Missing authorization code or state from Google callback.',
-      );
+      const msg = 'Missing authorization code or state from Google callback.';
+      if (isJson) {
+        return reply.status(400).send({ success: false, message: msg });
+      }
+      return this.renderHtmlResult(reply, false, msg);
     }
 
     try {
@@ -249,6 +256,14 @@ export class GooglePlayController {
         code,
         state,
       );
+
+      if (isJson) {
+        return reply.send({
+          success: true,
+          googleAccountEmail: connection.googleAccountEmail,
+          developerAccountId: connection.developerAccountId,
+        });
+      }
 
       return this.renderHtmlResult(
         reply,
@@ -260,7 +275,45 @@ export class GooglePlayController {
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Failed to complete Google Play account connection.';
+      if (isJson) {
+        return reply.status(400).send({ success: false, message });
+      }
       return this.renderHtmlResult(reply, false, message, 'Connection Error');
+    }
+  }
+
+  @Post('callback')
+  @HttpCode(200)
+  async callbackPost(
+    @Body() body: unknown,
+  ) {
+    const parsed = CallbackQuerySchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException('Invalid callback parameters');
+    }
+
+    const { code, state, error, error_description } = parsed.data;
+    if (error) {
+      throw new BadRequestException(error_description || `Google authorization failed: ${error}`);
+    }
+    if (!code || !state) {
+      throw new BadRequestException('Missing authorization code or state');
+    }
+
+    try {
+      const { connection } = await this.googlePlayService.handleCallback(
+        code,
+        state,
+      );
+      return {
+        success: true,
+        googleAccountEmail: connection.googleAccountEmail,
+        developerAccountId: connection.developerAccountId,
+      };
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to complete Google Play account connection.';
+      throw new BadRequestException(message);
     }
   }
 

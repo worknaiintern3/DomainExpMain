@@ -89,3 +89,13 @@ export function startGooglePlayAuth(
     { method: 'GET' },
   );
 }
+
+export function completeGooglePlayOAuth(
+  code: string,
+  state: string,
+): Promise<{ success: boolean; googleAccountEmail?: string; developerAccountId?: string | null }> {
+  return apiRequest('/google-play/callback', {
+    body: { code, state },
+    method: 'POST',
+  });
+}

@@ -41,12 +41,12 @@ export function Navbar() {
           aria-label="DomainPulse — back to top"
         >
           <Image
-            src="/logo.svg"
+            src="/logo.png"
             alt="DomainPulse logo"
             width={32}
             height={32}
             priority
-            className="h-8 w-8 rounded-lg"
+            className="h-8 w-8 rounded-lg object-cover"
           />
           <span className="font-display text-lg font-bold tracking-tight text-foreground">
             DomainPulse

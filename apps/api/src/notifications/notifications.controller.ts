@@ -93,6 +93,11 @@ export class NotificationsController {
     }
 
     const pref = await this.repository.getPreferences(userId);
+    const toIso = (val: any) => {
+      if (!val) return new Date().toISOString();
+      if (val instanceof Date) return val.toISOString();
+      return new Date(val).toISOString();
+    };
     return {
       id: pref.id,
       userId: pref.userId,
@@ -105,8 +110,8 @@ export class NotificationsController {
       notifySsl: pref.sslEnabled,
       timeZone: 'Asia/Kolkata',
       preferredHour: 9,
-      createdAt: pref.createdAt.toISOString(),
-      updatedAt: pref.updatedAt.toISOString(),
+      createdAt: toIso(pref.createdAt),
+      updatedAt: toIso(pref.updatedAt),
     };
   }
 
@@ -136,20 +141,25 @@ export class NotificationsController {
     if (data.notifySsl !== undefined) updatePayload.sslEnabled = data.notifySsl;
 
     const updated = await this.repository.upsertPreferences(userId, updatePayload);
+    const toIso = (val: any) => {
+      if (!val) return new Date().toISOString();
+      if (val instanceof Date) return val.toISOString();
+      return new Date(val).toISOString();
+    };
     return {
-      id: updated.id,
-      userId: updated.userId,
+      id: updated?.id ?? 'default',
+      userId: updated?.userId ?? userId,
       workspaceId: request.workspacePrincipal?.workspaceId ?? '',
-      pushEnabled: updated.enabled,
-      reminderThresholds: updated.reminderThresholds ?? [15, 7, 3, 1, 0],
-      notifyDomains: updated.domainsEnabled,
-      notifyServers: updated.serversEnabled,
-      notifyHosting: updated.hostingEnabled,
-      notifySsl: updated.sslEnabled,
+      pushEnabled: updated?.enabled ?? true,
+      reminderThresholds: updated?.reminderThresholds ?? [15, 7, 3, 1, 0],
+      notifyDomains: updated?.domainsEnabled ?? true,
+      notifyServers: updated?.serversEnabled ?? true,
+      notifyHosting: updated?.hostingEnabled ?? true,
+      notifySsl: updated?.sslEnabled ?? true,
       timeZone: 'Asia/Kolkata',
       preferredHour: 9,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
+      createdAt: toIso(updated?.createdAt),
+      updatedAt: toIso(updated?.updatedAt),
     };
   }
 

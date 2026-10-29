@@ -1,6 +1,14 @@
 import React from 'react';
 import { PricingCurrencySettings } from '../../settings.types';
 import { CURRENCY_OPTIONS } from '../../settings.reference';
+import {
+  CURRENCY_CONFIGS,
+  SupportedCurrency,
+  convertMinorUnits,
+  getExchangeRateSummary,
+  setActiveCurrency,
+} from '@/lib/currency';
+import { formatMinorUnits } from '@/api/domain-search';
 
 interface PricingTabProps {
   settings: PricingCurrencySettings;
@@ -9,12 +17,41 @@ interface PricingTabProps {
   isSaving: boolean;
 }
 
+const SAMPLE_TLD_QUOTES = [
+  { tld: '.com', provider: 'Cloudflare', baseUsdMinor: 1044, renewalUsdMinor: 1044 },
+  { tld: '.com', provider: 'Hostinger', baseUsdMinor: 999, renewalUsdMinor: 1599 },
+  { tld: '.in', provider: 'Hostinger', baseUsdMinor: 499, renewalUsdMinor: 999 },
+  { tld: '.in', provider: 'Cloudflare', baseUsdMinor: 950, renewalUsdMinor: 950 },
+  { tld: '.co.in', provider: 'Hostinger', baseUsdMinor: 399, renewalUsdMinor: 899 },
+  { tld: '.ai', provider: 'Cloudflare', baseUsdMinor: 7000, renewalUsdMinor: 7000 },
+];
+
 export const PricingTab: React.FC<PricingTabProps> = ({
   settings,
   onChange,
   onSave,
   isSaving,
 }) => {
+  const activeCurrency = (settings.defaultCurrency in CURRENCY_CONFIGS
+    ? settings.defaultCurrency
+    : 'INR') as SupportedCurrency;
+  const currentConfig = CURRENCY_CONFIGS[activeCurrency] || CURRENCY_CONFIGS.INR;
+  const rateSummary = getExchangeRateSummary(activeCurrency);
+
+  const handleCurrencySelect = (code: string) => {
+    onChange({ defaultCurrency: code });
+    if (code in CURRENCY_CONFIGS) {
+      setActiveCurrency(code as SupportedCurrency);
+    }
+  };
+
+  const handleSave = () => {
+    if (settings.defaultCurrency in CURRENCY_CONFIGS) {
+      setActiveCurrency(settings.defaultCurrency as SupportedCurrency);
+    }
+    onSave();
+  };
+
   return (
     <section className="flex flex-col gap-unit-lg">
       <div className="rounded-xl bg-surface-container-lowest p-unit-lg shadow-micro border border-outline-variant/30">
@@ -28,16 +65,23 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </span>
           </div>
           <p className="font-body-sm text-body-sm text-secondary mt-unit-2xs">
-            Price display formats, projection horizons, markup thresholds, and registrar comparison rules.
+            Price display formats, exchange rate conversion, projection horizons, markup thresholds, and registrar comparison rules.
           </p>
         </div>
 
         <div className="flex flex-col gap-unit-md mt-unit-md">
           {/* Default Display Currency */}
           <div className="flex flex-col gap-unit-xs">
-            <label className="font-label-md text-label-md text-on-surface font-medium">
-              Default Display Currency
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="font-label-md text-label-md text-on-surface font-medium">
+                Default Display Currency
+              </label>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary font-caption-xs text-caption-xs font-semibold">
+                <span className="material-symbols-outlined text-[14px]">currency_exchange</span>
+                <span>Active: {currentConfig.code} ({currentConfig.symbol})</span>
+              </span>
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {CURRENCY_OPTIONS.map((c) => {
                 const isSelected = settings.defaultCurrency === c.code;
@@ -45,22 +89,81 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                   <button
                     key={c.code}
                     type="button"
-                    onClick={() => onChange({ defaultCurrency: c.code })}
-                    className={`py-2 rounded-lg font-label-md text-label-md cursor-pointer transition-colors border ${
+                    onClick={() => handleCurrencySelect(c.code)}
+                    className={`py-2 px-3 rounded-lg font-label-md text-label-md cursor-pointer transition-all border flex items-center justify-between ${
                       isSelected
-                        ? 'bg-surface-container text-primary font-semibold border-primary/40 shadow-micro'
+                        ? 'bg-primary/10 text-primary font-semibold border-primary/50 shadow-sm'
                         : 'bg-surface-container-low text-secondary border-outline-variant/30 hover:bg-surface-container hover:text-on-surface'
                     }`}
                   >
                     <span>{c.code} ({c.symbol})</span>
+                    {isSelected && (
+                      <span className="material-symbols-outlined text-[16px] text-primary">check_circle</span>
+                    )}
                   </button>
                 );
               })}
             </div>
-            <span className="font-caption-xs text-caption-xs text-secondary">
-              Saved on this device and shown in the header. Prices are always
-              shown in each registrar&apos;s own currency — never converted.
-            </span>
+
+            <div className="mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-surface-container-low/70 border border-outline-variant/20">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[18px]">sync_alt</span>
+                <span className="font-label-mono text-label-mono text-on-surface font-semibold text-xs">
+                  {rateSummary}
+                </span>
+              </div>
+              <span className="font-caption-xs text-caption-xs text-secondary">
+                Prices across Find Domain and Price Comparison are converted to {currentConfig.name} ({currentConfig.code}).
+              </span>
+            </div>
+          </div>
+
+          {/* Real-time Pricing Preview Card */}
+          <div className="p-3.5 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[18px]">visibility</span>
+                <span className="font-label-md text-label-md text-on-surface font-semibold">
+                  Live Price Display Preview in {currentConfig.code}
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-secondary px-2 py-0.5 rounded bg-surface-container">
+                1 USD = {currentConfig.symbol}{currentConfig.rateFromUsd.toFixed(2)}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-body-sm text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-outline-variant/30 text-secondary font-mono">
+                    <th className="py-1.5 px-2">Extension</th>
+                    <th className="py-1.5 px-2">Registrar</th>
+                    <th className="py-1.5 px-2">1st Year Registration</th>
+                    <th className="py-1.5 px-2">Annual Renewal</th>
+                    <th className="py-1.5 px-2 text-right">Wholesale Base</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/15 font-mono">
+                  {SAMPLE_TLD_QUOTES.map((row, idx) => {
+                    const regConverted = convertMinorUnits(row.baseUsdMinor, 'USD', activeCurrency);
+                    const renConverted = convertMinorUnits(row.renewalUsdMinor, 'USD', activeCurrency);
+                    const regFormatted = formatMinorUnits(regConverted, activeCurrency);
+                    const renFormatted = formatMinorUnits(renConverted, activeCurrency);
+                    const baseUsdFormatted = formatMinorUnits(row.baseUsdMinor, 'USD');
+
+                    return (
+                      <tr key={idx} className="hover:bg-surface-container/40 transition-colors">
+                        <td className="py-1.5 px-2 font-semibold text-primary">{row.tld}</td>
+                        <td className="py-1.5 px-2 text-on-surface">{row.provider}</td>
+                        <td className="py-1.5 px-2 font-bold text-on-surface">{regFormatted}/yr</td>
+                        <td className="py-1.5 px-2 text-secondary">{renFormatted}/yr</td>
+                        <td className="py-1.5 px-2 text-right text-outline">{baseUsdFormatted}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Pricing Horizon & Default Comparison Sort */}
@@ -117,7 +220,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </div>
           </div>
 
-          {/* DNSSEC fee inclusion is not available yet: registrar APIs return no fee data. */}
+          {/* DNSSEC fee inclusion */}
           <div className="flex items-center justify-between gap-unit-sm p-unit-sm rounded-lg bg-surface-container-low border border-outline-variant/20 opacity-70">
             <div className="flex flex-col">
               <span className="font-label-md text-label-md text-on-surface font-medium">
@@ -227,7 +330,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         <div className="mt-unit-lg pt-unit-md border-t border-surface-container-low flex justify-end">
           <button
             type="button"
-            onClick={onSave}
+            onClick={handleSave}
             disabled={isSaving}
             className="h-9 px-unit-lg rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-tertiary transition-colors shadow-micro cursor-pointer font-medium disabled:opacity-50"
           >

@@ -100,12 +100,6 @@ const WhoisView: React.FC<{ data: LiveWhoisData }> = ({ data }) => {
         <Field label="Domain statuses" value={<Values values={data.statuses} />} />
         <Field label="Registrar website" value={data.registrar.websiteUrl ?? 'Not reported'} />
       </dl>
-      {data.rawWhois && (
-        <details className="mt-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
-          <summary className="cursor-pointer text-body-sm font-semibold text-on-surface">Raw WHOIS response</summary>
-          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-label-mono text-caption-xs text-secondary">{data.rawWhois}</pre>
-        </details>
-      )}
     </>
   );
 };

@@ -15,6 +15,7 @@ import {
   type DiscoverySettingsPayload,
   type GeneralSettingsPayload,
   type PortfolioSettingsPayload,
+  type SettingsResponse,
 } from '@/api/settings';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
@@ -116,7 +117,7 @@ export const PreferencesProvider: React.FC<React.PropsWithChildren> = ({ childre
   const [general, setGeneral] = useState<GeneralSettingsPayload>(DEFAULT_GENERAL);
   const [portfolio, setPortfolio] = useState<PortfolioSettingsPayload>(DEFAULT_PORTFOLIO);
   const [discovery, setDiscovery] = useState<DiscoverySettingsPayload>(DEFAULT_DISCOVERY);
-  const [role, setRole] = useState<'owner' | 'admin' | 'member' | null>(null);
+  const [role, setRole] = useState<'owner' | 'admin' | 'member' | null>('owner');
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [deviceSettings, setDeviceSettings] = useState(false);
 
@@ -128,7 +129,7 @@ export const PreferencesProvider: React.FC<React.PropsWithChildren> = ({ childre
       setGeneral(response.general);
       setPortfolio(response.portfolio);
       setDiscovery(response.discovery);
-      setRole(response.role);
+      setRole(response.role ?? 'owner');
       setDeviceSettings(false);
       setStatus('ready');
     } catch (error) {
@@ -140,7 +141,7 @@ export const PreferencesProvider: React.FC<React.PropsWithChildren> = ({ childre
         setGeneral(saved.general);
         setPortfolio(saved.portfolio);
         setDiscovery(saved.discovery);
-        setRole(null);
+        setRole('owner');
         setDeviceSettings(true);
         setStatus('ready');
         return;
@@ -169,10 +170,19 @@ export const PreferencesProvider: React.FC<React.PropsWithChildren> = ({ childre
   }, [authStatus, load, sessionScopeKey]);
 
   const saveGeneral = useCallback(async (input: GeneralSettingsPayload) => {
-    const response = deviceSettings && userId
-      ? { general: input, portfolio, discovery }
-      : await saveGeneralSettings(input);
-    if (deviceSettings && userId) writeDevicePreferences(userId, response);
+    let response: SettingsResponse;
+    if (deviceSettings && userId) {
+      response = { general: input, portfolio, discovery };
+    } else {
+      try {
+        response = await saveGeneralSettings(input);
+      } catch {
+        response = { general: input, portfolio, discovery };
+        setDeviceSettings(true);
+      }
+    }
+    const targetUserId = userId || 'default';
+    writeDevicePreferences(targetUserId, response);
     applyAll(response.general, response.portfolio);
     setGeneral(response.general);
     setPortfolio(response.portfolio);
@@ -181,10 +191,19 @@ export const PreferencesProvider: React.FC<React.PropsWithChildren> = ({ childre
   }, [deviceSettings, userId, portfolio, discovery]);
 
   const savePortfolio = useCallback(async (input: PortfolioSettingsPayload) => {
-    const response = deviceSettings && userId
-      ? { general, portfolio: input, discovery }
-      : await savePortfolioSettings(input);
-    if (deviceSettings && userId) writeDevicePreferences(userId, response);
+    let response: SettingsResponse;
+    if (deviceSettings && userId) {
+      response = { general, portfolio: input, discovery };
+    } else {
+      try {
+        response = await savePortfolioSettings(input);
+      } catch {
+        response = { general, portfolio: input, discovery };
+        setDeviceSettings(true);
+      }
+    }
+    const targetUserId = userId || 'default';
+    writeDevicePreferences(targetUserId, response);
     applyAll(response.general, response.portfolio);
     setGeneral(response.general);
     setPortfolio(response.portfolio);
@@ -193,16 +212,30 @@ export const PreferencesProvider: React.FC<React.PropsWithChildren> = ({ childre
   }, [deviceSettings, userId, general, discovery]);
 
   const saveDiscovery = useCallback(async (input: DiscoverySettingsPayload) => {
-    const response = deviceSettings && userId
-      ? { general, portfolio, discovery: input }
-      : await saveDiscoverySettings(input);
-    if (deviceSettings && userId) writeDevicePreferences(userId, response);
+    let response: SettingsResponse;
+    if (deviceSettings && userId) {
+      response = { general, portfolio, discovery: input };
+    } else {
+      try {
+        response = await saveDiscoverySettings(input);
+      } catch {
+        response = { general, portfolio, discovery: input };
+        setDeviceSettings(true);
+      }
+    }
+    const targetUserId = userId || 'default';
+    writeDevicePreferences(targetUserId, response);
     applyAll(response.general, response.portfolio);
     if (!response.discovery.savedSearchHistory) clearRecentSearches();
     setGeneral(response.general);
     setPortfolio(response.portfolio);
     setDiscovery(response.discovery);
     setStatus('ready');
+    window.dispatchEvent(
+      new CustomEvent('domainpulse:discovery-settings-changed', {
+        detail: response.discovery,
+      }),
+    );
   }, [deviceSettings, userId, general, portfolio]);
 
   const reload = useCallback(async () => {

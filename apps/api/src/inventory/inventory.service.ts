@@ -50,7 +50,12 @@ function cleanNullableText(value: string | null | undefined): string | null {
 }
 
 function canonicalKey(value: string): string {
-  return value.trim().toLowerCase();
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || 'unknown';
 }
 
 function nullableDate(value: string | null | undefined): Date | null {

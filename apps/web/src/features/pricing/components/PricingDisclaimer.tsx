@@ -13,7 +13,7 @@ export const PricingDisclaimer: React.FC = () => {
         </span>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
           <strong className="font-label-md text-on-surface">Live Market Comparison:</strong>{' '}
-          DomainPulse checks domain availability via registry/DNS and compares authentic registrar rates across Cloudflare, Hostinger, Namecheap, and GoDaddy in real-time.
+          DomainPulse checks domain availability via registry/DNS and compares authentic registrar rates across leading providers in real-time.
           Confirm final checkout promotions and ICANN fees directly with your chosen registrar before purchasing.
         </p>
       </div>

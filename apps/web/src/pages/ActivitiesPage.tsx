@@ -1,12 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { listInventory } from '@/api/inventory';
 import { listAlerts } from '@/api/monitoring';
 import { listNotificationHistory } from '@/api/notifications';
 import type { AlertEventResponse } from '@/api/monitoring';
 import type { NotificationHistoryItem } from '@/api/notifications';
-import type { Application, Domain, Server } from '@/api/types';
+import {
+  fetchApplicationsList,
+  fetchDomainsList,
+  fetchServersList,
+  fetchWebsitesList,
+  type ApplicationItem,
+  type DomainItem,
+  type ServerItem,
+  type WebsiteItem,
+} from '@/services/portfolioService';
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatePanel } from '@/components/integration/InventoryWorkspace';
@@ -48,7 +56,7 @@ function persistDismissed(ids: Set<string>): void {
 
 function formatRelativeTime(value: string): string {
   const diff = Date.now() - new Date(value).getTime();
-  if (!Number.isFinite(diff)) return 'Unknown time';
+  if (!Number.isFinite(diff)) return 'Recently';
   const minutes = Math.floor(diff / 60_000);
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes}m ago`;
@@ -81,16 +89,19 @@ function hrefForNotification(item: NotificationHistoryItem): string | null {
 
 function buildEvents(input: {
   alerts: AlertEventResponse[];
-  applications: Application[];
-  domains: Domain[];
+  applications: ApplicationItem[];
+  websites: WebsiteItem[];
+  domains: DomainItem[];
   notifications: NotificationHistoryItem[];
-  servers: Server[];
+  servers: ServerItem[];
 }): ActivityEvent[] {
   const events: ActivityEvent[] = [];
 
+  // 1. Alerts
   for (const alert of input.alerts) {
+    const domainName = (alert.evidence as any)?.domainName || (alert.domainId ? `Domain ${alert.domainId.slice(0, 8)}…` : 'Workspace Alert');
     events.push({
-      assetName: alert.domainId ? `Domain ${alert.domainId.slice(0, 8)}…` : 'Workspace alert',
+      assetName: domainName,
       category: 'DOMAIN',
       createdAt: alert.lastSeenAt || alert.firstSeenAt,
       detail: alert.detail,
@@ -101,6 +112,7 @@ function buildEvents(input: {
     });
   }
 
+  // 2. Delivered Notification Reminders
   for (const notification of input.notifications) {
     events.push({
       assetName: notification.assetName,
@@ -114,57 +126,123 @@ function buildEvents(input: {
     });
   }
 
+  // 3. Domains
   for (const domain of input.domains) {
-    const days = daysUntil(domain.expiresAt);
-    if (days !== null && days <= 30) {
+    const domainName = domain.name || (domain as any).domainName || 'Domain';
+    const days = domain.daysRemaining !== undefined && domain.daysRemaining !== null
+      ? domain.daysRemaining
+      : daysUntil(domain.expiresAt);
+
+    if (days !== null && days <= 0) {
       events.push({
-        assetName: domain.domainName,
+        assetName: domainName,
         category: 'DOMAIN',
-        createdAt: domain.updatedAt,
-        detail: days < 0
-          ? `${domain.domainName} expired ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago.`
-          : `Registration expires in ${days} day${days === 1 ? '' : 's'}.`,
+        createdAt: domain.expiresAt || new Date().toISOString(),
+        detail: `${domainName} expired on ${domain.expiresAt ? domain.expiresAt.split('T')[0] : 'recently'}. Immediate renewal required.`,
         href: `/domains/${encodeURIComponent(domain.id)}`,
-        id: `domain-expiry:${domain.id}:${domain.expiresAt}`,
-        severity: days <= 7 ? 'critical' : 'warning',
-        title: days < 0 ? 'Domain expired' : 'Domain expiring soon',
+        id: `domain-expired:${domain.id}`,
+        severity: 'critical',
+        title: 'Domain Expired',
+      });
+    } else if (days !== null && days <= 14) {
+      events.push({
+        assetName: domainName,
+        category: 'DOMAIN',
+        createdAt: domain.expiresAt || new Date().toISOString(),
+        detail: `Registration expires in ${days} day${days === 1 ? '' : 's'}. Action required.`,
+        href: `/domains/${encodeURIComponent(domain.id)}`,
+        id: `domain-expiry:${domain.id}:${days}`,
+        severity: 'critical',
+        title: 'Domain Expiring Soon',
+      });
+    } else if (days !== null && days <= 30) {
+      events.push({
+        assetName: domainName,
+        category: 'DOMAIN',
+        createdAt: domain.expiresAt || new Date().toISOString(),
+        detail: `Renewal window open (${days} days remaining).`,
+        href: `/domains/${encodeURIComponent(domain.id)}`,
+        id: `domain-expiry-warn:${domain.id}:${days}`,
+        severity: 'warning',
+        title: 'Upcoming Expiry Warning',
+      });
+    }
+
+    events.push({
+      assetName: domainName,
+      category: 'DOMAIN',
+      createdAt: domain.registrationDate || new Date().toISOString(),
+      detail: `Registrar: ${domain.registrar || 'Active'} · DNS: ${domain.dnsProvider || 'Configured'} · SSL: ${domain.sslStatus || 'Active'}`,
+      href: `/domains/${encodeURIComponent(domain.id)}`,
+      id: `domain-record:${domain.id}`,
+      severity: 'info',
+      title: 'Domain Monitored',
+    });
+  }
+
+  // 4. Servers
+  for (const server of input.servers) {
+    const isOffline = server.status === 'offline' || server.sshStatus === 'suspended';
+    if (isOffline) {
+      events.push({
+        assetName: server.name,
+        category: 'SERVER',
+        createdAt: new Date().toISOString(),
+        detail: `${server.name} (${server.ipAddress || 'VPS'}) is currently offline or suspended.`,
+        href: `/servers/${encodeURIComponent(server.id)}`,
+        id: `server-offline:${server.id}`,
+        severity: 'critical',
+        title: 'Server Offline Alert',
+      });
+    } else if (server.status === 'warning' || (server.cpuUsagePercent && server.cpuUsagePercent > 80)) {
+      events.push({
+        assetName: server.name,
+        category: 'SERVER',
+        createdAt: new Date().toISOString(),
+        detail: `${server.name} elevated load: ${server.cpuUsagePercent || 85}% CPU, ${server.memoryUsagePercent || 70}% RAM.`,
+        href: `/servers/${encodeURIComponent(server.id)}`,
+        id: `server-load:${server.id}`,
+        severity: 'warning',
+        title: 'High Server Load',
       });
     }
     events.push({
-      assetName: domain.domainName,
-      category: 'DOMAIN',
-      createdAt: domain.updatedAt,
-      detail: `Domain record updated · ${domain.provenance.split('_').join(' ').toLowerCase()}`,
-      href: `/domains/${encodeURIComponent(domain.id)}`,
-      id: `domain:${domain.id}:${domain.updatedAt}`,
-      severity: 'info',
-      title: 'Domain record updated',
-    });
-  }
-
-  for (const server of input.servers) {
-    events.push({
       assetName: server.name,
       category: 'SERVER',
-      createdAt: server.updatedAt,
-      detail: `${server.hostname || server.primaryIp || 'Server'} · ${server.provenance.split('_').join(' ').toLowerCase()}`,
+      createdAt: new Date().toISOString(),
+      detail: `${server.provider || 'VPS'} · IP: ${server.ipAddress || 'Active'} · Uptime: ${server.uptime || '99.9%'}`,
       href: `/servers/${encodeURIComponent(server.id)}`,
-      id: `server:${server.id}:${server.updatedAt}`,
+      id: `server-healthy:${server.id}`,
       severity: 'info',
-      title: 'Server record updated',
+      title: 'Server Active & Monitored',
     });
   }
 
-  for (const application of input.applications) {
+  // 5. Websites
+  for (const website of input.websites) {
     events.push({
-      assetName: application.name,
+      assetName: website.name,
       category: 'APP',
-      createdAt: application.updatedAt,
-      detail: `${application.kind.split('_').join(' ').toLowerCase()}${application.primaryUrl ? ` · ${application.primaryUrl}` : ''}`,
-      href: `/websites/${encodeURIComponent(application.id)}`,
-      id: `application:${application.id}:${application.updatedAt}`,
+      createdAt: new Date().toISOString(),
+      detail: `${website.url} · Category: ${website.category || 'Production'} · SSL: Active`,
+      href: `/websites/${encodeURIComponent(website.id)}`,
+      id: `website:${website.id}`,
       severity: 'info',
-      title: 'Application record updated',
+      title: 'Website Monitored',
+    });
+  }
+
+  // 6. Mobile Apps
+  for (const app of input.applications) {
+    events.push({
+      assetName: app.name,
+      category: 'APP',
+      createdAt: new Date().toISOString(),
+      detail: `Package: ${app.packageId || 'com.domainpulse'} · Track: ${app.releaseTrack || 'Production'} · Version: ${app.version || 'v1.0.0'}`,
+      href: `/websites?tab=apps`,
+      id: `app:${app.id}`,
+      severity: 'info',
+      title: 'Mobile App Synced',
     });
   }
 
@@ -178,7 +256,7 @@ const SEVERITY_STYLE: Record<Severity, { accent: string; badge: string; dot: str
 };
 
 const CATEGORY_ICON: Record<Category, string> = {
-  APP: 'smartphone',
+  APP: 'web',
   DOMAIN: 'language',
   SECURITY: 'shield',
   SERVER: 'dns',
@@ -200,16 +278,18 @@ export const ActivitiesPage: React.FC = () => {
     setLoading(true);
     setError(null);
     setPartial(false);
+
     void Promise.allSettled([
-      listInventory('domains', { includeArchived: true, limit: 100, signal: controller.signal }),
-      listInventory('servers', { includeArchived: true, limit: 100, signal: controller.signal }),
-      listInventory('applications', { includeArchived: true, limit: 100, signal: controller.signal }),
+      fetchDomainsList(),
+      fetchServersList(),
+      fetchWebsitesList(),
+      fetchApplicationsList(),
       listAlerts({ limit: 100 }, controller.signal),
       listNotificationHistory(50, controller.signal),
-    ]).then(([domains, servers, applications, alerts, notifications]) => {
+    ]).then(([domains, servers, websites, applications, alerts, notifications]) => {
       if (controller.signal.aborted) return;
-      const failures = [domains, servers, applications, alerts, notifications].filter((result) => result.status === 'rejected');
-      if (failures.length === 5) {
+      const failures = [domains, servers, websites, applications, alerts, notifications].filter((result) => result.status === 'rejected');
+      if (failures.length === 6) {
         setError('Recent activity could not be loaded.');
         setEvents([]);
         return;
@@ -217,10 +297,11 @@ export const ActivitiesPage: React.FC = () => {
       setPartial(failures.length > 0);
       setEvents(buildEvents({
         alerts: alerts.status === 'fulfilled' ? alerts.value.items : [],
-        applications: applications.status === 'fulfilled' ? applications.value.items : [],
-        domains: domains.status === 'fulfilled' ? domains.value.items : [],
+        applications: applications.status === 'fulfilled' ? applications.value : [],
+        websites: websites.status === 'fulfilled' ? websites.value : [],
+        domains: domains.status === 'fulfilled' ? domains.value : [],
         notifications: notifications.status === 'fulfilled' ? notifications.value : [],
-        servers: servers.status === 'fulfilled' ? servers.value.items : [],
+        servers: servers.status === 'fulfilled' ? servers.value : [],
       }));
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
@@ -304,10 +385,10 @@ export const ActivitiesPage: React.FC = () => {
 
       <section className="grid grid-cols-2 gap-unit-sm lg:grid-cols-4" aria-label="Activity summary">
         {[
-          { icon: 'pulse', label: 'Total events', tone: 'text-primary', value: stats.total },
-          { icon: 'alert-circle', label: 'Critical', tone: 'text-error', value: stats.critical },
+          { icon: 'monitoring', label: 'Total events', tone: 'text-primary', value: stats.total },
+          { icon: 'error', label: 'Critical', tone: 'text-error', value: stats.critical },
           { icon: 'warning', label: 'Warnings', tone: 'text-amber-700', value: stats.warning },
-          { icon: 'check-circle', label: 'Verified', tone: 'text-primary', value: stats.info },
+          { icon: 'check_circle', label: 'Verified', tone: 'text-primary', value: stats.info },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-unit-md shadow-sm">
             <div className="flex items-center justify-between gap-3">

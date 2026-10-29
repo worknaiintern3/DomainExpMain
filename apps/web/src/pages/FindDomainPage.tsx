@@ -23,6 +23,9 @@ import {
 import { ApiError } from '@/api/client';
 import { addRecentSearch, clearRecentSearches, readRecentSearches } from '@/lib/recentSearches';
 import { usePreferences } from '@/preferences/PreferencesContext';
+import { getActiveCurrency } from '@/lib/currency';
+
+import { useSearchParams } from 'react-router-dom';
 
 interface LiveRow {
   item: TldAvailabilityItem;
@@ -135,19 +138,42 @@ function buildRow(
 }
 
 export const FindDomainPage: React.FC = () => {
-  const [query, setQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialQueryFromUrl = searchParams.get('q') || '';
+  const [query, setQuery] = useState(initialQueryFromUrl);
   const { discovery, status: preferencesStatus } = usePreferences();
   const [selectedTlds, setSelectedTlds] = useState<string[]>(SUPPORTED_TLDS);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => readRecentSearches());
-  const defaultsAppliedRef = useRef(false);
+  const lastAppliedTldsRef = useRef<string>('');
 
-  // Start from the user's saved default TLDs once their settings have loaded.
+  // Synchronize with the user's saved default TLDs from Preferences
   useEffect(() => {
-    if (preferencesStatus !== 'ready' || defaultsAppliedRef.current) return;
-    defaultsAppliedRef.current = true;
-    const wanted = discovery.defaultCheckedTlds.filter((tld) => SUPPORTED_TLDS.includes(tld));
-    if (wanted.length > 0) setSelectedTlds(wanted);
+    if (preferencesStatus !== 'ready') return;
+    const currentKey = discovery.defaultCheckedTlds.join(',');
+    if (lastAppliedTldsRef.current !== currentKey) {
+      lastAppliedTldsRef.current = currentKey;
+      const wanted = discovery.defaultCheckedTlds.filter((tld) => SUPPORTED_TLDS.includes(tld));
+      if (wanted.length > 0) setSelectedTlds(wanted);
+    }
   }, [preferencesStatus, discovery.defaultCheckedTlds]);
+
+  // Real-time synchronization event from Settings Domain Discovery tab
+  useEffect(() => {
+    const handleDiscoveryChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ defaultCheckedTlds?: string[] }>;
+      if (customEvent.detail?.defaultCheckedTlds) {
+        const wanted = customEvent.detail.defaultCheckedTlds.filter((tld) =>
+          SUPPORTED_TLDS.includes(tld),
+        );
+        if (wanted.length > 0) setSelectedTlds(wanted);
+      }
+    };
+    window.addEventListener('domainpulse:discovery-settings-changed', handleDiscoveryChanged);
+    return () => {
+      window.removeEventListener('domainpulse:discovery-settings-changed', handleDiscoveryChanged);
+    };
+  }, []);
+
   const [searchState, setSearchState] = useState<SearchState>('empty');
   const [rows, setRows] = useState<LiveRow[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
@@ -155,13 +181,18 @@ export const FindDomainPage: React.FC = () => {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const initialSearchTriggeredRef = useRef(false);
 
   // Derived set of saved domain names
   const savedSet = useMemo(() => new Set(watchlist.map((w) => w.domain)), [watchlist]);
 
   const items = useMemo(
-    () => sortRows(rows, discovery.defaultSearchSort).map((row) => ({ ...row.item, isSaved: savedSet.has(row.item.domain) })),
-    [rows, savedSet],
+    () =>
+      sortRows(rows, discovery.defaultSearchSort).map((row) => ({
+        ...row.item,
+        isSaved: savedSet.has(row.item.domain),
+      })),
+    [rows, savedSet, discovery.defaultSearchSort],
   );
 
   const summary = useMemo<FindDomainSummary>(() => {
@@ -177,8 +208,9 @@ export const FindDomainPage: React.FC = () => {
         )
         .map((result) => ({ domain: row.item.domain, result })),
     );
-    const usdPriced = priced.filter((entry) => entry.result.currency === 'USD');
-    const pool = usdPriced.length > 0 ? usdPriced : priced;
+    const activeCurrency = getActiveCurrency();
+    const preferredPriced = priced.filter((entry) => entry.result.currency === activeCurrency);
+    const pool = preferredPriced.length > 0 ? preferredPriced : priced;
     const lowest =
       pool.length > 0
         ? pool.reduce((min, curr) =>
@@ -276,6 +308,13 @@ export const FindDomainPage: React.FC = () => {
       setSearchState('results');
     }
   };
+
+  useEffect(() => {
+    if (initialQueryFromUrl && !initialSearchTriggeredRef.current && preferencesStatus === 'ready') {
+      initialSearchTriggeredRef.current = true;
+      void handleSearch(initialQueryFromUrl);
+    }
+  }, [initialQueryFromUrl, preferencesStatus]);
 
   const handleToggleTld = (tld: string) => {
     setSelectedTlds((prev) =>

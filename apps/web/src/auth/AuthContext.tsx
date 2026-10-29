@@ -33,33 +33,30 @@ type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
  * or clear this marker and the worst outcome is landing on the wrong local
  * UI branch, never a security bypass.
  */
-export type GoogleOAuthIntent = 'link' | 'login';
+export type GoogleOAuthIntent = 'link' | 'login' | 'play_console';
 
 /**
  * Returns `null` -- rather than guessing 'login' -- when the marker is
- * absent or holds anything other than exactly 'login'/'link'. A stray visit
- * to this callback URL that never went through `startGoogleLogin`/
- * `startGoogleLink` (a stale bookmark, a manually-typed URL, a blocked
- * session store) must never be silently treated as an intended login
+ * absent or holds anything other than a valid intent. A stray visit
+ * to this callback URL that never went through an auth flow
+ * must never be silently treated as an intended login
  * attempt; `GoogleCallbackPage` fails closed on `null` instead.
  */
 export function readAndClearGoogleOAuthIntent(): GoogleOAuthIntent | null {
   try {
     const value = sessionStorage.getItem(GOOGLE_OAUTH_INTENT_STORAGE_KEY);
     sessionStorage.removeItem(GOOGLE_OAUTH_INTENT_STORAGE_KEY);
-    return value === 'link' || value === 'login' ? value : null;
+    return value === 'link' || value === 'login' || value === 'play_console' ? value : null;
   } catch {
     return null;
   }
 }
 
-function writeGoogleOAuthIntent(intent: GoogleOAuthIntent): void {
+export function writeGoogleOAuthIntent(intent: GoogleOAuthIntent): void {
   try {
     sessionStorage.setItem(GOOGLE_OAUTH_INTENT_STORAGE_KEY, intent);
   } catch {
-    // A blocked session store just leaves the callback page unable to read
-    // the marker back, which now fails closed to the 'failed' state --
-    // never a security-relevant fallback.
+    // A blocked session store leaves the callback page unable to read the marker
   }
 }
 

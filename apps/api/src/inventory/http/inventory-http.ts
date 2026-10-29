@@ -60,6 +60,12 @@ function parseRequest<T>(
 ): T {
   const result = schema.safeParse(input);
   if (!result.success) {
+    console.error(
+      `[parseRequest] Validation failed for "${failureMessage}":`,
+      JSON.stringify(result.error.issues),
+      'Input received was:',
+      JSON.stringify(input),
+    );
     throw new BadRequestException(failureMessage);
   }
   return result.data;

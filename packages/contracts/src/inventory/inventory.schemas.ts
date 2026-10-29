@@ -21,16 +21,40 @@ export const ApplicationKindSchema = z.enum([
 ]);
 
 const ShortTextSchema = z.string().trim().min(1).max(255);
-const OptionalShortTextSchema = z.string().trim().min(1).max(255).nullable();
-const NotesSchema = z.string().trim().max(10_000).nullable();
-const UuidReferenceSchema = z.uuid().nullable();
-const DateTimeInputSchema = z.iso.datetime({ offset: true }).nullable();
-const CanonicalKeySchema = z
+const OptionalShortTextSchema = z.preprocess(
+  (val) => (val === '' ? null : val),
+  z.string().trim().min(1).max(255).nullable(),
+);
+const NotesSchema = z.preprocess(
+  (val) => (val === '' ? null : val),
+  z.string().trim().max(10_000).nullable(),
+);
+const UuidReferenceSchema = z.preprocess(
+  (val) => (val === '' ? null : val),
+  z.uuid().nullable(),
+);
+const DateTimeInputSchema = z.preprocess(
+  (val) => (val === '' ? null : val),
+  z.iso.datetime({ offset: true }).nullable(),
+);
+export const CanonicalKeySchema = z
   .string()
   .trim()
   .min(1)
   .max(100)
   .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u);
+
+export const CanonicalKeyInputSchema = z.preprocess(
+  (val) =>
+    typeof val === 'string'
+      ? val
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9._-]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+      : val,
+  CanonicalKeySchema,
+);
 
 function hasAtLeastOneProperty(value: object): boolean {
   return Object.keys(value).length > 0;
@@ -226,7 +250,7 @@ export const CreateCloudResourceRequestSchema = z
     notes: NotesSchema.optional(),
     providerAccountId: z.uuid(),
     region: OptionalShortTextSchema.optional(),
-    resourceType: CanonicalKeySchema,
+    resourceType: CanonicalKeyInputSchema,
   })
   .strict();
 export const UpdateCloudResourceRequestSchema = z
@@ -237,7 +261,7 @@ export const UpdateCloudResourceRequestSchema = z
     notes: NotesSchema.optional(),
     providerAccountId: z.uuid().optional(),
     region: OptionalShortTextSchema.optional(),
-    resourceType: CanonicalKeySchema.optional(),
+    resourceType: CanonicalKeyInputSchema.optional(),
   })
   .strict()
   .refine(hasAtLeastOneProperty, { message: 'At least one field is required' });

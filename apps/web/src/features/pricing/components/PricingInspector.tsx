@@ -47,6 +47,9 @@ export const PricingInspector: React.FC<PricingInspectorProps> = ({ result }) =>
   if (!result) {
     return (
       <div className="p-unit-base rounded-lg bg-surface-container-lowest shadow-micro border border-outline-variant/30 text-body-sm text-secondary">
+        <p className="font-caption-xs text-caption-xs text-secondary mb-1">
+          Availability estimate: select a domain and registrar to inspect live rates.
+        </p>
         Select a registrar row to see the details it returned.
       </div>
     );

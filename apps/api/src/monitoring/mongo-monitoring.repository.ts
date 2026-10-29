@@ -8,6 +8,7 @@ import type {
   AlertRule,
   AlertRuleKey,
   AlertRuleUpdateInput,
+  AlertSeverity,
   AlertsListQuery,
   MonitoringResultStatus,
   MonitoringRun,
@@ -249,6 +250,96 @@ export class MongoMonitoringRepository implements MonitoringStore {
     const cols = this.database.collections;
     if (!cols) throw new MonitoringPersistenceError('Database not initialized');
 
+    // Auto-sync truthful alerts from active inventory
+    try {
+      const now = new Date();
+      const domainList = await (cols.domains as any).find({ workspaceId }).toArray();
+      for (const d of domainList) {
+        if (!d.expiresAt) continue;
+        const exp = new Date(d.expiresAt);
+        const diffDays = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 30) {
+          const severity: AlertSeverity = diffDays <= 14 ? 'CRITICAL' : 'WARNING';
+          const ruleId = diffDays <= 14 ? 'DOMAIN_EXPIRY_CRITICAL' : 'DOMAIN_EXPIRY_WARNING';
+          const name = d.domainName || d.name || 'Domain';
+          const title = diffDays <= 0 ? `Domain Expired: ${name}` : `Domain Expiring Soon: ${name}`;
+          const detail = diffDays <= 0
+            ? `Domain registration for ${name} has expired. Renew immediately to restore services.`
+            : `Domain ${name} expires in ${diffDays} day${diffDays === 1 ? '' : 's'}. Review renewal status.`;
+          const dedupeKey = `domain_expiry_${d.id}_${ruleId}`;
+
+          const existing = await (cols.alertEvents as any).findOne({
+            workspaceId,
+            dedupeKey,
+          });
+
+          if (!existing) {
+            await (cols.alertEvents as any).insertOne({
+              id: randomUUID(),
+              workspaceId,
+              domainId: d.id,
+              targetId: null,
+              dedupeKey,
+              ruleId,
+              severity,
+              status: 'OPEN',
+              title,
+              detail,
+              occurrenceCount: 1,
+              evidence: { domainName: name, expiresAt: d.expiresAt, daysRemaining: diffDays },
+              firstSeenAt: now,
+              lastSeenAt: now,
+              ackedAt: null,
+              ackedByUserId: null,
+              resolvedAt: null,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+      }
+
+      const serverList = await (cols.servers as any).find({ workspaceId }).toArray();
+      for (const s of serverList) {
+        if (s.status === 'offline' || s.status === 'suspended') {
+          const ruleId = 'RETRIEVAL_FAILURE_REPEATED';
+          const dedupeKey = `server_status_${s.id}_${s.status}`;
+          const title = `Server Offline: ${s.name}`;
+          const detail = `Server ${s.name} (${s.hostname || s.primaryIp || 'VPS'}) is currently ${s.status}.`;
+          const existing = await (cols.alertEvents as any).findOne({
+            workspaceId,
+            dedupeKey,
+          });
+
+          if (!existing) {
+            await (cols.alertEvents as any).insertOne({
+              id: randomUUID(),
+              workspaceId,
+              domainId: s.id,
+              targetId: null,
+              dedupeKey,
+              ruleId,
+              severity: 'CRITICAL',
+              status: 'OPEN',
+              title,
+              detail,
+              occurrenceCount: 1,
+              evidence: { serverName: s.name, status: s.status, primaryIp: s.primaryIp },
+              firstSeenAt: now,
+              lastSeenAt: now,
+              ackedAt: null,
+              ackedByUserId: null,
+              resolvedAt: null,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+      }
+    } catch {
+      // Non-blocking auto-sync
+    }
+
     const limit = query.limit ?? 20;
     const filter: any = { workspaceId };
     if (query.status) filter.status = query.status;
@@ -269,6 +360,29 @@ export class MongoMonitoringRepository implements MonitoringStore {
       items,
       nextCursor: hasNext && last ? last.id : null,
     };
+  }
+
+  async resolveAlert(
+    workspaceId: string,
+    alertId: string,
+    now: Date,
+  ): Promise<AlertEvent | undefined> {
+    const cols = this.database.collections;
+    if (!cols) throw new MonitoringPersistenceError('Database not initialized');
+
+    const updated = await (cols.alertEvents as any).findOneAndUpdate(
+      { workspaceId, id: alertId },
+      {
+        $set: {
+          status: 'RESOLVED',
+          resolvedAt: now,
+          updatedAt: now,
+        },
+      },
+      { returnDocument: 'after' },
+    );
+
+    return updated ?? undefined;
   }
 
   async findAlertById(

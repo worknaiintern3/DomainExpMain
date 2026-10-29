@@ -21,7 +21,7 @@ export const WhoisDetailsModal: React.FC<WhoisDetailsModalProps> = ({
   onRefresh,
   onAddToPortfolio,
 }) => {
-  const [activeTab, setActiveTab] = useState<'summary' | 'registrar' | 'nameservers' | 'raw' | 'json'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'registrar' | 'nameservers'>('summary');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -174,8 +174,6 @@ export const WhoisDetailsModal: React.FC<WhoisDetailsModalProps> = ({
                 { id: 'summary', label: 'Summary', icon: 'dashboard' },
                 { id: 'registrar', label: 'Registrar & Contacts', icon: 'badge' },
                 { id: 'nameservers', label: `Nameservers (${data.nameservers.length})`, icon: 'dns' },
-                { id: 'raw', label: 'Raw WHOIS', icon: 'terminal' },
-                { id: 'json', label: 'Full JSON', icon: 'code' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -413,46 +411,6 @@ export const WhoisDetailsModal: React.FC<WhoisDetailsModalProps> = ({
                       ))}
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* 4. Raw WHOIS Tab */}
-              {activeTab === 'raw' && (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-caption-xs text-secondary">Raw text returned by the WHOIS registry server:</p>
-                    {data.rawWhois && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleCopy(data.rawWhois || '', 'raw_whois')}
-                      >
-                        {copiedKey === 'raw_whois' ? 'Copied text!' : 'Copy raw text'}
-                      </Button>
-                    )}
-                  </div>
-                  <pre className="p-unit-md rounded-xl bg-slate-950 text-slate-200 font-mono text-caption-xs leading-relaxed overflow-x-auto max-h-96 whitespace-pre-wrap select-all border border-slate-800">
-                    {data.rawWhois || 'No raw WHOIS text provided.'}
-                  </pre>
-                </div>
-              )}
-
-              {/* 5. Full JSON Tab */}
-              {activeTab === 'json' && (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-caption-xs text-secondary">Complete normalized database payload (JSON):</p>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleCopy(JSON.stringify(data, null, 2), 'raw_json')}
-                    >
-                      {copiedKey === 'raw_json' ? 'Copied JSON!' : 'Copy JSON'}
-                    </Button>
-                  </div>
-                  <pre className="p-unit-md rounded-xl bg-slate-950 text-emerald-400 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-96 whitespace-pre-wrap select-all border border-slate-800">
-                    {JSON.stringify(data, null, 2)}
-                  </pre>
                 </div>
               )}
             </div>

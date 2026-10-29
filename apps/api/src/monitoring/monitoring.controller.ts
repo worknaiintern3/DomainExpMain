@@ -39,6 +39,7 @@ import {
   type MonitoringTargetApiResponse,
   type MonitoringTargetResponse,
 } from '@domainpulse/contracts';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { AccessTokenGuard } from '../auth/http';
@@ -192,15 +193,37 @@ function presentAlertEvent(event: AlertEvent): AlertEventResponse {
 }
 
 function presentAlertRule(rule: AlertRule): AlertRuleResponse {
+  const toIso = (val: any) => {
+    if (!val) return new Date().toISOString();
+    if (val instanceof Date) return val.toISOString();
+    try {
+      return new Date(val).toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  };
+  const usesDays = rule.key.includes('_EXPIRY_');
+  const usesCount = rule.key === 'RETRIEVAL_FAILURE_REPEATED';
+
+  let validId = rule.id;
+  if (
+    !validId ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      validId,
+    )
+  ) {
+    validId = randomUUID();
+  }
+
   const presented = {
-    createdAt: rule.createdAt.toISOString(),
-    enabled: rule.enabled,
-    id: rule.id,
+    createdAt: toIso(rule.createdAt),
+    enabled: Boolean(rule.enabled),
+    id: validId,
     key: rule.key,
-    severity: rule.severity,
-    thresholdCount: rule.thresholdCount,
-    thresholdDays: rule.thresholdDays,
-    updatedAt: rule.updatedAt.toISOString(),
+    severity: rule.severity || 'WARNING',
+    thresholdCount: usesCount ? (rule.thresholdCount ?? 3) : null,
+    thresholdDays: usesDays ? (rule.thresholdDays ?? 7) : null,
+    updatedAt: toIso(rule.updatedAt),
   };
   return AlertRuleResponseSchema.parse(presented);
 }
