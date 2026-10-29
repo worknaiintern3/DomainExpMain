@@ -3,10 +3,10 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { getMobileAdminConfig } from '@/api/mobile-admin';
 import { useAuth } from '@/auth/AuthContext';
 import {
-  loadAppearancePreferences,
   readSidebarManuallyCollapsed,
   setSidebarManuallyCollapsed,
   useSidebarCollapsed,
+  useSidebarPreference,
 } from '@/lib/appearance';
 import { usePreferences } from '@/preferences/PreferencesContext';
 import { NavItem } from '@/types';
@@ -62,7 +62,8 @@ export const Sidebar: React.FC<{ mobileOpen?: boolean; onClose?: () => void }> =
   const savedName = preferencesStatus === 'ready' ? general.displayName?.trim() : undefined;
   const userLabel = savedName || user?.displayName?.trim() || user?.email || 'Signed-in user';
   const workspaceLabel = preferencesStatus === 'ready' ? general.workspaceName : 'Personal workspace';
-  const rememberMode = loadAppearancePreferences().sidebar === 'remember';
+  const sidebarPref = useSidebarPreference();
+  const rememberMode = sidebarPref === 'remember';
 
   const [counts, setCounts] = useState<{
     domains: number;

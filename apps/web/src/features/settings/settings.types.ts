@@ -43,13 +43,26 @@ export interface PricingCurrencySettings {
   showTransferPriceColumn: boolean;
 }
 
+export type InterfaceFontOption =
+  | 'Inter'
+  | 'Roboto'
+  | 'Outfit'
+  | 'Plus Jakarta Sans'
+  | 'System Sans';
+
+export type MonoFontOption =
+  | 'JetBrains Mono'
+  | 'Fira Code'
+  | 'Roboto Mono'
+  | 'Source Code Pro';
+
 export interface AppearanceSettings {
   theme: 'light' | 'dark' | 'system';
   density: 'compact' | 'comfortable';
   sidebar: 'expanded' | 'collapsed' | 'remember';
   tableRowDensity: 'compact' | 'standard';
-  monoDataFont: 'JetBrains Mono';
-  interfaceFont: 'Inter';
+  monoDataFont: MonoFontOption;
+  interfaceFont: InterfaceFontOption;
   microInteractions: boolean;
   respectReducedMotion: boolean;
 }

@@ -21,8 +21,9 @@ import {
 import { useAuth } from '@/auth/AuthContext';
 import { applyTheme, readThemePreference, saveThemePreference } from '@/lib/theme';
 import {
-  applyAppearancePreferences,
+  clearAppearancePreview,
   loadAppearancePreferences,
+  previewAppearancePreferences,
   saveAppearancePreferences,
 } from '@/lib/appearance';
 import { loadPricingPreferences, savePricingPreferences } from '@/features/settings/pricing-preferences';
@@ -54,13 +55,13 @@ export const SettingsPage: React.FC = () => {
     applyTheme(settings.appearance.theme);
   }, [settings.appearance.theme]);
 
-  // Density, rows, motion and sidebar preview immediately; Save remembers them on this device.
+  // Density, rows, fonts, motion and sidebar preview immediately; Save remembers them on this device.
   useEffect(() => {
-    applyAppearancePreferences(settings.appearance);
+    previewAppearancePreferences(settings.appearance);
   }, [settings.appearance]);
   useEffect(() => () => {
     applyTheme(readThemePreference());
-    applyAppearancePreferences(loadAppearancePreferences());
+    clearAppearancePreview();
   }, []);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [toast, setToast] = useState<ToastData | null>(null);

@@ -80,6 +80,31 @@ describe('appearance preferences', () => {
       motionReducedFor({ microInteractions: true, respectReducedMotion: false }),
     ).toBe(false);
   });
+
+  it('round-trips custom interface and mono fonts through localStorage', () => {
+    saveAppearancePreferences({
+      ...defaultAppearancePreferences(),
+      interfaceFont: 'Outfit',
+      monoDataFont: 'Fira Code',
+    });
+
+    const loaded = loadAppearancePreferences();
+    expect(loaded.interfaceFont).toBe('Outfit');
+    expect(loaded.monoDataFont).toBe('Fira Code');
+  });
+
+  it('applies font CSS variables and dataset properties on <html>', () => {
+    applyAppearancePreferences({
+      ...defaultAppearancePreferences(),
+      interfaceFont: 'Plus Jakarta Sans',
+      monoDataFont: 'Roboto Mono',
+    });
+
+    expect(document.documentElement.dataset.interfaceFont).toBe('Plus Jakarta Sans');
+    expect(document.documentElement.dataset.monoFont).toBe('Roboto Mono');
+    expect(document.documentElement.style.getPropertyValue('--font-interface')).toContain('Plus Jakarta Sans');
+    expect(document.documentElement.style.getPropertyValue('--font-mono-data')).toContain('Roboto Mono');
+  });
 });
 
 describe('SidebarItem collapsed mode', () => {

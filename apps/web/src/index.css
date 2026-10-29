@@ -7,6 +7,8 @@
    by src/lib/theme.ts. */
 :root {
   color-scheme: light;
+  --font-interface: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono-data: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --c-background: 248 249 252;
   --c-on-background: 11 28 48;
   --c-surface: 248 249 252;
@@ -141,7 +143,7 @@
     padding: 0;
     background-color: rgb(var(--c-background));
     color: rgb(var(--c-on-surface));
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-interface, 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -151,6 +153,16 @@
     font-feature-settings: "tnum" on, "zero" on;
     font-variant-numeric: tabular-nums;
   }
+}
+
+.font-sans,
+.font-body {
+  font-family: var(--font-interface, 'Inter', system-ui, -apple-system, sans-serif) !important;
+}
+
+.font-mono,
+.font-label-mono {
+  font-family: var(--font-mono-data, 'JetBrains Mono', monospace) !important;
 }
 
 /* Material Symbols Icon Sizing & Align */
@@ -207,31 +219,39 @@
   animation: helpTabSlideEnter 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Appearance preferences (src/lib/appearance.ts). Compact is the default:
-   rules below only add the opt-in Comfortable / Standard / reduced-motion states. */
+/* Appearance preferences (src/lib/appearance.ts). */
 
-/* Comfortable interface density: roomier click targets. */
-html[data-density="comfortable"] button {
+/* Comfortable interface density: roomier click targets (excludes checkboxes & radios) */
+html[data-density="comfortable"] button:not(.no-density) {
   min-height: 2.5rem;
 }
 
-html[data-density="comfortable"] input,
+html[data-density="comfortable"] input:not([type="checkbox"]):not([type="radio"]),
 html[data-density="comfortable"] select,
 html[data-density="comfortable"] textarea {
   min-height: 2.75rem;
 }
 
-/* Standard table rows: taller than the compact 44px target. */
-html[data-table-density="standard"] table td {
-  padding-top: 0.625rem;
-  padding-bottom: 0.625rem;
+/* Table Row Density: overrides utility classes py-2.5, py-3 on all <th> and <td> */
+html[data-table-density="compact"] table tbody tr td,
+html[data-table-density="compact"] table thead tr th {
+  padding-top: 0.375rem !important;
+  padding-bottom: 0.375rem !important;
 }
 
-/* Reduced motion: suppress transitions/animations without removing content. */
+html[data-table-density="standard"] table tbody tr td,
+html[data-table-density="standard"] table thead tr th {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+}
+
+/* Reduced motion / micro-interactions off: suppress all transitions and animations smoothly */
 html[data-motion="reduced"] *,
 html[data-motion="reduced"] *::before,
 html[data-motion="reduced"] *::after {
-  animation-duration: 0.01ms !important;
+  animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
 }

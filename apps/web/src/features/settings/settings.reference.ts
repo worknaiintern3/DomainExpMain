@@ -1,5 +1,10 @@
 import type { LandingPage } from '@/api/settings';
-import { DomainPulseSettings, WorkspaceDataSummary } from './settings.types';
+import {
+  DomainPulseSettings,
+  InterfaceFontOption,
+  MonoFontOption,
+  WorkspaceDataSummary,
+} from './settings.types';
 
 export const DEFAULT_SETTINGS: DomainPulseSettings = {
   general: {
@@ -109,3 +114,71 @@ export const AVAILABLE_TLDS = [
   '.cloud',
   '.co',
 ];
+
+export interface FontChoice<T extends string> {
+  value: T;
+  label: string;
+  tagline: string;
+  familyCss: string;
+}
+
+export const INTERFACE_FONT_OPTIONS: ReadonlyArray<FontChoice<InterfaceFontOption>> = [
+  {
+    value: 'Inter',
+    label: 'Inter',
+    tagline: 'Default · Ultra-clean, neutral UI typography',
+    familyCss: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+  {
+    value: 'Roboto',
+    label: 'Roboto',
+    tagline: 'Google Classic · Friendly, open geometric curves',
+    familyCss: "'Roboto', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+  {
+    value: 'Outfit',
+    label: 'Outfit',
+    tagline: 'Vibrant · Modern, high-fashion display sans',
+    familyCss: "'Outfit', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+  {
+    value: 'Plus Jakarta Sans',
+    label: 'Plus Jakarta Sans',
+    tagline: 'Enterprise · Sleek, contemporary tech appearance',
+    familyCss: "'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+  {
+    value: 'System Sans',
+    label: 'System Sans',
+    tagline: 'Native · Native OS system stack (San Francisco, Segoe)',
+    familyCss: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+];
+
+export const MONO_FONT_OPTIONS: ReadonlyArray<FontChoice<MonoFontOption>> = [
+  {
+    value: 'JetBrains Mono',
+    label: 'JetBrains Mono',
+    tagline: 'Default · Code-engineered with clear glyph distinctions',
+    familyCss: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  },
+  {
+    value: 'Fira Code',
+    label: 'Fira Code',
+    tagline: 'Mozilla Classic · Distinct zero, clear punctuation',
+    familyCss: "'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  },
+  {
+    value: 'Roboto Mono',
+    label: 'Roboto Mono',
+    tagline: 'Technical · Crisp tabular alignment for IPs & currency',
+    familyCss: "'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  },
+  {
+    value: 'Source Code Pro',
+    label: 'Source Code Pro',
+    tagline: 'Adobe Standard · Legible server & terminal aesthetic',
+    familyCss: "'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  },
+];
+
