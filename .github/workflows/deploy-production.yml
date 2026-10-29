@@ -2,6 +2,24 @@ name: DomainExp production
 on:
   push:
     branches: [main, Api-Branch]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.base.json'
+      - '.dockerignore'
+      - '.github/workflows/deploy-production.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.base.json'
+      - '.dockerignore'
+      - '.github/workflows/deploy-production.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -9,7 +27,21 @@ concurrency:
   group: domainexp-app-production
   cancel-in-progress: false
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate deployment sources
+        run: |
+          set -euo pipefail
+          for script in apps/api/deploy/*.sh; do bash -n "$script"; done
+          python3 -m unittest discover -s apps/api/deploy/tests -p 'test_*.py' -v
   deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -25,11 +57,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Validate deployment sources
-        run: |
-          set -euo pipefail
-          for script in apps/api/deploy/*.sh; do bash -n "$script"; done
-          python3 -m unittest discover -s apps/api/deploy/tests -p 'test_*.py' -v
       - name: Configure verified SSH access
         run: |
           set -euo pipefail

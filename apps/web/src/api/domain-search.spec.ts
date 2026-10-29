@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 
 describe('domain-search adapter', () => {
-  it('queries the deployed availability endpoint and marks its result as an estimate', async () => {
+  it('queries availability once and leaves unavailable registration prices empty for every registrar', async () => {
     const controller = new AbortController();
     const response = await searchDomainAvailability('Example.COM.', controller.signal);
 
@@ -25,7 +25,10 @@ describe('domain-search adapter', () => {
     const [path, options] = apiRequestMock.mock.calls[0] as [string, { signal?: AbortSignal }];
     expect(path).toBe('/whois/availability?query=example&tlds=.com');
     expect(options.signal).toBe(controller.signal);
-    expect(response.results[0]).toMatchObject({ provider: 'whois', state: 'UNAVAILABLE', definitive: false, registrationPriceMinorUnits: null });
+    expect(response.results.map((result) => result.provider)).toEqual(['hostinger', 'namecheap', 'cloudflare', 'godaddy']);
+    for (const result of response.results) {
+      expect(result).toMatchObject({ state: 'UNAVAILABLE', available: false, registrationPriceMinorUnits: null, pricingNature: 'UNKNOWN' });
+    }
   });
 
   it('encodes special characters in the domain query', async () => {
@@ -34,7 +37,9 @@ describe('domain-search adapter', () => {
 
     const [path] = apiRequestMock.mock.calls[0] as [string];
     expect(path).toBe('/whois/availability?query=m%C3%BCnchen&tlds=.de');
-    expect(response.results[0]).toMatchObject({ state: 'AVAILABLE', definitive: false, currency: null });
+    expect(response.domain).toBe('münchen.de');
+    expect(response.results).toHaveLength(4);
+    for (const result of response.results) expect(result).toMatchObject({ state: 'AVAILABLE', available: true });
   });
 
   it('checks several extensions through one backend request', async () => {

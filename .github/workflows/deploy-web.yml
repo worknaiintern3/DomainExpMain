@@ -1,0 +1,118 @@
+name: DomainExp web production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-web.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked frontend dependencies
+        run: npm ci --workspace=@domainpulse/web --include-workspace-root --no-audit --no-fund
+      - name: Validate deployment and packaging
+        run: |
+          bash -n apps/web/deploy/install.sh
+          node --test apps/web/deploy/test/*.test.mjs
+      - name: Test frontend
+        run: npm run test --workspace=@domainpulse/web
+      - name: Typecheck and build production frontend
+        run: npm run build --workspace=@domainpulse/web
+      - name: Package exact revision
+        id: package
+        run: node apps/web/deploy/package.mjs
+      - name: Smoke-test the packaged Nginx image
+        env:
+          PACKAGE_DIRECTORY: ${{ steps.package.outputs.directory }}
+        run: |
+          set -euo pipefail
+          docker build -t domainexp-web-check "$PACKAGE_DIRECTORY"
+          docker run --rm domainexp-web-check nginx -t
+          trap 'docker rm -f domainexp-web-check >/dev/null 2>&1 || true' EXIT
+          docker run -d --name domainexp-web-check -p 127.0.0.1:8089:80 domainexp-web-check
+          curl --fail --silent --show-error --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:8089/login -o /tmp/frontend-login.html
+          cmp apps/web/dist/index.html /tmp/frontend-login.html
+          curl --fail --silent --show-error http://127.0.0.1:8089/domains -o /tmp/frontend-route.html
+          cmp apps/web/dist/index.html /tmp/frontend-route.html
+          [[ "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8089/assets/missing.js)" == 404 ]]
+          [[ "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8089/api/v1/missing)" == 404 ]]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: domainexp-web-${{ github.sha }}
+          path: |
+            artifacts/domainexp-web.tar.gz
+            artifacts/domainexp-web.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: domainexp-web-production
+      cancel-in-progress: false
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: domainexp-web-${{ github.sha }}
+          path: release
+      - name: Configure verified SSH access
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_PORT VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            [[ -n "${!name}" ]] || { echo "Missing secret: $name"; exit 1; }
+          done
+          [[ "$VPS_HOST" == 200.234.45.233 && "$VPS_USER" == root && "$VPS_PORT" == 22 ]]
+          install -d -m 700 ~/.ssh
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/domainexp_web_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Upload and deploy the tested artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ && "$GITHUB_RUN_NUMBER" =~ ^[0-9]+$ ]]
+          cd release
+          sha256sum -c domainexp-web.tar.gz.sha256
+          remote_dir="/opt/domainexp-web-ci/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh_options=(-i ~/.ssh/domainexp_web_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+          ssh "${ssh_options[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "umask 077; mkdir -p /opt/domainexp-web-ci; mkdir '$remote_dir'"
+          scp "${ssh_options[@]}" -P "$VPS_PORT" domainexp-web.tar.gz domainexp-web.tar.gz.sha256 "$VPS_USER@$VPS_HOST:$remote_dir/"
+          ssh "${ssh_options[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+            "set -eu; cd '$remote_dir'; sha256sum -c domainexp-web.tar.gz.sha256; tar -xzf domainexp-web.tar.gz; WEB_DEPLOY_MODE=update WEB_RELEASE_SHA='$GITHUB_SHA' WEB_RELEASE_NUMBER='$GITHUB_RUN_NUMBER' bash install.sh"
+      - name: Clean up private key
+        if: always()
+        run: rm -f ~/.ssh/domainexp_web_key

@@ -76,8 +76,11 @@ managed domain config after backend readiness and shared proxy connectivity.
 
 Set GitHub secrets VPS_HOST, VPS_USER, VPS_PORT, VPS_SSH_KEY, VPS_KNOWN_HOSTS and
 DEPLOY_PATH for the specified target. SSH host verification remains strict.
-Push `main` or dispatch the workflow manually. Actions checks out the triggering
-SHA, validates deployment tests, buffers that revision's deployment script into
+Push `main` or dispatch the workflow manually from `main`. `Api-Branch` pushes
+and pull requests run validation only; their commits deploy after merging into
+`main`. Path filters avoid backend restarts for frontend-only changes.
+Actions checks out the triggering SHA, validates deployment tests, and buffers
+that revision's deployment script into
 a private temporary remote file, and runs the single deployment implementation.
 This lets a new fix run even when the server's old preflight is broken.
 

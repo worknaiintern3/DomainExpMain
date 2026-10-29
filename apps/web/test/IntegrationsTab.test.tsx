@@ -217,24 +217,24 @@ describe('IntegrationsTab', () => {
     expect(sessionStorage.length).toBe(0);
   });
 
-  it('reconnects with a new account when the previous account is linked to a disconnected connection', async () => {
+  it('reuses the saved account when its previous connection is disconnected', async () => {
     const disconnected = { ...connectedConnection, connectionStatus: 'DISCONNECTED' as const };
     listProviderConnections.mockResolvedValue({ items: [disconnected] });
     listProviderAccounts.mockResolvedValue({
       items: [{ externalAccountId: null, id: 'account-1', label: 'Cloudflare', providerKey: 'cloudflare' }],
     });
     createProviderAccount.mockResolvedValue({ id: 'account-2', label: 'Cloudflare', providerKey: 'cloudflare' });
-    createProviderConnection.mockResolvedValue({ ...connectedConnection, id: 'connection-2', providerAccountId: 'account-2' });
+    createProviderConnection.mockResolvedValue({ ...connectedConnection, id: 'connection-2', providerAccountId: 'account-1' });
 
     render(<IntegrationsTab />);
     fireEvent.click(await within(cloudflareCard()).findByRole('button', { name: 'Connect' }));
     fireEvent.change(screen.getByTestId('cloudflare-token-input'), { target: { value: 'new-token' } });
     fireEvent.click(within(cloudflareCard()).getByRole('button', { name: 'Save and connect' }));
 
-    await waitFor(() => expect(createProviderAccount).toHaveBeenCalledWith({ label: 'Cloudflare', providerKey: 'cloudflare' }));
-    expect(createProviderConnection).toHaveBeenCalledWith({
-      authType: 'CLOUDFLARE_API_TOKEN', credential: 'new-token', providerAccountId: 'account-2',
-    });
+    await waitFor(() => expect(createProviderConnection).toHaveBeenCalledWith({
+      authType: 'CLOUDFLARE_API_TOKEN', credential: 'new-token', providerAccountId: 'account-1',
+    }));
+    expect(createProviderAccount).not.toHaveBeenCalled();
   });
 
   it('still shows an active connection when sync history cannot load', async () => {
