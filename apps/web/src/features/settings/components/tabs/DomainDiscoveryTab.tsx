@@ -302,7 +302,7 @@ export const DomainDiscoveryTab: React.FC<DomainDiscoveryTabProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h4 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-                Default Extensions
+                Default Extensions Scoping
               </h4>
               <span className="rounded-full bg-surface-container-high px-2 py-0.5 font-mono text-[11px] font-semibold text-secondary">
                 {checked.size} of {SUPPORTED_TLDS.length} Active
@@ -346,7 +346,6 @@ export const DomainDiscoveryTab: React.FC<DomainDiscoveryTabProps> = ({
               <button
                 key={tld}
                 type="button"
-                aria-label={tld}
                 aria-pressed={active}
                 disabled={isLast}
                 onClick={() => toggleTld(tld)}
@@ -400,7 +399,7 @@ export const DomainDiscoveryTab: React.FC<DomainDiscoveryTabProps> = ({
       <div className="rounded-xl bg-surface-container-lowest p-unit-lg shadow-micro border border-outline-variant/30 flex flex-col gap-unit-md">
         <div className="flex flex-col pb-unit-sm border-b border-surface-container-low">
           <h4 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-            Availability Check
+            Availability Probe Policy
           </h4>
           <p className="font-body-sm text-body-sm text-secondary mt-1">
             Choose whether the discovery engine restricts queries to your selected extensions or probes all 11 supported extensions for complete coverage.
@@ -482,7 +481,7 @@ export const DomainDiscoveryTab: React.FC<DomainDiscoveryTabProps> = ({
       <div className="rounded-xl bg-surface-container-lowest p-unit-lg shadow-micro border border-outline-variant/30 flex flex-col gap-unit-md">
         <div className="flex flex-col pb-unit-sm border-b border-surface-container-low">
           <h4 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-            Default Result Order
+            Default Result Ranking &amp; Sorting
           </h4>
           <p className="font-body-sm text-body-sm text-secondary mt-1">
             Specify how candidate domain rows are ordered when search results populate on the Find Domain page.
@@ -563,7 +562,7 @@ export const DomainDiscoveryTab: React.FC<DomainDiscoveryTabProps> = ({
               onClick={handleClearHistory}
               className="h-9 px-3 rounded-lg border border-outline-variant/50 text-label-md text-secondary hover:text-on-surface hover:bg-surface-container-lowest transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">delete_sweep</span>
+              <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
               <span>Clear history{historyCount > 0 ? ` (${historyCount})` : ''}</span>
             </button>
           </div>
@@ -669,7 +668,7 @@ export const DomainDiscoveryTab: React.FC<DomainDiscoveryTabProps> = ({
               </>
             ) : (
               <>
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">save</span>
+                <span className="material-symbols-outlined text-[18px]">save</span>
                 <span>Save Discovery Settings</span>
               </>
             )}
