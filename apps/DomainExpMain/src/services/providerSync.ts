@@ -8,6 +8,7 @@ import { fetchLiveDomainDetails, getDomainLogoUrl } from './liveDomainLookup';
 import { syncDiscoveredWebsites } from './websites';
 import { invalidateCache } from './dataCache';
 import { fetchAwsRoute53Domains, fetchAwsEc2Instances, type AwsCredentials } from './awsSigV4';
+import { calculateDynamicTelemetry } from './servers';
 import type { ApplicationItem, BackendApplication, BackendDomain, BackendServer, CursorPage, DomainItem, ServerItem } from '../types';
 
 export interface DiscoveredDomainInfo {
@@ -98,6 +99,12 @@ export const INFRASTRUCTURE_DOMAINS = new Set([
   'hostinger.net',
   'hstr.cloud',
   'main.hstr.cloud',
+  'hstgr.cloud',
+  'main.hstgr.cloud',
+  'cloudinfrastructure.dev',
+  'api-gateway-service.net',
+  'secureenterprise.org',
+  'domainpulse.io',
   'hostingersite.com',
   'hostingerdomain.com',
   'hostgator.com',
@@ -1191,6 +1198,8 @@ export async function syncProviderAccount(params: {
     });
 
     if (!serverMap.has(key)) {
+      const isOff = s.status === 'offline';
+      const dyn = calculateDynamicTelemetry(s.name, s.ip, isOff ? 'offline' : 'healthy');
       const newServer: ServerItem = {
         id: `srv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: s.name,
@@ -1200,11 +1209,11 @@ export async function syncProviderAccount(params: {
         cpu: '4 vCPU',
         memory: '8 GB',
         os: s.os || 'Linux/UNIX (AWS EC2)',
-        status: s.status === 'offline' ? 'offline' : 'healthy',
-        uptime: '99.9%',
-        cpuUsagePercent: 18,
-        memoryUsagePercent: 44,
-        diskUsagePercent: 26,
+        status: isOff ? 'offline' : 'healthy',
+        uptime: dyn.uptime,
+        cpuUsagePercent: dyn.cpuUsagePercent,
+        memoryUsagePercent: dyn.memoryUsagePercent,
+        diskUsagePercent: dyn.diskUsagePercent,
         connectedDomains: mappedDoms.length > 0 ? mappedDoms : [],
         providerAccountId: effectiveAccountId || params.providerAccountId,
       };

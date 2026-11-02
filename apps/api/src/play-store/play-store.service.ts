@@ -255,12 +255,18 @@ function matchesDeveloper(appDev?: string | null, targetDev?: string | null): bo
   if (!keyA || !keyB) return false;
   if (keyA === keyB) return true;
 
-  // Exact developer entity match accounting for standard corporate suffixes (e.g. LLC / Ltd / Inc / Pvt Ltd)
+  // Prefix match (e.g. "flipkartinternetprivatelimited" starts with "flipkart")
+  if (keyA.startsWith(keyB) || keyB.startsWith(keyA)) return true;
+
+  // Suffix strip accounting for common enterprise legal and division words
   const stripSuffix = (s: string) =>
-    s.replace(/(technologiesindiapvtltd|technologiesindia|technologies|technology|indiapvtltd|pvtltd|limited|ltd|corp|corporation|inc|llc|co)$/g, '');
+    s.replace(
+      /(technologiesindiapvtltd|technologiesindia|technologies|technology|indiapvtltd|privatelimited|pvtltd|limited|ltd|corp|corporation|inc|llc|co|internet|mobile|services|apps|studio|studios|interactive|media|labs)$/g,
+      ''
+    );
   const baseA = stripSuffix(keyA);
   const baseB = stripSuffix(keyB);
-  if (baseA && baseB && baseA === baseB) return true;
+  if (baseA && baseB && (baseA === baseB || baseA.startsWith(baseB) || baseB.startsWith(baseA))) return true;
 
   return false;
 }
@@ -365,13 +371,18 @@ export class PlayStoreService {
                   const devId = item.developerId || devName;
                   const key = devName.toLowerCase();
 
+                  const cachedApps =
+                    this.appsCache.get(`${devName.toLowerCase()}::100`) ||
+                    this.appsCache.get(`${String(devId).toLowerCase()}::100`);
+                  const initialCount = cachedApps ? cachedApps.data.total : 1;
+
                   if (!devMap.has(key)) {
                     devMap.set(key, {
                       id: String(devId),
                       name: devName,
                       icon: item.icon,
                       sampleApps: item.title ? [item.title] : [],
-                      appCount: 1,
+                      appCount: initialCount,
                       verified: false,
                     });
                   } else {
@@ -379,7 +390,11 @@ export class PlayStoreService {
                     if (item.title && existing.sampleApps.length < 3 && !existing.sampleApps.includes(item.title)) {
                       existing.sampleApps.push(item.title);
                     }
-                    existing.appCount++;
+                    if (cachedApps) {
+                      existing.appCount = Math.max(existing.appCount, cachedApps.data.total);
+                    } else {
+                      existing.appCount++;
+                    }
                   }
                 }
               }
@@ -389,7 +404,7 @@ export class PlayStoreService {
           })
         );
       })(),
-      3500,
+      6000,
       undefined
     );
 
@@ -465,12 +480,39 @@ export class PlayStoreService {
       }
     }
 
-    // 2. Discover canonical registered developer entity name if devId is a brand / partial name
+    // 2. Discover canonical registered developer entity name
     const isPurelyNumeric = /^[0-9]+$/.test(devId);
     let canonicalDevName = devId;
     const probeCountries = ['in', 'us'];
 
-    if (!isPurelyNumeric) {
+    if (isPurelyNumeric) {
+      try {
+        await Promise.allSettled(
+          probeCountries.map(async (c) => {
+            try {
+              const directProbe = await withTimeout<any[]>(
+                gplay.developer({ devId, country: c, num: 20 }),
+                3000,
+                []
+              );
+              if (Array.isArray(directProbe) && directProbe.length > 0) {
+                const foundDev = directProbe[0]?.developer;
+                if (foundDev) {
+                  canonicalDevName = foundDev;
+                  detectedDevName = foundDev;
+                }
+                for (const item of directProbe) {
+                  const pkg = item.appId || item.id;
+                  if (pkg && !discoveredMap.has(pkg)) {
+                    discoveredMap.set(pkg, item);
+                  }
+                }
+              }
+            } catch {}
+          })
+        );
+      } catch {}
+    } else {
       try {
         const devFrequency = new Map<string, number>();
         await Promise.allSettled(
@@ -517,9 +559,18 @@ export class PlayStoreService {
                 for (const item of directApps) {
                   const pkg = item.appId || item.id;
                   if (pkg && !discoveredMap.has(pkg)) {
-                    if (matchesDeveloper(item.developer, devId) || matchesDeveloper(item.developer, canonicalDevName) || !item.developer) {
+                    if (
+                      isPurelyNumeric ||
+                      matchesDeveloper(item.developer, devId) ||
+                      matchesDeveloper(item.developer, canonicalDevName) ||
+                      matchesDeveloper(item.developer, detectedDevName) ||
+                      !item.developer
+                    ) {
                       discoveredMap.set(pkg, item);
-                      if (item.developer) detectedDevName = item.developer;
+                      if (item.developer && (detectedDevName === devId || isPurelyNumeric)) {
+                        detectedDevName = item.developer;
+                        canonicalDevName = item.developer;
+                      }
                     }
                   }
                 }
@@ -543,11 +594,19 @@ export class PlayStoreService {
               const searchResults = await gplay.search({ term: target, country, num: 60 });
               if (Array.isArray(searchResults)) {
                 for (const item of searchResults) {
-                  if (matchesDeveloper(item.developer, target) || matchesDeveloper(item.developer, devId)) {
+                  if (
+                    matchesDeveloper(item.developer, target) ||
+                    matchesDeveloper(item.developer, devId) ||
+                    matchesDeveloper(item.developer, canonicalDevName) ||
+                    matchesDeveloper(item.developer, detectedDevName) ||
+                    (item.developerId && devId && String(item.developerId) === String(devId))
+                  ) {
                     const pkg = item.appId || item.id;
                     if (pkg && !discoveredMap.has(pkg)) {
                       discoveredMap.set(pkg, item);
-                      if (item.developer) detectedDevName = item.developer;
+                      if (item.developer && (detectedDevName === devId || isPurelyNumeric)) {
+                        detectedDevName = item.developer;
+                      }
                     }
                   }
                 }
@@ -604,24 +663,48 @@ export class PlayStoreService {
       };
     });
 
-    // Strictly keep ONLY apps that belong to this particular developer name (no loosely related apps)
-    const apps = rawApps.filter((a) =>
-      matchesDeveloper(a.developerName, devId) ||
-      matchesDeveloper(a.developerName, detectedDevName) ||
-      matchesDeveloper(a.developerName, canonicalDevName)
-    );
+    // Strictly keep ONLY apps that belong to this particular developer name or ID
+    const apps = rawApps.filter((a) => {
+      if (a.developerId && devId && String(a.developerId) === String(devId)) return true;
+      if (isPurelyNumeric && detectedDevName !== devId) {
+        return (
+          matchesDeveloper(a.developerName, detectedDevName) ||
+          matchesDeveloper(a.developerName, canonicalDevName)
+        );
+      }
+      return (
+        matchesDeveloper(a.developerName, devId) ||
+        matchesDeveloper(a.developerName, detectedDevName) ||
+        matchesDeveloper(a.developerName, canonicalDevName)
+      );
+    });
 
     const result: DeveloperAppsResponse = {
       developerId: devId,
-      developerName: detectedDevName,
+      developerName: detectedDevName !== devId ? detectedDevName : canonicalDevName,
       total: apps.length,
       apps,
     };
 
-    this.appsCache.set(cacheKey, {
-      data: result,
-      expiresAt: Date.now() + this.CACHE_TTL_MS,
-    });
+    // Only synchronize and cache if apps were found (do NOT cache transient empty responses)
+    if (apps.length > 0) {
+      for (const [, cacheEntry] of this.searchCache.entries()) {
+        for (const dev of cacheEntry.data.developers) {
+          if (
+            dev.id.toLowerCase() === devId.toLowerCase() ||
+            dev.name.toLowerCase() === detectedDevName.toLowerCase() ||
+            cleanDevKey(dev.name) === cleanDevKey(detectedDevName)
+          ) {
+            dev.appCount = apps.length;
+          }
+        }
+      }
+
+      this.appsCache.set(cacheKey, {
+        data: result,
+        expiresAt: Date.now() + this.CACHE_TTL_MS,
+      });
+    }
 
     return result;
   }

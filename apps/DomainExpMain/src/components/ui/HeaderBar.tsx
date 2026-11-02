@@ -40,7 +40,9 @@ export function HeaderBar({ title = 'DomainPulse', subtitle, rightAction }: Head
 
         <View style={styles.rightGroup}>
 
-          {rightAction || (
+          {rightAction ? (
+            rightAction as any
+          ) : (
             <TouchableOpacity
               style={[
                 styles.avatarButton,

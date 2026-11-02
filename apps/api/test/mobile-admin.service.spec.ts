@@ -47,7 +47,7 @@ describe('MobileAdminService', () => {
       },
     } as any;
 
-    const service = new MobileAdminService(mockDbService);
+    const service = new MobileAdminService(mockDbService, {} as any);
     const updated = await service.updateAppConfig(
       { appName: 'DomainPulse Pro', maintenanceMode: true },
       randomUUID(),
@@ -92,7 +92,7 @@ describe('MobileAdminService', () => {
       },
     } as any;
 
-    const service = new MobileAdminService(mockDbService);
+    const service = new MobileAdminService(mockDbService, {} as any);
     const updated = await service.updateFeatureFlag(
       'domains',
       { enabled: false },

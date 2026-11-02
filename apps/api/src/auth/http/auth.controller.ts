@@ -349,4 +349,29 @@ export class AuthController {
       throw error;
     }
   }
+
+  @Delete('account')
+  @HttpCode(200)
+  @UseGuards(AccessTokenGuard)
+  async deleteAccount(@Req() request: AuthenticatedRequest) {
+    const userId = getPrincipal(request).userId;
+    await this.accountService.deleteAccount(userId);
+    return {
+      success: true,
+      message: 'Account and associated resources deleted successfully.',
+    };
+  }
+
+  @Post('delete-account')
+  @HttpCode(200)
+  @UseGuards(AccessTokenGuard)
+  async postDeleteAccount(@Req() request: AuthenticatedRequest) {
+    const userId = getPrincipal(request).userId;
+    await this.accountService.deleteAccount(userId);
+    return {
+      success: true,
+      message: 'Account and associated resources deleted successfully.',
+    };
+  }
 }
+

@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -83,15 +84,40 @@ export default function ServersScreen() {
   const [cpu, setCpu] = useState('4 vCPU');
   const [memory, setMemory] = useState('8 GB');
   const [formError, setFormError] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const loadServers = useCallback(async (isRefresh = false) => {
     const list = await fetchServersList({ forceRefresh: isRefresh });
     setServers(list);
   }, []);
 
+  useEffect(() => {
+    loadServers(false);
+  }, [loadServers]);
+
   useFocusEffect(
     useCallback(() => {
       loadServers(false);
+      // Dynamic live telemetry polling every 15s while screen is in focus
+      const timer = setInterval(() => {
+        loadServers(true);
+      }, 15000);
+      return () => clearInterval(timer);
     }, [loadServers])
   );
 
@@ -117,12 +143,37 @@ export default function ServersScreen() {
   };
 
   const handleCreateServer = async () => {
-    if (!name.trim()) {
+    const cleanName = name.trim();
+    const cleanIp = ipAddress.trim();
+
+    if (!cleanName) {
       setFormError('Please enter a server name.');
       return;
     }
-    if (!ipAddress.trim()) {
+    if (cleanName.length < 2) {
+      setFormError('Server name must be at least 2 characters.');
+      return;
+    }
+    if (!cleanIp) {
       setFormError('Please enter a valid IP address or hostname.');
+      return;
+    }
+
+    const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(cleanIp);
+    const isHostname = /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(cleanIp);
+    if (isIpv4) {
+      const octets = cleanIp.split('.').map(Number);
+      if (octets.some((o) => o < 0 || o > 255)) {
+        setFormError('IPv4 octets must be between 0 and 255.');
+        return;
+      }
+    } else if (!isHostname && cleanIp !== 'localhost') {
+      setFormError('Please enter a valid IPv4 address (e.g. 76.13.185.120) or hostname.');
+      return;
+    }
+
+    if (servers.some((s) => s.name.toLowerCase() === cleanName.toLowerCase())) {
+      setFormError(`Server with name "${cleanName}" is already registered.`);
       return;
     }
 
@@ -130,15 +181,16 @@ export default function ServersScreen() {
     setFormError('');
     try {
       await createServer({
-        name: name.trim().toLowerCase(),
+        name: cleanName.toLowerCase(),
         provider,
-        ipAddress: ipAddress.trim(),
+        ipAddress: cleanIp,
         region: region.trim() || 'Global',
         os,
         cpu,
         memory,
         status: 'healthy',
       });
+      Keyboard.dismiss();
       setShowAddModal(false);
       await loadServers();
     } catch (err: any) {
@@ -271,8 +323,10 @@ export default function ServersScreen() {
               : server.name.toLowerCase().includes('hstgr')
               ? 'hostinger'
               : null);
-          const cpuPercent = server.cpuUsagePercent ?? 30;
-          const ramPercent = server.memoryUsagePercent ?? 50;
+          const isOffline = server.status === 'offline';
+          const cpuPercent = isOffline ? 0 : (server.cpuUsagePercent ?? 28);
+          const ramPercent = isOffline ? 0 : (server.memoryUsagePercent ?? 46);
+          const uptimeText = isOffline ? 'Offline' : (server.uptime || '99.98%');
 
           return (
             <TouchableOpacity
@@ -400,7 +454,9 @@ export default function ServersScreen() {
                 <View style={{ flex: 1, gap: 4 }}>
                   <View style={styles.gaugeHeader}>
                     <Text style={[styles.gaugeLabel, { color: colors.textMuted }]}>CPU</Text>
-                    <Text style={[styles.gaugeValue, { color: colors.text }]}>{cpuPercent}%</Text>
+                    <Text style={[styles.gaugeValue, { color: isOffline ? colors.textMuted : colors.text }]}>
+                      {cpuPercent}%{isOffline ? ' (Off)' : ''}
+                    </Text>
                   </View>
                   <View style={[styles.progressBarTrack, { backgroundColor: isDark ? colors.surfaceHighlight : '#e2e8f0' }]}>
                     <View
@@ -408,7 +464,13 @@ export default function ServersScreen() {
                         styles.progressBarFill,
                         {
                           width: `${cpuPercent}%`,
-                          backgroundColor: cpuPercent > 80 ? colors.rose : cpuPercent > 60 ? colors.amber : colors.primary,
+                          backgroundColor: isOffline
+                            ? (isDark ? '#334155' : '#cbd5e1')
+                            : cpuPercent > 80
+                            ? colors.rose
+                            : cpuPercent > 60
+                            ? colors.amber
+                            : colors.primary,
                         },
                       ]}
                     />
@@ -418,7 +480,9 @@ export default function ServersScreen() {
                 <View style={{ flex: 1, gap: 4 }}>
                   <View style={styles.gaugeHeader}>
                     <Text style={[styles.gaugeLabel, { color: colors.textMuted }]}>RAM</Text>
-                    <Text style={[styles.gaugeValue, { color: colors.text }]}>{ramPercent}%</Text>
+                    <Text style={[styles.gaugeValue, { color: isOffline ? colors.textMuted : colors.text }]}>
+                      {ramPercent}%
+                    </Text>
                   </View>
                   <View style={[styles.progressBarTrack, { backgroundColor: isDark ? colors.surfaceHighlight : '#e2e8f0' }]}>
                     <View
@@ -426,7 +490,13 @@ export default function ServersScreen() {
                         styles.progressBarFill,
                         {
                           width: `${ramPercent}%`,
-                          backgroundColor: ramPercent > 85 ? colors.rose : ramPercent > 70 ? colors.amber : '#10b981',
+                          backgroundColor: isOffline
+                            ? (isDark ? '#334155' : '#cbd5e1')
+                            : ramPercent > 85
+                            ? colors.rose
+                            : ramPercent > 70
+                            ? colors.amber
+                            : '#10b981',
                         },
                       ]}
                     />
@@ -435,7 +505,9 @@ export default function ServersScreen() {
 
                 <View style={styles.uptimeBadge}>
                   <Text style={[styles.uptimeLabel, { color: colors.textMuted }]}>Uptime</Text>
-                  <Text style={[styles.uptimeValue, { color: '#10b981' }]}>{server.uptime || '99.9%'}</Text>
+                  <Text style={[styles.uptimeValue, { color: isOffline ? colors.rose : '#10b981' }]}>
+                    {uptimeText}
+                  </Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -470,12 +542,36 @@ export default function ServersScreen() {
       />
 
       {/* Add Server Modal */}
-      <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => setShowAddModal(false)}>
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setShowAddModal(false);
+        }}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <View style={[styles.modalSheet, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, 24) }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowAddModal(false);
+            }}
+          />
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: colors.surface,
+                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : Math.max(insets.bottom, 24),
+              },
+            ]}
+          >
             <View style={styles.modalHeader}>
               <View>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>Add Server Node</Text>
@@ -483,12 +579,22 @@ export default function ServersScreen() {
                   Connect a VPS, cloud compute or bare-metal server
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.modalCloseBtn}>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setShowAddModal(false);
+                }}
+                style={styles.modalCloseBtn}
+              >
                 <Text style={[styles.modalCloseText, { color: colors.textMuted }]}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              contentContainerStyle={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               {formError ? (
                 <View style={styles.errorBanner}>
                   <Text style={styles.errorBannerText}>⚠️ {formError}</Text>
@@ -497,28 +603,52 @@ export default function ServersScreen() {
 
               {/* Server Name */}
               <View style={styles.formGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Server Name / Hostname *</Text>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                  Server Name / Hostname <Text style={{ color: '#ef4444' }}>*</Text>
+                </Text>
                 <TextInput
-                  style={[styles.fieldInput, { color: colors.text, borderColor: colors.border }]}
+                  style={[
+                    styles.fieldInput,
+                    {
+                      color: colors.text,
+                      borderColor: formError && !name.trim() ? '#ef4444' : colors.border,
+                    },
+                  ]}
                   placeholder="e.g. prod-api-01, web-frontend"
                   placeholderTextColor={colors.textMuted}
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(val) => {
+                    setName(val);
+                    if (formError) setFormError('');
+                  }}
                   autoCapitalize="none"
+                  autoCorrect={false}
                 />
               </View>
 
               {/* IP Address */}
               <View style={styles.formGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Public IP Address *</Text>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                  Public IP Address / Hostname <Text style={{ color: '#ef4444' }}>*</Text>
+                </Text>
                 <TextInput
-                  style={[styles.fieldInput, { color: colors.text, borderColor: colors.border }]}
-                  placeholder="e.g. 194.195.112.45"
+                  style={[
+                    styles.fieldInput,
+                    {
+                      color: colors.text,
+                      borderColor: formError && !ipAddress.trim() ? '#ef4444' : colors.border,
+                    },
+                  ]}
+                  placeholder="e.g. 194.195.112.45 or server.mydomain.com"
                   placeholderTextColor={colors.textMuted}
                   value={ipAddress}
-                  onChangeText={setIpAddress}
+                  onChangeText={(val) => {
+                    setIpAddress(val);
+                    if (formError) setFormError('');
+                  }}
                   autoCapitalize="none"
-                  keyboardType="numeric"
+                  autoCorrect={false}
+                  keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
                 />
               </View>
 

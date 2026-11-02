@@ -136,19 +136,21 @@ export const DomainRow: React.FC<DomainRowProps> = ({
       {/* Auto-Renew */}
       <td className="px-unit-md py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
         {domain.autoRenew ? (
-          <div
-            className="inline-flex w-7 h-4 rounded-full bg-primary-container relative cursor-pointer items-center justify-end p-0.5"
-            title="Auto-Renew: On"
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 select-none cursor-default"
+            title="Auto-Renew: Configured at registrar"
           >
-            <div className="w-3 h-3 rounded-full bg-on-primary shadow-sm" />
-          </div>
+            <span className="material-symbols-outlined text-[13px]">check_circle</span>
+            On
+          </span>
         ) : (
-          <div
-            className="inline-flex w-7 h-4 rounded-full bg-outline-variant relative cursor-pointer items-center p-0.5"
-            title="Auto-Renew: Off"
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface-container-high text-secondary border border-outline-variant/40 select-none cursor-default"
+            title="Auto-Renew: Inactive at registrar"
           >
-            <div className="w-3 h-3 rounded-full bg-surface-container-lowest shadow-sm" />
-          </div>
+            <span className="material-symbols-outlined text-[13px]">cancel</span>
+            Off
+          </span>
         )}
       </td>
 

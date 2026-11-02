@@ -21,14 +21,34 @@ import { Spacing } from '../../constants/theme';
 import { BrandLogo } from '../../components/ui/BrandLogo';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+export function isValidEmailFormat(val: string): boolean {
+  if (!val || typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  if (trimmed.includes('..')) return false;
+  const parts = trimmed.split('@');
+  if (parts.length !== 2) return false;
+  const [local, domain] = parts;
+  if (!local || !domain) return false;
+  if (local.startsWith('.') || local.endsWith('.')) return false;
+  if (domain.startsWith('.') || domain.endsWith('.') || domain.startsWith('-') || domain.endsWith('-')) return false;
+  const labels = domain.split('.');
+  if (labels.length < 2) return false;
+  for (const label of labels) {
+    if (!label || label.length > 63) return false;
+    if (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label)) return false;
+  }
+  const tld = labels[labels.length - 1];
+  if (!tld || !/^[a-zA-Z]{2,}$/.test(tld)) return false;
+  return true;
+}
 
 export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { register, isLoading } = useAuth();
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,8 +84,8 @@ export default function RegisterScreen() {
       setErrorMessage('Please provide both email and password.');
       return;
     }
-    if (!EMAIL_REGEX.test(cleanEmail)) {
-      setErrorMessage('Please enter a valid email address with @ and domain (e.g. name@company.com).');
+    if (!isValidEmailFormat(cleanEmail)) {
+      setErrorMessage('Please enter a valid email address with @ and domain (e.g. name@company.com). Consecutive dots or invalid domain labels are not permitted.');
       return;
     }
     if (password.length < 8) {

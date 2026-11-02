@@ -414,7 +414,7 @@ export default function DashboardScreen() {
         {isFeatureEnabled('providers') && (
           <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => router.push('/(tabs)/more')}
+            onPress={() => router.push({ pathname: '/(tabs)/more', params: { modal: 'providers' } } as any)}
             activeOpacity={0.85}
           >
             <View style={styles.statCardHeader}>
@@ -503,14 +503,14 @@ export default function DashboardScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Card 2: Domain Registrar → More */}
+        {/* Card 2: Domain Registrar → Domains */}
         {(isFeatureEnabled('domains') || isFeatureEnabled('providers')) && (
           <TouchableOpacity
             style={[
               styles.quickConnectCard,
               { backgroundColor: isDark ? '#0a1628' : '#eff6ff', borderColor: isDark ? '#1a2e4a' : '#bfdbfe' },
             ]}
-            onPress={() => router.push('/(tabs)/more')}
+            onPress={() => router.push('/(tabs)/domains')}
             activeOpacity={0.82}
           >
             <View style={[styles.quickConnectIconBox, { backgroundColor: isDark ? '#112240' : '#dbeafe' }]}>
@@ -526,14 +526,14 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Card 3: Cloud Servers → More */}
+        {/* Card 3: Cloud Servers → Servers */}
         {(isFeatureEnabled('servers') || isFeatureEnabled('providers')) && (
           <TouchableOpacity
             style={[
               styles.quickConnectCard,
               { backgroundColor: isDark ? '#0a1628' : '#fdf4ff', borderColor: isDark ? '#1a2e4a' : '#e9d5ff' },
             ]}
-            onPress={() => router.push('/(tabs)/more')}
+            onPress={() => router.push('/(tabs)/servers')}
             activeOpacity={0.82}
           >
             <View style={[styles.quickConnectIconBox, { backgroundColor: isDark ? '#112240' : '#f3e8ff' }]}>

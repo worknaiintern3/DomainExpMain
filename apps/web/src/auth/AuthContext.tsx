@@ -170,6 +170,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     setApiCacheSession(null);
     refreshFlightRef.current = null;
     clearStoredRefreshTokens();
+    try {
+      localStorage.removeItem('domainpulse.active_user_id');
+      sessionStorage.removeItem('domainpulse.active_user_id');
+    } catch {}
     rememberMeRef.current = false;
     setSessionId(null);
     setUser(null);
@@ -237,6 +241,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         });
         if (generation === generationRef.current) {
           setUser(response.user);
+          try {
+            localStorage.setItem('domainpulse.active_user_id', response.user.id);
+            sessionStorage.setItem('domainpulse.active_user_id', response.user.id);
+          } catch {}
           setStatus('authenticated');
         }
       } catch {
@@ -262,6 +270,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     if (generation !== generationRef.current) return;
     acceptTokenPair(response);
     setUser(response.user);
+    try {
+      localStorage.setItem('domainpulse.active_user_id', response.user.id);
+      sessionStorage.setItem('domainpulse.active_user_id', response.user.id);
+    } catch {}
     setStatus('authenticated');
   }, [acceptTokenPair]);
 

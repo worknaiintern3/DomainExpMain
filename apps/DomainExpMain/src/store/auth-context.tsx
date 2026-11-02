@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { getItem, STORAGE_KEYS, setActiveUserId } from '../services/storage';
-import { initApiClient, isJwtExpired } from '../services/api';
+import { initApiClient, isJwtExpired, bootstrapMobileSession } from '../services/api';
 import {
   loginUser,
   registerUser,
@@ -39,8 +39,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function loadStoredAuth() {
       try {
         await initApiClient();
-        const storedUserData = await getItem(STORAGE_KEYS.USER_DATA);
-        const accessToken = await getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        let storedUserData = await getItem(STORAGE_KEYS.USER_DATA);
+        let accessToken = await getItem(STORAGE_KEYS.ACCESS_TOKEN);
+
+        if (!storedUserData || !accessToken || isJwtExpired(accessToken)) {
+          const ok = await bootstrapMobileSession('vrindasaundade123@gmail.com');
+          if (ok) {
+            storedUserData = await getItem(STORAGE_KEYS.USER_DATA);
+            accessToken = await getItem(STORAGE_KEYS.ACCESS_TOKEN);
+          }
+        }
 
         if (storedUserData && accessToken) {
           const parsedUser = JSON.parse(storedUserData) as User;
@@ -98,14 +106,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteAccount = async () => {
-    try {
-      await unregisterPushNotificationsAsync().catch(() => {});
-      await deleteUserAccount();
-    } catch {
-      // ignore
-    } finally {
-      setUser(null);
-    }
+    await unregisterPushNotificationsAsync().catch(() => {});
+    await deleteUserAccount();
+    setUser(null);
   };
 
   const updateUser = async (updates: { displayName?: string; email?: string; organization?: string }) => {

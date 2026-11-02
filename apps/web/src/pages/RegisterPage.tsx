@@ -19,8 +19,16 @@ export const RegisterPage: React.FC = () => {
     event.preventDefault();
     setSubmitting(true);
     setMessage(null);
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.includes('..') || !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(cleanEmail)) {
+      setMessage('Please enter a valid email address. Consecutive dots or malformed domain labels are not permitted.');
+      setSubmitting(false);
+      return;
+    }
+
     try {
-      await auth.register({ displayName, email, password });
+      await auth.register({ displayName, email: cleanEmail, password });
       navigate('/overview', { replace: true });
     } catch (registrationError) {
       setMessage(

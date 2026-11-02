@@ -421,7 +421,7 @@ export async function updateUserProfile(updates: {
       };
 
   const cleanName = updates.displayName !== undefined ? updates.displayName.trim() : currentUser.displayName;
-  const cleanEmail = updates.email !== undefined ? updates.email.trim().toLowerCase() : currentUser.email;
+  const cleanEmail = currentUser.email; // Email is immutable after registration
   const cleanOrg = updates.organization !== undefined ? updates.organization.trim() : currentUser.organization;
 
   const updatedUser: User = {
@@ -556,6 +556,10 @@ export async function logoutUser(): Promise<void> {
 }
 
 export async function deleteUserAccount(): Promise<void> {
+  // 1. Call backend API endpoint to delete the user account and associated resources
+  await apiPost<{ success: boolean }>('/auth/delete-account', undefined, { retryOnUnauthorized: false });
+
+  // 2. Only after backend confirms deletion, clean up local cache and stored sessions
   let userIdToDelete: string | null = null;
   try {
     const currentRaw = await getItem(STORAGE_KEYS.USER_DATA);
@@ -579,8 +583,6 @@ export async function deleteUserAccount(): Promise<void> {
   const { resetApiState } = require('./api');
   resetApiState();
   setActiveUserId(null);
-
-  apiPost<void>('/auth/delete-account', undefined, { retryOnUnauthorized: false }).catch(() => {});
 
   await Promise.allSettled([
     deleteItem(STORAGE_KEYS.ACCESS_TOKEN),

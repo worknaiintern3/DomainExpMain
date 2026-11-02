@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { useAuth } from '../store/auth-context';
 import { useRemoteConfig } from '../store/remote-config-context';
 import { Spacing } from '../constants/theme';
@@ -62,7 +63,7 @@ const SCAN_MESSAGES = [
   'All 4 Infrastructure Stacks Online.',
 ];
 
-export default function SplashScreen() {
+export default function InAppSplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -107,14 +108,13 @@ export default function SplashScreen() {
 
   const handleContinue = () => {
     if (hasNavigated.current) return;
-    if (!isLoading) {
-      navigateToDestination(isAuthenticated && Boolean(user));
-    } else {
-      setMinTimePassed(true);
-    }
+    navigateToDestination(isAuthenticated && Boolean(user));
   };
 
   useEffect(() => {
+    // Ensure native splash screen is dismissed once in-app animated splash mounts
+    ExpoSplashScreen.hideAsync().catch(() => {});
+
     // 1. Hero Entrance
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -220,6 +220,17 @@ export default function SplashScreen() {
       navigateToDestination(isAuthenticated && Boolean(user));
     }
   }, [minTimePassed, isLoading, isAuthenticated, user]);
+
+  // Failsafe timer: transition out of splash screen after 3.0s unconditionally
+  useEffect(() => {
+    const maxTimer = setTimeout(() => {
+      if (!hasNavigated.current) {
+        navigateToDestination(isAuthenticated && Boolean(user));
+      }
+    }, 3000);
+
+    return () => clearTimeout(maxTimer);
+  }, [isAuthenticated, user]);
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],

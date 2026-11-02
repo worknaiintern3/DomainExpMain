@@ -57,17 +57,16 @@ export class GooglePlayService {
   }
 
   getRedirectUri(explicitRedirectUri?: string): string {
-    let uri =
-      explicitRedirectUri ||
-      process.env.GOOGLE_PLAY_REDIRECT_URI ||
-      process.env.GOOGLE_OAUTH_REDIRECT_URI ||
-      'http://localhost:5173/auth/google/callback';
-
-    if (uri.includes('/api/v1/google-play/callback')) {
-      uri = uri.replace('/api/v1/google-play/callback', '/auth/google/callback');
+    if (process.env.GOOGLE_PLAY_REDIRECT_URI) {
+      return process.env.GOOGLE_PLAY_REDIRECT_URI;
     }
-
-    return uri;
+    if (process.env.GOOGLE_OAUTH_REDIRECT_URI) {
+      return process.env.GOOGLE_OAUTH_REDIRECT_URI;
+    }
+    if (explicitRedirectUri && !explicitRedirectUri.includes('/api/v1/google-play/callback')) {
+      return explicitRedirectUri;
+    }
+    return 'http://localhost:5173/auth/google/callback';
   }
 
   async startOAuth(params: {

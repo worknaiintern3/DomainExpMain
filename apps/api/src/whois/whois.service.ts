@@ -22,7 +22,7 @@ interface CachedEntry {
   expiresAt: number;
 }
 
-const DEFAULT_API_KEY = 'aa02fd191f444368a77d343ecf4c2994';
+const DEFAULT_API_KEY = '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache to avoid exhausting API credits
 
 @Injectable()

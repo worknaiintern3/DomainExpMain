@@ -8,8 +8,10 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { AccessTokenGuard } from '../auth/http';
 import { DatabaseService } from '../database/database.service';
@@ -31,6 +33,56 @@ export class PlayStoreController {
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
   ) {}
+
+  /**
+   * Proxies Google Play Store application and developer icons to bypass browser CORS / hotlink / referrer blocking.
+   * Example: GET /api/v1/play-store/icon-proxy?url=https%3A%2F%2Fplay-lh.googleusercontent.com%2F...
+   */
+  @Get('icon-proxy')
+  async proxyIcon(
+    @Query('url') iconUrl: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    if (!iconUrl) {
+      reply.status(400).send('Missing "url" query parameter');
+      return;
+    }
+
+    try {
+      const parsed = new URL(iconUrl);
+      const isGoogleHost =
+        parsed.hostname.endsWith('googleusercontent.com') ||
+        parsed.hostname.endsWith('ggpht.com') ||
+        parsed.hostname.endsWith('play.google.com');
+
+      if (!isGoogleHost) {
+        reply.status(403).send('Host not allowed');
+        return;
+      }
+
+      const res = await fetch(iconUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        },
+      });
+
+      if (!res.ok) {
+        reply.status(res.status).send('Upstream image error');
+        return;
+      }
+
+      const contentType = res.headers.get('content-type') || 'image/png';
+      const buffer = Buffer.from(await res.arrayBuffer());
+
+      reply
+        .header('Content-Type', contentType)
+        .header('Cache-Control', 'public, max-age=86400, immutable')
+        .send(buffer);
+    } catch {
+      reply.status(502).send('Failed to fetch icon');
+    }
+  }
 
 
   /**

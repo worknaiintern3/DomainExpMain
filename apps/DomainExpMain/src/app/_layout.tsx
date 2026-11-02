@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +19,11 @@ import {
 
 import { RemoteConfigProvider, useRemoteConfig } from '../store/remote-config-context';
 import { MaintenanceBarrier, UpdateRequiredBarrier } from '../components/AdminBarriers';
+
+// Configure initial route anchoring for Expo Router
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
 
 // Keep splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -107,6 +112,13 @@ function NavigationRoot() {
             animation: 'slide_from_right',
           }}
         />
+        <Stack.Screen
+          name="+not-found"
+          options={{
+            headerShown: false,
+            title: 'Oops!',
+          }}
+        />
       </Stack>
 
       {/* Admin Controlled Emergency Kill-Switch Overlay */}
@@ -121,20 +133,29 @@ function NavigationRoot() {
 export default function RootLayout() {
   // Pre-bundle ALL vector icon fonts at startup so Android never downloads them
   // from Metro on-demand — this permanently fixes the "Unable to download Ionicons.ttf" error
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     ...Ionicons.font,
     ...MaterialIcons.font,
   });
 
+  const [fallbackReady, setFallbackReady] = useState(false);
+
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded || fontError) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
-  // Hold render until fonts are ready
-  if (!fontsLoaded) return null;
+  // Guaranteed failsafe timer: hide splash screen and mount app within 1.8s
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFallbackReady(true);
+      SplashScreen.hideAsync().catch(() => {});
+    }, 1800);
+    return () => clearTimeout(timer);
+  }, []);
 
+  // Let the native splash screen remain visible over the initial mount until fonts/failsafe are ready
   return (
     <SafeAreaProvider>
       <ThemeProvider>

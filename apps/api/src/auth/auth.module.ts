@@ -173,11 +173,16 @@ import {
     },
     {
       provide: AccountService,
-      inject: [MongoPasswordCredentialRepository, MongoOAuthIdentityRepository],
+      inject: [
+        MongoPasswordCredentialRepository,
+        MongoOAuthIdentityRepository,
+        DatabaseService,
+      ],
       useFactory: (
         passwordCredentialStore: MongoPasswordCredentialRepository,
         identityStore: MongoOAuthIdentityRepository,
-      ) => new AccountService(passwordCredentialStore, identityStore),
+        database: DatabaseService,
+      ) => new AccountService(passwordCredentialStore, identityStore, undefined, database),
     },
     AccessTokenGuard,
   ],

@@ -105,7 +105,7 @@ export async function bootstrapMobileSession(email?: string): Promise<boolean> {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({ email: email || 'vrd@gmail.com' }),
+      body: JSON.stringify({ email: email || 'vrindasaundade123@gmail.com' }),
     });
 
     if (!response.ok) {

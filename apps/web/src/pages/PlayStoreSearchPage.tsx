@@ -37,40 +37,94 @@ function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function getProxiedIconUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (
+    url.includes('googleusercontent.com') ||
+    url.includes('play.google.com') ||
+    url.includes('ggpht.com')
+  ) {
+    return `/api/v1/play-store/icon-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
+const AVATAR_GRADIENTS = [
+  'from-blue-600 to-indigo-700 text-white',
+  'from-emerald-600 to-teal-700 text-white',
+  'from-violet-600 to-purple-700 text-white',
+  'from-amber-500 to-orange-600 text-white',
+  'from-rose-500 to-pink-600 text-white',
+  'from-cyan-600 to-blue-700 text-white',
+];
+
+function getGradientForName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_GRADIENTS.length;
+  return AVATAR_GRADIENTS[index];
+}
+
 function DeveloperAvatar({
   developer,
 }: {
   developer: DeveloperSearchResult;
 }): React.ReactElement {
-  if (developer.icon) {
+  const [hasError, setHasError] = useState(false);
+  const iconUrl = !hasError ? getProxiedIconUrl(developer.icon) : undefined;
+  const initial = (developer.name || 'D').trim().charAt(0).toUpperCase();
+  const gradient = getGradientForName(developer.name || 'D');
+
+  if (iconUrl) {
     return (
       <img
         alt=""
-        className="h-10 w-10 shrink-0 rounded-lg border border-outline-variant/30 object-cover"
-        src={developer.icon}
+        className="h-10 w-10 shrink-0 rounded-lg border border-outline-variant/30 object-cover bg-surface-container"
+        loading="lazy"
+        onError={() => setHasError(true)}
+        referrerPolicy="no-referrer"
+        src={iconUrl}
       />
     );
   }
+
   return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container text-secondary">
-      <span className="material-symbols-outlined text-[20px]">storefront</span>
+    <span
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-outline-variant/30 bg-gradient-to-br ${gradient} font-semibold text-sm shadow-sm select-none`}
+      aria-hidden="true"
+    >
+      {initial}
     </span>
   );
 }
 
 function AppIcon({ app }: { app: PlayStoreAppItem }): React.ReactElement {
-  if (app.iconUrl) {
+  const [hasError, setHasError] = useState(false);
+  const iconUrl = !hasError ? getProxiedIconUrl(app.iconUrl) : undefined;
+  const initial = (app.name || 'A').trim().charAt(0).toUpperCase();
+  const gradient = getGradientForName(app.name || 'A');
+
+  if (iconUrl) {
     return (
       <img
         alt=""
-        className="h-11 w-11 shrink-0 rounded-lg border border-outline-variant/30 object-cover"
-        src={app.iconUrl}
+        className="h-11 w-11 shrink-0 rounded-lg border border-outline-variant/30 object-cover bg-surface-container"
+        loading="lazy"
+        onError={() => setHasError(true)}
+        referrerPolicy="no-referrer"
+        src={iconUrl}
       />
     );
   }
+
   return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container text-secondary">
-      <span className="material-symbols-outlined text-[20px]">android</span>
+    <span
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-outline-variant/30 bg-gradient-to-br ${gradient} font-semibold text-base shadow-sm select-none`}
+      aria-hidden="true"
+    >
+      {initial}
     </span>
   );
 }
@@ -220,6 +274,22 @@ export const PlayStoreSearchPage: React.FC = () => {
       if (requestId !== appsRequestRef.current) return;
       setAppsResult(response);
       setAppsState('success');
+
+      // Keep developer count strictly synchronized across both the left list and the detail drawer
+      if (response.total > 0) {
+        setSelectedDeveloper((prev) => (prev ? { ...prev, appCount: response.total } : prev));
+        setResult((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            developers: prev.developers.map((d) =>
+              d.id === developer.id || d.name.toLowerCase() === developer.name.toLowerCase()
+                ? { ...d, appCount: response.total }
+                : d,
+            ),
+          };
+        });
+      }
     } catch (error) {
       if (requestId !== appsRequestRef.current) return;
       setAppsError(toErrorMessage(error, 'Apps could not be loaded for this developer.'));
@@ -348,6 +418,12 @@ export const PlayStoreSearchPage: React.FC = () => {
               <ul className="mt-unit-md flex flex-col gap-unit-2xs">
                 {developers.map((developer) => {
                   const selected = selectedDeveloper?.id === developer.id;
+                  const isSelectedWithResult =
+                    (selectedDeveloper?.id === developer.id ||
+                      selectedDeveloper?.name.toLowerCase() === developer.name.toLowerCase()) &&
+                    appsResult !== null;
+                  const displayedAppCount =
+                    isSelectedWithResult && appsResult.total > 0 ? appsResult.total : developer.appCount;
                   return (
                     <li key={developer.id}>
                       <button
@@ -376,7 +452,7 @@ export const PlayStoreSearchPage: React.FC = () => {
                             )}
                           </span>
                           <span className="mt-unit-2xs block font-caption-xs text-caption-xs text-secondary">
-                            {developer.appCount} {developer.appCount === 1 ? 'app' : 'apps'}
+                            {displayedAppCount} {displayedAppCount === 1 ? 'app' : 'apps'}
                           </span>
                           {developer.sampleApps.length > 0 && (
                             <span className="mt-unit-2xs block truncate font-caption-xs text-caption-xs text-outline">
@@ -419,11 +495,18 @@ export const PlayStoreSearchPage: React.FC = () => {
                     >
                       {selectedDeveloper.name}
                     </h2>
-                    <p className="font-caption-xs text-caption-xs text-secondary">
-                      {appsResult?.total ?? selectedDeveloper.appCount}{' '}
-                      {(appsResult?.total ?? selectedDeveloper.appCount) === 1 ? 'app' : 'apps'}
-                      {selectedDeveloper.verified ? ' · Verified developer' : ''}
-                    </p>
+                    {(() => {
+                      const count =
+                        appsResult && appsResult.total > 0
+                          ? appsResult.total
+                          : selectedDeveloper.appCount;
+                      return (
+                        <p className="font-caption-xs text-caption-xs text-secondary">
+                          {count} {count === 1 ? 'app' : 'apps'}
+                          {selectedDeveloper.verified ? ' · Verified developer' : ''}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
                 <IconButton
@@ -458,9 +541,19 @@ export const PlayStoreSearchPage: React.FC = () => {
               )}
 
               {appsState === 'success' && apps.length === 0 && (
-                <p className="mt-unit-lg font-body-sm text-body-sm text-secondary">
-                  No published apps were returned for this developer.
-                </p>
+                <div className="mt-unit-lg flex flex-col items-start gap-unit-sm">
+                  <p className="font-body-sm text-body-sm text-secondary">
+                    No published apps were returned for this probe.
+                  </p>
+                  <Button
+                    iconLeading="refresh"
+                    onClick={() => void loadApps(selectedDeveloper)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Retry loading apps
+                  </Button>
+                </div>
               )}
 
               {apps.length > 0 && (

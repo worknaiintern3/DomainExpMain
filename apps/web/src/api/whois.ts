@@ -188,7 +188,7 @@ export function refreshWhois(domainId: string): Promise<LiveWhoisData> {
 
 const FALLBACK_API_KEY =
   (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.['VITE_WHOISFREAKS_API_KEY'] ||
-  'aa02fd191f444368a77d343ecf4c2994';
+  '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
 
 const WHOIS_CACHE = new Map<string, { data: NormalizedWhoisData; timestamp: number }>();
 const WHOIS_INFLIGHT = new Map<string, Promise<NormalizedWhoisData>>();

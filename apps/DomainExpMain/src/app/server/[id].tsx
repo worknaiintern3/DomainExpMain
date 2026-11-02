@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
-import { fetchServersList, deleteServer } from '../../services/servers';
+import { fetchServersList, deleteServer, fetchServerTelemetry, calculateDynamicTelemetry } from '../../services/servers';
 import type { ServerItem } from '../../types';
 
 const PROVIDER_LOGOS: Record<string, any> = {
@@ -44,7 +44,23 @@ export default function ServerDetailsScreen() {
     const found = list.find((s) => s.id === id || s.name.toLowerCase() === serverIdOrName.toLowerCase());
     if (found) {
       setServer(found);
+      const live = await fetchServerTelemetry(found.id).catch(() => null);
+      if (live) {
+        setServer((prev) =>
+          prev
+            ? {
+                ...prev,
+                cpuUsagePercent: live.cpuUsagePercent,
+                memoryUsagePercent: live.memoryUsagePercent,
+                diskUsagePercent: live.diskUsagePercent,
+                uptime: live.uptimeFormatted,
+                status: live.status,
+              }
+            : prev
+        );
+      }
     } else {
+      const dyn = calculateDynamicTelemetry(id || 'srv', '194.195.112.45', 'healthy');
       setServer({
         id: serverIdOrName,
         name: serverIdOrName,
@@ -55,10 +71,10 @@ export default function ServerDetailsScreen() {
         memory: serverIdOrName.includes('hetzner') ? '16 GB' : '8 GB',
         os: serverIdOrName.includes('hetzner') ? 'Debian 12 Bookworm' : 'Ubuntu 24.04 LTS',
         status: 'healthy',
-        uptime: '99.99%',
-        cpuUsagePercent: 24,
-        memoryUsagePercent: 48,
-        diskUsagePercent: 36,
+        uptime: dyn.uptime,
+        cpuUsagePercent: dyn.cpuUsagePercent,
+        memoryUsagePercent: dyn.memoryUsagePercent,
+        diskUsagePercent: dyn.diskUsagePercent,
         connectedDomains: [],
       });
     }
@@ -68,21 +84,43 @@ export default function ServerDetailsScreen() {
     loadServer();
   }, [loadServer]);
 
-  const handlePingRefresh = () => {
+  const handlePingRefresh = async () => {
     setShowMenuModal(false);
     setIsRefreshingTelemetry(true);
-    setTimeout(() => {
+    try {
       if (server) {
-        setServer({
-          ...server,
-          cpuUsagePercent: Math.floor(Math.random() * 20) + 18,
-          memoryUsagePercent: Math.floor(Math.random() * 15) + 42,
-          diskUsagePercent: server.diskUsagePercent || 36,
-          uptime: '99.99%',
-        });
+        const live = await fetchServerTelemetry(server.id).catch(() => null);
+        if (live) {
+          setServer((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  cpuUsagePercent: live.cpuUsagePercent,
+                  memoryUsagePercent: live.memoryUsagePercent,
+                  diskUsagePercent: live.diskUsagePercent,
+                  uptime: live.uptimeFormatted,
+                  status: live.status,
+                }
+              : prev
+          );
+        } else {
+          const dyn = calculateDynamicTelemetry(server.id, server.ipAddress, server.status);
+          setServer((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  cpuUsagePercent: dyn.cpuUsagePercent,
+                  memoryUsagePercent: dyn.memoryUsagePercent,
+                  diskUsagePercent: dyn.diskUsagePercent,
+                  uptime: dyn.uptime,
+                }
+              : prev
+          );
+        }
       }
+    } finally {
       setIsRefreshingTelemetry(false);
-    }, 700);
+    }
   };
 
   const handleCopyIp = () => {

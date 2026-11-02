@@ -240,6 +240,7 @@ export const ServerResponseSchema = z
     providerAccountId: z.uuid().nullable(),
     region: z.string().nullable(),
     serverKind: z.string().nullable(),
+    expiresAt: z.iso.datetime({ offset: true }).nullable().optional(),
   })
   .strict();
 

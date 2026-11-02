@@ -20,6 +20,7 @@ import { GooglePlayModule } from './google-play/google-play.module';
 import { PrivacyModule } from './privacy/privacy.module';
 import { PlayStoreModule } from './play-store/play-store.module';
 import { SettingsModule } from './settings/settings.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { SettingsModule } from './settings/settings.module';
     PrivacyModule,
     PlayStoreModule,
     SettingsModule,
+    BillingModule,
   ],
   providers: [
     {

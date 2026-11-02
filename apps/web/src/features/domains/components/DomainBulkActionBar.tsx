@@ -50,14 +50,6 @@ export const DomainBulkActionBar: React.FC<DomainBulkActionBarProps> = ({
           className="h-8 px-unit-sm flex items-center gap-1 rounded bg-inverse-surface hover:bg-white/10 text-inverse-on-surface font-label-md text-caption-xs transition-colors border border-white/10"
           type="button"
         >
-          <span className="material-symbols-outlined text-[16px]">sync</span>
-          <span>Mark Auto-Renew On</span>
-        </button>
-
-        <button
-          className="h-8 px-unit-sm flex items-center gap-1 rounded bg-inverse-surface hover:bg-white/10 text-inverse-on-surface font-label-md text-caption-xs transition-colors border border-white/10"
-          type="button"
-        >
           <span className="material-symbols-outlined text-[16px]">ios_share</span>
           <span>Export Selected</span>
         </button>

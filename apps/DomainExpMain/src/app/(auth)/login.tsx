@@ -28,7 +28,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login, isLoading } = useAuth();
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

@@ -2,7 +2,34 @@ import { z } from 'zod';
 
 import { MAX_REFRESH_TOKEN_INPUT_LENGTH } from '../session';
 
-const EmailSchema = z.string().trim().max(320).pipe(z.email());
+export function isValidEmailFormat(val: string): boolean {
+  if (!val || typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  if (trimmed.includes('..')) return false;
+  const parts = trimmed.split('@');
+  if (parts.length !== 2) return false;
+  const [local, domain] = parts;
+  if (!local || !domain) return false;
+  if (local.startsWith('.') || local.endsWith('.')) return false;
+  if (domain.startsWith('.') || domain.endsWith('.') || domain.startsWith('-') || domain.endsWith('-')) return false;
+  const labels = domain.split('.');
+  if (labels.length < 2) return false;
+  for (const label of labels) {
+    if (!label || label.length > 63) return false;
+    if (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label)) return false;
+  }
+  const tld = labels[labels.length - 1];
+  if (!tld || !/^[a-zA-Z]{2,}$/.test(tld)) return false;
+  return true;
+}
+
+const EmailSchema = z
+  .string()
+  .trim()
+  .max(320)
+  .pipe(z.email())
+  .refine(isValidEmailFormat, { message: 'Invalid email address format' })
+  .transform((val) => val.toLowerCase());
 const BoundedPasswordSchema = z.string().min(1).max(256);
 
 export const RegisterRequestSchema = z

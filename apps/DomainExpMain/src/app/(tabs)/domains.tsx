@@ -54,8 +54,25 @@ export default function DomainsScreen() {
   const [newDomainName, setNewDomainName] = useState('');
   const [newRegistrar, setNewRegistrar] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [domainError, setDomainError] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const loadDomains = useCallback(async (isRefresh = false) => {
     const list = await fetchDomainsList({ forceRefresh: isRefresh });
@@ -84,6 +101,10 @@ export default function DomainsScreen() {
     await loadDomains(true);
     setIsSyncing(false);
   };
+
+  useEffect(() => {
+    loadDomains(false);
+  }, [loadDomains]);
 
   useFocusEffect(
     useCallback(() => {
@@ -114,19 +135,50 @@ export default function DomainsScreen() {
     });
   }, [domains, searchQuery, selectedFilter]);
 
+  const handleOpenAddModal = () => {
+    setNewDomainName('');
+    setNewRegistrar('');
+    setDomainError(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleCloseAddModal = () => {
+    Keyboard.dismiss();
+    setNewDomainName('');
+    setNewRegistrar('');
+    setDomainError(null);
+    setIsAddModalOpen(false);
+  };
+
   const handleAddDomain = async () => {
-    if (!newDomainName.trim()) return;
+    const clean = newDomainName.trim().toLowerCase().replace(/^https?:\/\//i, '').split('/')[0];
+    if (!clean) {
+      setDomainError('Please enter a domain name.');
+      return;
+    }
+    // Strict domain validation regex: labels separated by dots, minimum 2-char TLD
+    const domainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+    if (!domainRegex.test(clean) || clean.split('.').pop()!.length < 2 || isInfrastructureDomain(clean)) {
+      setDomainError('Please enter a valid domain format (e.g. mycompany.com or webapp.io).');
+      return;
+    }
+    if (domains.some((d) => d.name.toLowerCase() === clean)) {
+      setDomainError(`Domain "${clean}" is already in your portfolio.`);
+      return;
+    }
+
+    setDomainError(null);
     setIsAdding(true);
     try {
       const created = await createDomain({
-        name: newDomainName.trim(),
+        name: clean,
         registrar: newRegistrar.trim() ? newRegistrar.trim() : undefined,
         autoRenew: true,
       });
       setDomains((prev) => [created, ...prev]);
-      setNewDomainName('');
-      setNewRegistrar('');
-      setIsAddModalOpen(false);
+      handleCloseAddModal();
+    } catch (err: any) {
+      setDomainError(err?.message || 'Failed to add domain. Please try again.');
     } finally {
       setIsAdding(false);
     }
@@ -176,7 +228,7 @@ export default function DomainsScreen() {
 
           <TouchableOpacity
             style={[styles.addButtonSquare, { backgroundColor: colors.primary }]}
-            onPress={() => setIsAddModalOpen(true)}
+            onPress={handleOpenAddModal}
             activeOpacity={0.8}
           >
             <Ionicons name="add" size={22} color="#ffffff" />
@@ -381,7 +433,7 @@ export default function DomainsScreen() {
         visible={isAddModalOpen}
         transparent
         animationType="slide"
-        onRequestClose={() => setIsAddModalOpen(false)}
+        onRequestClose={handleCloseAddModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -391,10 +443,7 @@ export default function DomainsScreen() {
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
               activeOpacity={1}
-              onPress={() => {
-                Keyboard.dismiss();
-                setIsAddModalOpen(false);
-              }}
+              onPress={handleCloseAddModal}
             />
             <View
               style={[
@@ -402,72 +451,90 @@ export default function DomainsScreen() {
                 {
                   backgroundColor: isDark ? '#111827' : '#ffffff',
                   borderColor: isDark ? '#1f2937' : '#e2e8f0',
-                  paddingBottom: Math.max(insets.bottom, 24),
+                  paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : Math.max(insets.bottom, 24),
                 },
               ]}
             >
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Domain</Text>
-                <TouchableOpacity onPress={() => setIsAddModalOpen(false)}>
-                  <Ionicons name="close" size={22} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Domain</Text>
+                  <TouchableOpacity onPress={handleCloseAddModal} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Ionicons name="close" size={22} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
 
-              <View style={styles.modalForm}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Domain Name</Text>
-                <TextInput
-                  style={[
-                    styles.modalInput,
-                    {
-                      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
-                      color: colors.text,
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  ]}
-                  placeholder="e.g. mycompany.com"
-                  placeholderTextColor={colors.textMuted}
-                  value={newDomainName}
-                  onChangeText={setNewDomainName}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                {domainError ? (
+                  <View style={styles.errorBanner}>
+                    <Ionicons name="alert-circle" size={18} color="#ef4444" style={{ marginRight: 8 }} />
+                    <Text style={styles.errorText}>{domainError}</Text>
+                  </View>
+                ) : null}
 
-                <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 12 }]}>
-                  Registrar (Optional)
-                </Text>
-                <TextInput
-                  style={[
-                    styles.modalInput,
-                    {
-                      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
-                      color: colors.text,
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  ]}
-                  placeholder="e.g. GoDaddy, Cloudflare, Namecheap"
-                  placeholderTextColor={colors.textMuted}
-                  value={newRegistrar}
-                  onChangeText={setNewRegistrar}
-                  autoCapitalize="words"
-                />
-
-                <TouchableOpacity
-                  style={[
-                    styles.submitButton,
-                    {
-                      backgroundColor: '#0f172a',
-                      opacity: !newDomainName.trim() || isAdding ? 0.6 : 1,
-                    },
-                  ]}
-                  onPress={handleAddDomain}
-                  disabled={!newDomainName.trim() || isAdding}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.submitButtonText}>
-                    {isAdding ? 'Adding...' : 'Add Domain'}
+                <View style={styles.modalForm}>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                    Domain Name <Text style={{ color: '#ef4444' }}>*</Text>
                   </Text>
-                </TouchableOpacity>
-              </View>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      {
+                        backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                        color: colors.text,
+                        borderColor: domainError ? '#ef4444' : (isDark ? '#334155' : '#e2e8f0'),
+                      },
+                    ]}
+                    placeholder="e.g. mycompany.com"
+                    placeholderTextColor={colors.textMuted}
+                    value={newDomainName}
+                    onChangeText={(val) => {
+                      setNewDomainName(val);
+                      if (domainError) setDomainError(null);
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 12 }]}>
+                    Registrar (Optional)
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      {
+                        backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                        color: colors.text,
+                        borderColor: isDark ? '#334155' : '#e2e8f0',
+                      },
+                    ]}
+                    placeholder="e.g. GoDaddy, Cloudflare, Namecheap"
+                    placeholderTextColor={colors.textMuted}
+                    value={newRegistrar}
+                    onChangeText={setNewRegistrar}
+                    autoCapitalize="words"
+                  />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      {
+                        backgroundColor: colors.primary,
+                        opacity: !newDomainName.trim() || isAdding ? 0.6 : 1,
+                      },
+                    ]}
+                    onPress={handleAddDomain}
+                    disabled={!newDomainName.trim() || isAdding}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.submitButtonText}>
+                      {isAdding ? 'Adding...' : 'Add Domain'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -684,5 +751,22 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '700',
     fontSize: 15,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  errorText: {
+    ...Typography.bodySmall,
+    color: '#dc2626',
+    flex: 1,
+    fontWeight: '500',
   },
 });

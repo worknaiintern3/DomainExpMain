@@ -35,7 +35,34 @@ export function domainConfiguration(labels: ReadonlyMap<string, string>): Resour
     fields: [
       { key: 'domainName', label: 'Domain', required: true },
       { key: 'expiresAt', label: 'Expires at (ISO)', nullable: true },
-      { input: 'select', key: 'autoRenew', label: 'Auto-renew', nullable: true, valueType: 'boolean', options: [{ label: 'Enabled', value: 'true' }, { label: 'Disabled', value: 'false' }] },
+      {
+        create: false,
+        key: 'autoRenew',
+        label: 'Auto-renew',
+        nullable: true,
+        render: (value) => {
+          if (value === null || value === undefined || value === '') {
+            return (
+              <span className="inline-flex items-center gap-1 rounded-md bg-surface-container px-2 py-0.5 text-caption-xs font-semibold text-secondary">
+                <span className="material-symbols-outlined text-[13px]">help</span>
+                Unknown
+              </span>
+            );
+          }
+          const isEnabled = Boolean(value);
+          return isEnabled ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-caption-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="material-symbols-outlined text-[13px]">check_circle</span>
+              Enabled
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-md bg-surface-container-high px-2 py-0.5 text-caption-xs font-semibold text-secondary border border-outline-variant/40">
+              <span className="material-symbols-outlined text-[13px]">cancel</span>
+              Disabled
+            </span>
+          );
+        },
+      },
       { key: 'registrarProviderAccountId', label: 'Registrar account ID', nullable: true, render: providerRender(labels) },
       { key: 'dnsProviderAccountId', label: 'DNS provider account ID', nullable: true, render: providerRender(labels) },
       { key: 'registeredAt', label: 'Registered at (ISO)', nullable: true, list: false },

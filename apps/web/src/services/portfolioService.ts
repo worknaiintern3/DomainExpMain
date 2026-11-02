@@ -13,7 +13,7 @@ export interface DomainItem {
   name: string;
   tld: string;
   registrar: string;
-  autoRenew: boolean;
+  autoRenew: boolean | null;
   registrationDate: string;
   expiresAt: string;
   daysRemaining: number;
@@ -952,9 +952,22 @@ export const STORAGE_KEYS = {
   DELETED_WEBSITES: 'dp_web_deleted_websites_keys_v1',
 };
 
+export function getScopedKey(baseKey: string): string {
+  try {
+    const userId =
+      localStorage.getItem('domainpulse.active_user_id') ||
+      sessionStorage.getItem('domainpulse.active_user_id');
+    if (userId) {
+      return `${baseKey}_${userId}`;
+    }
+  } catch {}
+  return baseKey;
+}
+
 export function getLocal<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key);
+    const scopedKey = getScopedKey(key);
+    const raw = localStorage.getItem(scopedKey) || localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(fallback) && Array.isArray(parsed) && parsed.length > 0) {
@@ -970,7 +983,8 @@ export function getLocal<T>(key: string, fallback: T): T {
 
 export function setLocal<T>(key: string, val: T): void {
   try {
-    localStorage.setItem(key, JSON.stringify(val));
+    const scopedKey = getScopedKey(key);
+    localStorage.setItem(scopedKey, JSON.stringify(val));
   } catch {}
 }
 
@@ -1175,7 +1189,7 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
             name: cleanName,
             tld: ext,
             registrar: extractedRegistrar,
-            autoRenew: b.autoRenew !== null ? Boolean(b.autoRenew) : true,
+            autoRenew: b.autoRenew === null || b.autoRenew === undefined ? null : Boolean(b.autoRenew),
             registrationDate: b.registeredAt ? b.registeredAt.split('T')[0] : '2026-01-21',
             expiresAt: expDate,
             daysRemaining: b.expiresAt ? daysRemaining : 365,

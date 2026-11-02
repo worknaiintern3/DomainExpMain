@@ -1150,6 +1150,58 @@ export default function GooglePlayConsoleScreen() {
                     Dev ID: {consoleStatus.developerAccount?.id || 'Unassigned'}
                   </Text>
 
+                  {/* Developer Account ID input — always shown so users can set/update it */}
+                  <View style={{ marginTop: 14, gap: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+                      {consoleStatus.developerAccount?.id ? 'Update Developer Account ID' : 'Set Developer Account ID'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TextInput
+                        style={[
+                          {
+                            flex: 1,
+                            height: 42,
+                            borderRadius: 10,
+                            borderWidth: 1.5,
+                            paddingHorizontal: 12,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: colors.text,
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f8fafc',
+                            borderColor: colors.border,
+                          },
+                        ]}
+                        placeholder="e.g. 1234567890123456789"
+                        placeholderTextColor={colors.textMuted}
+                        value={developerAccountIdInput}
+                        onChangeText={setDeveloperAccountIdInput}
+                        keyboardType="numeric"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      <TouchableOpacity
+                        style={{
+                          height: 42,
+                          paddingHorizontal: 14,
+                          borderRadius: 10,
+                          backgroundColor: '#01875f',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: isVerifying || !developerAccountIdInput.trim() ? 0.6 : 1,
+                        }}
+                        onPress={handleVerifyDeveloperAccount}
+                        disabled={isVerifying || !developerAccountIdInput.trim()}
+                        activeOpacity={0.8}
+                      >
+                        {isVerifying ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 12 }}>Verify</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
                   <View style={styles.consoleBtnRow}>
                     <TouchableOpacity
                       style={[styles.consoleSmallBtn, { backgroundColor: '#01875f' }]}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { MobileAnnouncement } from '@domainpulse/contracts';
-import { mobileAdminClient } from '../api/mobile-admin.client';
+import { adminClient } from '../api/admin.client';
+import { IconCheckCircle, IconMegaphone, IconPlus, IconRefresh, IconTrash } from '../components/Icons';
 
 export const MobileAnnouncementsPage: React.FC = () => {
   const [announcements, setAnnouncements] = useState<MobileAnnouncement[]>([]);
@@ -12,15 +13,16 @@ export const MobileAnnouncementsPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [type, setType] = useState<'info' | 'warning' | 'critical' | 'promo'>('info');
+  const [actionUrl, setActionUrl] = useState('');
+  const [actionLabel, setActionLabel] = useState('');
 
   const loadAnnouncements = async () => {
     try {
       setIsLoading(true);
-      const data = await mobileAdminClient.getAnnouncements();
+      const data = await adminClient.getAnnouncements();
       setAnnouncements(data);
     } catch {
-      // Fallback
-      setAnnouncements([]);
+      // Handled in client fallback
     } finally {
       setIsLoading(false);
     }
@@ -36,19 +38,23 @@ export const MobileAnnouncementsPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const created = await mobileAdminClient.createAnnouncement({
+      const created = await adminClient.createAnnouncement({
         title: title.trim(),
         message: message.trim(),
         type,
+        actionUrl: actionUrl.trim() || null,
+        actionLabel: actionLabel.trim() || null,
         isActive: true,
       });
       setAnnouncements([created, ...announcements]);
       setTitle('');
       setMessage('');
-      setToast('✅ Announcement created and live for mobile clients');
+      setActionUrl('');
+      setActionLabel('');
+      setToast('Announcement broadcasted and live for all mobile users');
       setTimeout(() => setToast(null), 3000);
     } catch {
-      setToast('❌ Failed to publish announcement');
+      setToast('Failed to publish announcement');
       setTimeout(() => setToast(null), 3000);
     } finally {
       setIsSubmitting(false);
@@ -57,9 +63,9 @@ export const MobileAnnouncementsPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await mobileAdminClient.deleteAnnouncement(id);
+      await adminClient.deleteAnnouncement(id);
       setAnnouncements(announcements.filter((a) => a.id !== id));
-      setToast('🗑️ Announcement removed');
+      setToast('Announcement deleted');
       setTimeout(() => setToast(null), 3000);
     } catch {
       setToast('Failed to delete announcement');
@@ -67,114 +73,184 @@ export const MobileAnnouncementsPage: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return <div className="p-8 text-center text-slate-400 text-xs">Loading announcements...</div>;
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white tracking-tight">In-App Announcements & Banners</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Broadcast critical notices, maintenance warnings, or promotional messages to all mobile users.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+            <IconMegaphone size={24} className="text-amber-500" />
+            In-App Mobile Announcements & Push
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Publish notices, release banners, promo cards, and maintenance warnings directly to mobile users.
+          </p>
+        </div>
+
+        <button
+          onClick={loadAnnouncements}
+          className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 shadow-sm"
+        >
+          <IconRefresh size={13} />
+          <span>Refresh</span>
+        </button>
       </div>
 
       {toast && (
-        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm font-medium">
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium flex items-center gap-2">
+          <IconCheckCircle size={16} />
           {toast}
         </div>
       )}
 
-      {/* Creation Card */}
-      <form onSubmit={handleCreate} className="p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4 shadow-xl">
-        <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Create New Broadcast</h3>
+      {/* CREATE FORM */}
+      <div className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+          <IconPlus size={15} className="text-blue-500" />
+          Broadcast New Announcement
+        </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Scheduled Maintenance Window"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
-              required
-            />
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Headline / Title
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. DomainPulse Mobile v1.2 Released"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Announcement Type
+              </label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as any)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-semibold"
+              >
+                <option value="info">Info (Blue Accent)</option>
+                <option value="promo">Promo / Feature (Purple)</option>
+                <option value="warning">Warning Notice (Amber)</option>
+                <option value="critical">Critical Outage / Alert (Red)</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-3">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Detailed Message
+              </label>
+              <textarea
+                placeholder="Content displayed in the mobile home top announcement banner..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={2}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Action Deep Link URL (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. https://domainpulse.io/features"
+                value={actionUrl}
+                onChange={(e) => setActionUrl(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Action Button Label (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Learn More"
+                value={actionLabel}
+                onChange={(e) => setActionLabel(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="flex items-end justify-end">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all disabled:opacity-50"
+              >
+                {isSubmitting ? 'Publishing...' : 'Publish Announcement'}
+              </button>
+            </div>
           </div>
+        </form>
+      </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Severity Type</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as any)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
-            >
-              <option value="info">Info (Blue)</option>
-              <option value="warning">Warning (Amber)</option>
-              <option value="critical">Critical (Red)</option>
-              <option value="promo">Promo (Purple)</option>
-            </select>
+      {/* ANNOUNCEMENT LIST */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+          Active Mobile Announcements ({announcements.length})
+        </h3>
+
+        {announcements.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-xs border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+            No announcements currently active. Use the form above to broadcast one.
           </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">Message Body</label>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Detailed description shown inside the mobile banner card"
-            rows={2}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-5 py-2.5 rounded-xl shadow-md transition-all text-sm disabled:opacity-50"
-        >
-          {isSubmitting ? 'Broadcasting...' : 'Publish Announcement'}
-        </button>
-      </form>
-
-      {/* Announcements List */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Active & Past Announcements ({announcements.length})
-        </div>
-        {isLoading ? (
-          <div className="p-8 text-center text-slate-400 text-sm">Loading announcements...</div>
-        ) : announcements.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">No announcements published yet.</div>
         ) : (
-          <div className="divide-y divide-slate-800">
-            {announcements.map((ann) => (
-              <div key={ann.id} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-800/30">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                        ann.type === 'critical'
-                          ? 'bg-rose-500/20 text-rose-400'
-                          : ann.type === 'warning'
-                          ? 'bg-amber-500/20 text-amber-400'
-                          : 'bg-blue-500/20 text-blue-400'
-                      }`}
-                    >
-                      {ann.type}
-                    </span>
-                    <span className="font-semibold text-white text-sm">{ann.title}</span>
-                  </div>
-                  <p className="text-xs text-slate-400">{ann.message}</p>
+          announcements.map((item) => (
+            <div
+              key={item.id}
+              className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-start justify-between gap-4"
+            >
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                      item.type === 'critical'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30'
+                        : item.type === 'warning'
+                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+                        : item.type === 'promo'
+                        ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30'
+                        : 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30'
+                    }`}
+                  >
+                    {item.type}
+                  </span>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">{item.title}</h4>
                 </div>
 
-                <button
-                  onClick={() => handleDelete(ann.id)}
-                  className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors border border-rose-500/20"
-                >
-                  Delete
-                </button>
+                <p className="text-xs text-slate-600 dark:text-slate-300">{item.message}</p>
+
+                {item.actionUrl && (
+                  <div className="text-[11px] font-mono text-blue-600 dark:text-blue-400 flex items-center gap-2 pt-1">
+                    <span>Link: {item.actionUrl}</span>
+                    {item.actionLabel && <span>({item.actionLabel})</span>}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+
+              <button
+                onClick={() => handleDelete(item.id)}
+                className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                title="Delete Announcement"
+              >
+                <IconTrash size={15} />
+              </button>
+            </div>
+          ))
         )}
       </div>
     </div>

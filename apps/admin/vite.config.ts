@@ -15,9 +15,9 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_TARGET || 'https://app.domainexprt.com',
+        target: process.env.VITE_API_TARGET || 'http://localhost:4000',
         changeOrigin: true,
-        secure: true,
+        secure: false,
       },
     } as Record<string, any>,
   },

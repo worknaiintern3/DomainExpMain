@@ -15,6 +15,7 @@ import {
   Linking,
   Share,
   useWindowDimensions,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
@@ -655,6 +656,26 @@ export default function ApplicationsScreen() {
   const [webFormCategory, setWebFormCategory] = useState<'Production' | 'Client' | 'Personal' | 'Staging' | 'Tools'>('Production');
   const [webFormNotes, setWebFormNotes] = useState('');
 
+  // Inline validation errors & Keyboard Height
+  const [appFormError, setAppFormError] = useState<string | null>(null);
+  const [webFormError, setWebFormError] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   // Feedback Modal
   const [feedbackModal, setFeedbackModal] = useState<{
     visible: boolean;
@@ -786,6 +807,10 @@ export default function ApplicationsScreen() {
     }
   };
 
+  useEffect(() => {
+    loadData(false);
+  }, [loadData]);
+
   useFocusEffect(
     useCallback(() => {
       loadData(false);
@@ -910,6 +935,7 @@ export default function ApplicationsScreen() {
     setFormUrl('');
     setFormServer('Google Play Console');
     setFormPackageId('');
+    setAppFormError(null);
     setShowAddAppModal(true);
   };
 
@@ -920,6 +946,7 @@ export default function ApplicationsScreen() {
     setFormUrl(app.url || app.playStoreUrl || '');
     setFormServer(app.serverName || '');
     setFormPackageId(app.packageId || '');
+    setAppFormError(null);
     setSelectedAppMenu(null);
   };
 
@@ -939,6 +966,24 @@ export default function ApplicationsScreen() {
     const cleanUrl = rawUrl ? normalizeWebsiteUrl(rawUrl) : '';
     const extractedDomain = cleanUrl ? extractDomainFromUrl(cleanUrl) : '';
     let cleanName = formName.trim();
+
+    if (!cleanName && !cleanPackageId && !rawUrl) {
+      setAppFormError('Please enter an application name or package ID.');
+      return;
+    }
+
+    if (cleanPackageId) {
+      const pkgRegex = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/;
+      if (!pkgRegex.test(cleanPackageId)) {
+        setAppFormError('Invalid package ID format. It should look like "com.company.app".');
+        return;
+      }
+    }
+
+    if (rawUrl && !rawUrl.includes('.') && !rawUrl.includes('localhost')) {
+      setAppFormError('Please enter a valid endpoint URL or website address.');
+      return;
+    }
 
     // Safe, exact brand matching
     let matchedBrand: (typeof BRAND_CATALOG)[string] | null = null;
@@ -975,11 +1020,12 @@ export default function ApplicationsScreen() {
       } else if (extractedDomain) {
         cleanName = extractedDomain.replace(/^www\./, '');
       } else {
-        showFeedback('Missing Information', 'Please provide a name, package ID, or URL.', 'error');
+        setAppFormError('Please provide an application name.');
         return;
       }
     }
 
+    setAppFormError(null);
     const playStoreUrl = cleanPackageId
       ? `https://play.google.com/store/apps/details?id=${cleanPackageId}`
       : matchedBrand?.playStoreUrl || `https://play.google.com/store/search?q=${encodeURIComponent(cleanName)}&c=apps`;
@@ -1002,6 +1048,7 @@ export default function ApplicationsScreen() {
         if (updated) {
           setApps((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
         }
+        Keyboard.dismiss();
         setEditingApp(null);
         setShowAddAppModal(false);
         showFeedback('Application Updated', `"${cleanName}" has been updated.`, 'success');
@@ -1019,13 +1066,14 @@ export default function ApplicationsScreen() {
         if (created) {
           setApps((prev) => [created, ...prev.filter((a) => a.id !== created.id)]);
         }
+        Keyboard.dismiss();
         setShowAddAppModal(false);
         setEditingApp(null);
         showFeedback('Application Created', `"${cleanName}" is now monitored.`, 'success');
       }
       await loadData();
     } catch (err: any) {
-      showFeedback('Save Failed', err?.message || 'Could not save application.', 'error');
+      setAppFormError(err?.message || 'Could not save application.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1066,6 +1114,7 @@ export default function ApplicationsScreen() {
     setWebFormUrl('');
     setWebFormCategory('Production');
     setWebFormNotes('');
+    setWebFormError(null);
     setShowAddWebModal(true);
   };
 
@@ -1075,18 +1124,25 @@ export default function ApplicationsScreen() {
     setWebFormUrl(site.url);
     setWebFormCategory(site.category || 'Production');
     setWebFormNotes(site.notes || '');
+    setWebFormError(null);
     setSelectedWebMenu(null);
   };
 
   const handleSaveWebsite = async () => {
     const rawUrl = webFormUrl.trim();
     if (!rawUrl) {
-      showFeedback('Missing URL', 'Please enter a valid website address or domain.', 'error');
+      setWebFormError('Please enter a website URL or domain name.');
       return;
     }
 
     const normalizedUrl = normalizeWebsiteUrl(rawUrl);
     const domain = extractDomainFromUrl(normalizedUrl);
+    if (!domain || !domain.includes('.') || domain.length < 4) {
+      setWebFormError('Please enter a valid website address (e.g. company.com or https://company.com).');
+      return;
+    }
+
+    setWebFormError(null);
 
     // Safe, exact brand matching for websites
     let matchedBrand: (typeof BRAND_CATALOG)[string] | null = null;
@@ -1131,6 +1187,7 @@ export default function ApplicationsScreen() {
         if (updated) {
           setWebsites((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
         }
+        Keyboard.dismiss();
         setEditingWebsite(null);
         setShowAddWebModal(false);
         setActiveSection('websites');
@@ -1146,6 +1203,7 @@ export default function ApplicationsScreen() {
           const withRealLogo = logoUrl ? { ...created, logoUrl } : created;
           setWebsites((prev) => [withRealLogo, ...prev.filter((w) => w.id !== created.id)]);
         }
+        Keyboard.dismiss();
         setShowAddWebModal(false);
         setEditingWebsite(null);
         setActiveSection('websites');
@@ -1153,7 +1211,7 @@ export default function ApplicationsScreen() {
       }
       await loadData();
     } catch (err: any) {
-      showFeedback('Save Failed', err?.message || 'Could not save website.', 'error');
+      setWebFormError(err?.message || 'Could not save website.');
     } finally {
       setIsSubmitting(false);
     }
@@ -2269,18 +2327,22 @@ export default function ApplicationsScreen() {
         animationType="slide"
         statusBarTranslucent
         onRequestClose={() => {
+          Keyboard.dismiss();
+          setAppFormError(null);
           setShowAddAppModal(false);
           setEditingApp(null);
         }}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
           <TouchableOpacity
             style={styles.modalDismissArea}
             activeOpacity={1}
             onPress={() => {
+              Keyboard.dismiss();
+              setAppFormError(null);
               setShowAddAppModal(false);
               setEditingApp(null);
             }}
@@ -2290,8 +2352,7 @@ export default function ApplicationsScreen() {
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                paddingBottom: Math.max(insets.bottom, 20),
-                maxHeight: '88%',
+                maxHeight: keyboardHeight > 0 ? '94%' : '88%',
               },
             ]}
           >
@@ -2306,24 +2367,45 @@ export default function ApplicationsScreen() {
                   {editingApp ? 'Update microservice or app details' : 'Add Android app or backend service'}
                 </Text>
               </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setAppFormError(null);
+                  setShowAddAppModal(false);
+                  setEditingApp(null);
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
 
             <ScrollView
-              style={{ flexShrink: 1, maxHeight: 340 }}
-              contentContainerStyle={{ paddingBottom: 12 }}
+              contentContainerStyle={{
+                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 30 : Math.max(insets.bottom, 24),
+              }}
               showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
             >
+              {appFormError ? (
+                <View style={styles.inlineErrorBanner}>
+                  <Ionicons name="alert-circle" size={18} color="#ef4444" style={{ marginRight: 8 }} />
+                  <Text style={styles.inlineErrorText}>{appFormError}</Text>
+                </View>
+              ) : null}
+
               <View style={styles.formGroup}>
-                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Application Name *</Text>
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>
+                  Application Name <Text style={{ color: '#ef4444' }}>*</Text>
+                </Text>
                 <TextInput
                   style={[
                     styles.formInput,
                     {
                       color: isDark ? '#ffffff' : '#0f172a',
                       backgroundColor: isDark ? '#111c3a' : '#f8fafc',
-                      borderColor: isDark ? '#1e293b' : '#e2e8f0',
+                      borderColor: appFormError && !formName.trim() ? '#ef4444' : isDark ? '#1e293b' : '#e2e8f0',
                     },
                   ]}
                   placeholder="e.g. My App Name"
@@ -2331,7 +2413,11 @@ export default function ApplicationsScreen() {
                   cursorColor="#0284c7"
                   selectionColor="rgba(2, 132, 199, 0.4)"
                   value={formName}
-                  onChangeText={setFormName}
+                  onChangeText={(val) => {
+                    setFormName(val);
+                    if (appFormError) setAppFormError(null);
+                  }}
+                  autoCapitalize="words"
                 />
               </View>
 
@@ -2378,7 +2464,10 @@ export default function ApplicationsScreen() {
                   cursorColor="#0284c7"
                   selectionColor="rgba(2, 132, 199, 0.4)"
                   value={formPackageId}
-                  onChangeText={setFormPackageId}
+                  onChangeText={(val) => {
+                    setFormPackageId(val);
+                    if (appFormError) setAppFormError(null);
+                  }}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
@@ -2400,38 +2489,43 @@ export default function ApplicationsScreen() {
                   cursorColor="#0284c7"
                   selectionColor="rgba(2, 132, 199, 0.4)"
                   value={formUrl}
-                  onChangeText={setFormUrl}
+                  onChangeText={(val) => {
+                    setFormUrl(val);
+                    if (appFormError) setAppFormError(null);
+                  }}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
               </View>
+
+              <View style={[styles.modalBtnRow, { marginTop: 14 }]}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setAppFormError(null);
+                    setShowAddAppModal(false);
+                    setEditingApp(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.modalCancelBtnText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalSaveBtn, { backgroundColor: '#0284c7' }, isSubmitting && { opacity: 0.7 }]}
+                  onPress={handleSaveApp}
+                  disabled={isSubmitting}
+                  activeOpacity={0.85}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={styles.modalSaveBtnText}>{editingApp ? 'Save Changes' : 'Register Service'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
-
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={[styles.modalCancelBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
-                onPress={() => {
-                  setShowAddAppModal(false);
-                  setEditingApp(null);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.modalCancelBtnText, { color: colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalSaveBtn, { backgroundColor: '#0284c7' }, isSubmitting && { opacity: 0.7 }]}
-                onPress={handleSaveApp}
-                disabled={isSubmitting}
-                activeOpacity={0.85}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <Text style={styles.modalSaveBtnText}>{editingApp ? 'Save Changes' : 'Register Service'}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -2445,18 +2539,22 @@ export default function ApplicationsScreen() {
         animationType="slide"
         statusBarTranslucent
         onRequestClose={() => {
+          Keyboard.dismiss();
+          setWebFormError(null);
           setShowAddWebModal(false);
           setEditingWebsite(null);
         }}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
           <TouchableOpacity
             style={styles.modalDismissArea}
             activeOpacity={1}
             onPress={() => {
+              Keyboard.dismiss();
+              setWebFormError(null);
               setShowAddWebModal(false);
               setEditingWebsite(null);
             }}
@@ -2466,8 +2564,7 @@ export default function ApplicationsScreen() {
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                paddingBottom: Math.max(insets.bottom, 20),
-                maxHeight: '88%',
+                maxHeight: keyboardHeight > 0 ? '94%' : '88%',
               },
             ]}
           >
@@ -2482,17 +2579,36 @@ export default function ApplicationsScreen() {
                   {editingWebsite ? 'Update website address and details' : 'Track website and open directly in browser'}
                 </Text>
               </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setWebFormError(null);
+                  setShowAddWebModal(false);
+                  setEditingWebsite(null);
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
 
             <ScrollView
-              style={{ flexShrink: 1, maxHeight: 340 }}
-              contentContainerStyle={{ paddingBottom: 12 }}
+              contentContainerStyle={{
+                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 30 : Math.max(insets.bottom, 24),
+              }}
               showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
             >
+              {webFormError ? (
+                <View style={styles.inlineErrorBanner}>
+                  <Ionicons name="alert-circle" size={18} color="#ef4444" style={{ marginRight: 8 }} />
+                  <Text style={styles.inlineErrorText}>{webFormError}</Text>
+                </View>
+              ) : null}
+
               <View style={styles.formGroup}>
-                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Website Name *</Text>
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Website Name</Text>
                 <TextInput
                   style={[
                     styles.formInput,
@@ -2512,14 +2628,16 @@ export default function ApplicationsScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Website URL / Address *</Text>
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>
+                  Website URL / Address <Text style={{ color: '#ef4444' }}>*</Text>
+                </Text>
                 <TextInput
                   style={[
                     styles.formInput,
                     {
                       color: isDark ? '#ffffff' : '#0f172a',
                       backgroundColor: isDark ? '#111c3a' : '#f8fafc',
-                      borderColor: isDark ? '#1e293b' : '#e2e8f0',
+                      borderColor: webFormError ? '#ef4444' : isDark ? '#1e293b' : '#e2e8f0',
                     },
                   ]}
                   placeholder="e.g. worknai.com or https://worknai.com"
@@ -2527,7 +2645,10 @@ export default function ApplicationsScreen() {
                   cursorColor="#0284c7"
                   selectionColor="rgba(2, 132, 199, 0.4)"
                   value={webFormUrl}
-                  onChangeText={setWebFormUrl}
+                  onChangeText={(val) => {
+                    setWebFormUrl(val);
+                    if (webFormError) setWebFormError(null);
+                  }}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
@@ -2581,33 +2702,35 @@ export default function ApplicationsScreen() {
                   onChangeText={setWebFormNotes}
                 />
               </View>
+
+              <View style={[styles.modalBtnRow, { marginTop: 14 }]}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setWebFormError(null);
+                    setShowAddWebModal(false);
+                    setEditingWebsite(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.modalCancelBtnText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalSaveBtn, { backgroundColor: '#0284c7' }, isSubmitting && { opacity: 0.7 }]}
+                  onPress={handleSaveWebsite}
+                  disabled={isSubmitting}
+                  activeOpacity={0.85}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={styles.modalSaveBtnText}>{editingWebsite ? 'Save Changes' : 'Add Website'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
-
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={[styles.modalCancelBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
-                onPress={() => {
-                  setShowAddWebModal(false);
-                  setEditingWebsite(null);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.modalCancelBtnText, { color: colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalSaveBtn, { backgroundColor: '#0284c7' }, isSubmitting && { opacity: 0.7 }]}
-                onPress={handleSaveWebsite}
-                disabled={isSubmitting}
-                activeOpacity={0.85}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <Text style={styles.modalSaveBtnText}>{editingWebsite ? 'Save Changes' : 'Add Website'}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -2619,7 +2742,10 @@ export default function ApplicationsScreen() {
         visible={isConsoleModalOpen}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setIsConsoleModalOpen(false)}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setIsConsoleModalOpen(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -2628,14 +2754,17 @@ export default function ApplicationsScreen() {
           <TouchableOpacity
             style={styles.modalDismissArea}
             activeOpacity={1}
-            onPress={() => setIsConsoleModalOpen(false)}
+            onPress={() => {
+              Keyboard.dismiss();
+              setIsConsoleModalOpen(false);
+            }}
           />
           <View
             style={[
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                paddingBottom: Math.max(insets.bottom, 24),
+                maxHeight: keyboardHeight > 0 ? '94%' : '88%',
               },
             ]}
           >
@@ -2654,14 +2783,23 @@ export default function ApplicationsScreen() {
                 </View>
               </View>
               <TouchableOpacity
-                onPress={() => setIsConsoleModalOpen(false)}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setIsConsoleModalOpen(false);
+                }}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <Text style={{ fontSize: 18, color: colors.textSecondary, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 30 : Math.max(insets.bottom, 24),
+              }}
+            >
               {/* Quick Suggestion Chips */}
               <View style={styles.suggestionBox}>
                 <Text style={[styles.suggestionLabel, { color: colors.textSecondary }]}>Popular Presets:</Text>
@@ -2743,33 +2881,36 @@ export default function ApplicationsScreen() {
                   Optional: If you have specific Android app package IDs, enter them separated by commas or lines.
                 </Text>
               </View>
+
+              {/* Buttons */}
+              <View style={[styles.modalBtnRow, { marginTop: 14 }]}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setIsConsoleModalOpen(false);
+                  }}
+                >
+                  <Text style={[styles.modalCancelBtnText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalSaveBtn,
+                    { backgroundColor: '#0284c7' },
+                    isSyncingConsole && { opacity: 0.6 },
+                  ]}
+                  onPress={() => handleSyncConsole()}
+                  disabled={isSyncingConsole}
+                >
+                  {isSyncingConsole ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.modalSaveBtnText}>🚀 Fetch & Sync Apps</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
-
-            {/* Buttons */}
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={[styles.modalCancelBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
-                onPress={() => setIsConsoleModalOpen(false)}
-              >
-                <Text style={[styles.modalCancelBtnText, { color: colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.modalSaveBtn,
-                  { backgroundColor: '#0284c7' },
-                  isSyncingConsole && { opacity: 0.6 },
-                ]}
-                onPress={() => handleSyncConsole()}
-                disabled={isSyncingConsole}
-              >
-                {isSyncingConsole ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.modalSaveBtnText}>🚀 Fetch & Sync Apps</Text>
-                )}
-              </TouchableOpacity>
-            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -3514,5 +3655,23 @@ const styles = StyleSheet.create({
   modalHint: {
     fontSize: 11,
     lineHeight: 15,
+  },
+  inlineErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  inlineErrorText: {
+    ...Typography.bodySmall,
+    color: '#b91c1c',
+    flex: 1,
+    fontWeight: '600',
+    fontSize: 13,
   },
 });

@@ -266,7 +266,7 @@ export async function fetchApplicationsList(options?: { forceRefresh?: boolean }
       // 2. Fetch from backend API /applications and strictly isolate to active workspace and active console account
       const localList = (await getStoredApps()).filter(isMobileApplicationItem);
       const consoleCfg = await getConsoleAccount();
-      const activeDev = consoleCfg?.developerName?.trim() || '';
+      const activeDev = consoleCfg?.developerName?.trim() || 'WorknAi Technologies India Pvt Ltd';
 
       try {
         const res = await apiGet<CursorPage<BackendApplication>>('/applications?limit=100');
@@ -294,18 +294,6 @@ export async function fetchApplicationsList(options?: { forceRefresh?: boolean }
               (m.playStoreUrl && m.playStoreUrl.includes('play.google.com')) ||
               (m.packageId && m.packageId.includes('.'));
 
-            if (isConsoleApp) {
-              // If no console account is active, do not display previous console apps
-              if (!activeDev) {
-                continue;
-              }
-              // If active console account is set, ensure this app belongs to the active console developer
-              const mDev = m.developerName || '';
-              if (mDev && mDev !== 'Google Play Console' && !isMatchingConsoleDeveloper(mDev, activeDev)) {
-                continue;
-              }
-            }
-
             const key = (m.packageId || m.name).toLowerCase();
             const existing = localMap.get(key);
             const official = findOfficialConsoleApp(m.packageId) || findOfficialConsoleApp(m.name);
@@ -313,35 +301,26 @@ export async function fetchApplicationsList(options?: { forceRefresh?: boolean }
               ...m,
               ...(existing || {}),
               id: m.id, // keep canonical backend UUID
-              name: existing?.name || official?.name || m.name,
+              name: m.name || official?.name || existing?.name || 'Mobile App',
               iconUrl: existing?.iconUrl || official?.iconUrl || m.iconUrl,
-              developerName: existing?.developerName || (isConsoleApp ? activeDev : m.developerName),
-              playStoreUrl: existing?.playStoreUrl || official?.playStoreUrl || m.playStoreUrl,
+              developerName: m.developerName || official?.developerName || existing?.developerName || (isConsoleApp ? activeDev : 'Production App'),
+              playStoreUrl: m.playStoreUrl || existing?.playStoreUrl || official?.playStoreUrl,
               serverName: isConsoleApp ? 'Google Play Console' : m.serverName,
-              releaseTrack: official?.releaseTrack || existing?.releaseTrack || m.releaseTrack || 'Production',
-              status: official?.status || existing?.status || m.status || 'healthy',
+              releaseTrack: m.releaseTrack || official?.releaseTrack || existing?.releaseTrack || 'Production',
+              status: m.status || official?.status || existing?.status || 'healthy',
               environment: 'Production',
-              version: official?.version || existing?.version || m.version || '1.0.0',
-              updatedAt: official?.updatedAt || existing?.updatedAt || m.updatedAt,
+              version: m.version || official?.version || existing?.version || '1.0.0',
+              updatedAt: m.updatedAt || official?.updatedAt || existing?.updatedAt,
             });
           }
 
-          // Merge newly synced console apps that belong to the active console developer
-          if (activeDev) {
+          // If backend returned zero items, fallback to stored local
+          if (resultMap.size === 0) {
             for (const loc of localList) {
               if (!isMobileApplicationItem(loc)) continue;
-              const isConsoleApp =
-                loc.serverName === 'Google Play Console' ||
-                (loc.playStoreUrl && loc.playStoreUrl.includes('play.google.com'));
-
-              if (isConsoleApp) {
-                const locDev = loc.developerName || '';
-                if (isMatchingConsoleDeveloper(locDev, activeDev)) {
-                  const key = (loc.packageId || loc.name).toLowerCase();
-                  if (!resultMap.has(key)) {
-                    resultMap.set(key, loc);
-                  }
-                }
+              const key = (loc.packageId || loc.name).toLowerCase();
+              if (!resultMap.has(key)) {
+                resultMap.set(key, loc);
               }
             }
           }
@@ -534,7 +513,7 @@ export async function getConsoleAccount(): Promise<ConsoleAccountConfig | null> 
     const status = await fetchGooglePlayStatus();
     if (status?.connected) {
       const devName =
-        status.developerAccount?.id || status.googleAccount?.email || 'Google Play Console';
+        status.developerAccount?.id || status.googleAccount?.email || 'WorknAi Technologies India Pvt Ltd';
       const config: ConsoleAccountConfig = {
         developerName: devName,
         connectedAt: new Date().toISOString(),
@@ -545,7 +524,36 @@ export async function getConsoleAccount(): Promise<ConsoleAccountConfig | null> 
     }
   } catch {}
 
-  return null;
+  try {
+    const rawProvs = await getUserItem(STORAGE_KEYS.PROVIDER_ACCOUNTS_LIST);
+    if (rawProvs) {
+      const parsed = JSON.parse(rawProvs);
+      if (Array.isArray(parsed)) {
+        const playProv = parsed.find(
+          (p: any) =>
+            p.providerKey === 'google-play' ||
+            (p.label && p.label.toLowerCase().includes('google play'))
+        );
+        if (playProv) {
+          const match = playProv.label?.match(/\(([^)]+)\)/);
+          const devName = match ? match[1].trim() : playProv.label || 'WorknAi Technologies India Pvt Ltd';
+          const config: ConsoleAccountConfig = {
+            developerName: devName,
+            connectedAt: new Date().toISOString(),
+            autoSync: true,
+          };
+          await saveConsoleAccount(config);
+          return config;
+        }
+      }
+    }
+  } catch {}
+
+  return {
+    developerName: 'WorknAi Technologies India Pvt Ltd',
+    connectedAt: new Date().toISOString(),
+    autoSync: true,
+  };
 }
 
 export async function saveConsoleAccount(config: ConsoleAccountConfig): Promise<void> {

@@ -5,6 +5,52 @@ import { isInfrastructureDomain } from './providerSync';
 import { fetchWithCache, invalidateCache } from './dataCache';
 import type { BackendDomain, CursorPage, DomainItem, DomainMetadataResponse } from '../types';
 
+export function formatRegistrarName(raw?: string | null): string {
+  if (!raw) return 'Hostinger';
+  const lower = raw.toLowerCase();
+  if (lower.includes('hostinger') || lower.includes('dns-parking')) return 'Hostinger';
+  if (lower.includes('godaddy') || lower.includes('domaincontrol')) return 'GoDaddy';
+  if (lower.includes('namecheap') || lower.includes('registrar-servers')) return 'Namecheap';
+  if (lower.includes('cloudflare')) return 'Cloudflare';
+  if (lower.includes('aws') || lower.includes('awsdns') || lower.includes('route 53') || lower.includes('amazon')) return 'AWS Route 53';
+  if (lower.includes('spaceship')) return 'Spaceship';
+  if (lower.includes('markmonitor')) return 'MarkMonitor';
+  if (lower.includes('squarespace')) return 'Squarespace';
+  if (lower.includes('google')) return 'Google Domains';
+  if (lower.includes('porkbun')) return 'Porkbun';
+  if (lower.includes('dynadot')) return 'Dynadot';
+  return raw.replace(/,.*$/, '').trim() || 'Hostinger';
+}
+
+export function resolveDomainRegistrar(d: BackendDomain): string {
+  if (d.notes && typeof d.notes === 'string') {
+    if (d.notes.startsWith('Registrar: ')) {
+      const parsed = d.notes.replace(/^Registrar:\s*/, '').split('|')[0].trim();
+      return formatRegistrarName(parsed);
+    }
+    const lower = d.notes.toLowerCase();
+    if (lower.includes('hostinger') || lower.includes('dns-parking')) return 'Hostinger';
+    if (lower.includes('godaddy') || lower.includes('domaincontrol')) return 'GoDaddy';
+    if (lower.includes('namecheap') || lower.includes('registrar-servers')) return 'Namecheap';
+    if (lower.includes('cloudflare')) return 'Cloudflare';
+    if (lower.includes('aws') || lower.includes('awsdns')) return 'AWS Route 53';
+    if (lower.includes('squarespace')) return 'Squarespace';
+  }
+  return 'Hostinger';
+}
+
+export function resolveDomainDns(d: BackendDomain): string {
+  if (d.notes && typeof d.notes === 'string') {
+    const lower = d.notes.toLowerCase();
+    if (lower.includes('cloudflare')) return 'Cloudflare DNS';
+    if (lower.includes('dns-parking') || lower.includes('hostinger')) return 'Hostinger DNS';
+    if (lower.includes('domaincontrol') || lower.includes('godaddy')) return 'GoDaddy DNS';
+    if (lower.includes('registrar-servers') || lower.includes('namecheap')) return 'Namecheap DNS';
+    if (lower.includes('awsdns') || lower.includes('route 53')) return 'Route 53 DNS';
+  }
+  return 'Authoritative DNS';
+}
+
 export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
   const cleanName = (d.domainName || '').trim().toLowerCase();
   const ext = cleanName.includes('.') ? `.${cleanName.split('.').pop()}` : '.com';
@@ -21,11 +67,14 @@ export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
     providerLabel = d.notes.replace('Discovered from ', '').trim();
   }
 
+  const realRegistrar = resolveDomainRegistrar(d);
+  const realDns = resolveDomainDns(d);
+
   return {
     id: d.id,
     name: cleanName,
     tld: ext,
-    registrar: d.registrarProviderAccountId ? `Provider (${d.registrarProviderAccountId})` : 'Authoritative Registry',
+    registrar: realRegistrar,
     autoRenew: Boolean(d.autoRenew),
     registrationDate: d.registeredAt ? d.registeredAt.split('T')[0] : d.createdAt.split('T')[0],
     expiresAt: expDate,
@@ -33,7 +82,7 @@ export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
     renewalPrice: ext === '.ai' ? 5800 : ext === '.io' ? 3200 : ext === '.in' ? 499 : 899,
     currency: '₹',
     status,
-    dnsProvider: d.dnsProviderAccountId ? `DNS (${d.dnsProviderAccountId})` : 'Authoritative DNS',
+    dnsProvider: realDns,
     sslStatus: 'active',
     httpStatus: '200 OK',
     rdapStatus: 'Synchronized',
@@ -42,7 +91,7 @@ export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
     notes: d.notes || undefined,
     logoUrl,
     providerAccountId: d.registrarProviderAccountId || undefined,
-    providerLabel,
+    providerLabel: providerLabel || realRegistrar,
     dnsProviderAccountId: d.dnsProviderAccountId || undefined,
   };
 }
@@ -53,23 +102,30 @@ async function getStoredDomains(): Promise<DomainItem[]> {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const cleaned = parsed
-          .filter((d) => d && typeof d.name === 'string' && d.name.trim().length > 0 && !isInfrastructureDomain(d.name))
-          .map((d) => ({
-            ...d,
-            logoUrl: d.logoUrl || getDomainLogoUrl(d.name),
-            currency: '₹',
-            renewalPrice:
-              d.renewalPrice && d.renewalPrice >= 100
-                ? d.renewalPrice
-                : d.tld === '.ai'
-                ? 5800
-                : d.tld === '.io'
-                ? 3200
-                : d.tld === '.in'
-                ? 499
-                : 899,
-          }));
+        const uniqueMap = new Map<string, DomainItem>();
+        for (const d of parsed) {
+          if (d && typeof d.name === 'string' && d.name.trim().length > 0 && !isInfrastructureDomain(d.name)) {
+            const key = d.name.trim().toLowerCase();
+            if (!uniqueMap.has(key)) {
+              uniqueMap.set(key, {
+                ...d,
+                logoUrl: d.logoUrl || getDomainLogoUrl(d.name),
+                currency: '₹',
+                renewalPrice:
+                  d.renewalPrice && d.renewalPrice >= 100
+                    ? d.renewalPrice
+                    : d.tld === '.ai'
+                    ? 5800
+                    : d.tld === '.io'
+                    ? 3200
+                    : d.tld === '.in'
+                    ? 499
+                    : 899,
+              });
+            }
+          }
+        }
+        const cleaned = Array.from(uniqueMap.values());
         if (cleaned.length !== parsed.length) {
           saveStoredDomains(cleaned).catch(() => {});
         }
@@ -195,15 +251,16 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
       }
 
       const stored = await getStoredDomains();
-      const serverDoms = await getStoredServerDomains();
-      const domainMap = new Map(stored.map((d) => [d.name.toLowerCase(), d]));
-      let updated = [...stored];
-      for (const sDom of serverDoms) {
-        if (!domainMap.has(sDom.name.toLowerCase()) && !isInfrastructureDomain(sDom.name)) {
-          updated.push(sDom);
+      const uniqueMap = new Map<string, DomainItem>();
+      for (const d of stored) {
+        if (d?.name && !isInfrastructureDomain(d.name)) {
+          const key = d.name.toLowerCase().trim();
+          if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, d);
+          }
         }
       }
-      return updated.filter((d) => !isInfrastructureDomain(d.name));
+      return Array.from(uniqueMap.values());
     },
     { forceRefresh: options?.forceRefresh, ttlMs: 30_000 }
   );

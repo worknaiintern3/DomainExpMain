@@ -386,18 +386,6 @@ export async function getStoredWebsites(): Promise<WebsiteItem[]> {
         return cleaned;
       }
     }
-
-    // Check if active user is a WorknAI account
-    const { getItem } = require('./storage');
-    const { isWorknAiAccount } = require('./auth');
-    const userRaw = await getItem(STORAGE_KEYS.USER_DATA);
-    if (userRaw) {
-      const parsedUser = JSON.parse(userRaw);
-      if (isWorknAiAccount(parsedUser)) {
-        await saveStoredWebsites(WORKNAI_APPLICATION_WEBSITES);
-        return WORKNAI_APPLICATION_WEBSITES;
-      }
-    }
   } catch {}
   return [];
 }
@@ -415,14 +403,21 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
     async () => {
       const localList = (await getStoredWebsites()).filter(isWebsiteItem);
       try {
-        const res = await apiGet<CursorPage<BackendApplication>>('/applications?limit=100');
-        if (res?.items && Array.isArray(res.items)) {
-          // 1. Strictly filter backend items to ONLY WEBSITES / WEB APPS (exclude all mobile applications)
-          const websiteAppsOnly = res.items.filter(isWebsiteItem);
-          const websiteApps = websiteAppsOnly.map((a) => {
+        const [appRes, domRes] = await Promise.all([
+          apiGet<CursorPage<BackendApplication>>('/applications?limit=100').catch(() => null),
+          apiGet<CursorPage<any>>('/domains?limit=100').catch(() => null),
+        ]);
+
+        const webMap = new Map<string, WebsiteItem>();
+
+        // 1. Standalone web applications from backend
+        if (appRes?.items && Array.isArray(appRes.items)) {
+          const websiteAppsOnly = appRes.items.filter(isWebsiteItem);
+          for (const a of websiteAppsOnly) {
             const url = normalizeWebsiteUrl(a.primaryUrl || `https://${a.name}`);
             const domain = extractDomainFromUrl(url);
-            const item: WebsiteItem = {
+            if (!domain || domain.includes('play.google.com') || domain.startsWith('com.')) continue;
+            webMap.set(domain.toLowerCase(), {
               id: a.id,
               name: a.name,
               url,
@@ -436,43 +431,46 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
               notes: a.notes || '',
               createdAt: a.createdAt,
               lastCheckedAt: a.updatedAt,
-            };
-            return item;
-          });
-
-          // Filter to ensure legitimate website domains and deduplicate
-          const seen = new Set<string>();
-          const deduped: WebsiteItem[] = [];
-          for (const site of websiteApps) {
-            if (!isWebsiteItem(site)) continue;
-            const dom = extractDomainFromUrl(site.url).toLowerCase();
-            if (!dom || dom.includes('play.google.com') || dom.startsWith('com.')) continue;
-            if (!seen.has(dom)) {
-              seen.add(dom);
-              deduped.push(site);
-            }
+            });
           }
-
-          // Merge backend items with local items so discovered provider websites are never erased!
-          const webMap = new Map<string, WebsiteItem>();
-          for (const loc of localList) {
-            if (isWebsiteItem(loc)) {
-              const dom = extractDomainFromUrl(loc.url).toLowerCase();
-              if (dom) webMap.set(dom, loc);
-            }
-          }
-          for (const site of deduped) {
-            const dom = extractDomainFromUrl(site.url).toLowerCase();
-            if (dom) {
-              const existing = webMap.get(dom);
-              webMap.set(dom, existing ? { ...existing, ...site, id: site.id || existing.id } : site);
-            }
-          }
-
-          const mergedWebsites = Array.from(webMap.values());
-          await saveStoredWebsites(mergedWebsites);
-          return mergedWebsites;
         }
+
+        // 2. Domains as live production websites (mirroring Web portfolio service)
+        if (domRes?.items && Array.isArray(domRes.items)) {
+          for (const d of domRes.items) {
+            const dom = (d.domainName || '').toLowerCase().trim();
+            if (!dom || webMap.has(dom)) continue;
+            webMap.set(dom, {
+              id: d.id,
+              name: getFriendlyBrandName(dom),
+              url: `https://${dom}`,
+              category: 'Production',
+              status: 'healthy',
+              sslStatus: 'active',
+              httpStatus: '200 OK',
+              responseTimeMs: 24,
+              logoUrl: getDomainLogoUrl(dom),
+              tags: ['Hostinger Domain', 'Production'],
+              notes: d.notes || undefined,
+              createdAt: d.createdAt,
+              lastCheckedAt: d.updatedAt,
+            });
+          }
+        }
+
+        // 3. Merge local websites that aren't already represented
+        for (const loc of localList) {
+          if (isWebsiteItem(loc)) {
+            const dom = extractDomainFromUrl(loc.url).toLowerCase();
+            if (dom && !webMap.has(dom)) {
+              webMap.set(dom, loc);
+            }
+          }
+        }
+
+        const mergedWebsites = Array.from(webMap.values());
+        await saveStoredWebsites(mergedWebsites);
+        return mergedWebsites;
       } catch {
         // Offline fallback
       }

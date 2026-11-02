@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -15,6 +15,10 @@ type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs
 import { useTheme } from '../../store/theme-context';
 import { useAuth } from '../../store/auth-context';
 import { useRemoteConfig, type RemoteNavigationItem } from '../../store/remote-config-context';
+
+export const unstable_settings = {
+  initialRouteName: 'dashboard',
+};
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
@@ -232,7 +236,13 @@ function AnimatedTabButton({
   );
 }
 
-function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+function CustomAnimatedTabBar(props: any) {
+  const router = useRouter();
+  const state = props.state;
+  const descriptors = props.descriptors;
+  const emitter = props.emitter;
+  const navigateToTab = props.navigateToTab;
+
   const { isDark } = useTheme();
   const { navigationItems, isFeatureEnabled } = useRemoteConfig();
   const insets = useSafeAreaInsets();
@@ -240,10 +250,10 @@ function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   // Dynamic feature-flag and admin-controlled tab filtering & sorting
   const visibleRoutes = useMemo(() => {
-    return state.routes
-      .filter((route) => {
+    return (state?.routes || [])
+      .filter((route: any) => {
         if (HIDDEN_ROUTES.has(route.name)) return false;
-        const options = descriptors[route.key]?.options as { href?: string | null } | undefined;
+        const options = descriptors?.[route.key]?.options as { href?: string | null } | undefined;
         if (options?.href === null) return false;
 
         // 1. Feature Flag Filtering
@@ -265,7 +275,7 @@ function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
         return true;
       })
-      .sort((a, b) => {
+      .sort((a: any, b: any) => {
         const keyMap: Record<string, string[]> = {
           dashboard: ['home'],
           domains: ['domains'],
@@ -279,9 +289,9 @@ function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarPr
         const orderB = navigationItems.find((n) => matchB.includes(n.key.toLowerCase()))?.sortOrder ?? 99;
         return orderA - orderB;
       });
-  }, [state.routes, descriptors, navigationItems, isFeatureEnabled]);
+  }, [state?.routes, descriptors, navigationItems, isFeatureEnabled]);
 
-  const activeRouteName = state.routes[state.index]?.name;
+  const activeRouteName = state?.routes?.[state?.index ?? 0]?.name;
   const activeVisibleIndex = Math.max(
     0,
     visibleRoutes.findIndex((r: { name: string }) => r.name === activeRouteName)
@@ -364,22 +374,68 @@ function CustomAnimatedTabBar({ state, descriptors, navigation }: BottomTabBarPr
             const isFocused = route.name === activeRouteName;
 
             const onPress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
+              if (isFocused) return;
 
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
+              let defaultPrevented = false;
+
+              // 1. Emit tabPress event
+              try {
+                if (emitter && typeof emitter.emit === 'function') {
+                  const event = emitter.emit({
+                    type: 'tabPress',
+                    target: route.key,
+                    canPreventDefault: true,
+                  });
+                  defaultPrevented = Boolean(event?.defaultPrevented);
+                } else if (descriptors?.[route.key]?.navigation?.emit) {
+                  const event = descriptors[route.key].navigation.emit({
+                    type: 'tabPress',
+                    target: route.key,
+                    canPreventDefault: true,
+                  });
+                  defaultPrevented = Boolean(event?.defaultPrevented);
+                }
+              } catch {
+                // Ignore emit failure
+              }
+
+              if (defaultPrevented) return;
+
+              // 2. Switch tab
+              // Native React Navigation 7 / Expo Router 58 method
+              if (typeof navigateToTab === 'function') {
+                try {
+                  navigateToTab(route.key);
+                  return;
+                } catch {
+                  // Fall back
+                }
+              }
+
+              // Expo Router fallback
+              if (router && typeof router.navigate === 'function') {
+                router.navigate(`/(tabs)/${route.name}` as any);
+              } else if (router && typeof router.push === 'function') {
+                router.push(`/(tabs)/${route.name}` as any);
               }
             };
 
             const onLongPress = () => {
-              navigation.emit({
-                type: 'tabLongPress',
-                target: route.key,
-              });
+              try {
+                if (emitter && typeof emitter.emit === 'function') {
+                  emitter.emit({
+                    type: 'tabLongPress',
+                    target: route.key,
+                  });
+                } else if (descriptors?.[route.key]?.navigation?.emit) {
+                  descriptors[route.key].navigation.emit({
+                    type: 'tabLongPress',
+                    target: route.key,
+                  });
+                }
+              } catch {
+                // Ignore long-press emit failure
+              }
             };
 
             return (

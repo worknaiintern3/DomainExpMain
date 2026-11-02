@@ -3,6 +3,10 @@ import { Stack, Redirect } from 'expo-router';
 import { Colors } from '../../constants/theme';
 import { useAuth } from '../../store/auth-context';
 
+export const unstable_settings = {
+  initialRouteName: 'login',
+};
+
 export default function AuthLayout() {
   const { isAuthenticated, isLoading } = useAuth();
 

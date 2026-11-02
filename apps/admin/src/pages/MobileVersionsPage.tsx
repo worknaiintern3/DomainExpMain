@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { MobileAppVersion } from '@domainpulse/contracts';
-import { mobileAdminClient } from '../api/mobile-admin.client';
+import { adminClient } from '../api/admin.client';
+import { IconCheckCircle, IconGitBranch } from '../components/Icons';
 
 export const MobileVersionsPage: React.FC = () => {
   const [versions, setVersions] = useState<MobileAppVersion[]>([]);
@@ -9,21 +10,10 @@ export const MobileVersionsPage: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    mobileAdminClient
+    adminClient
       .getVersions()
       .then(setVersions)
-      .catch(() => {
-        setVersions([
-          {
-            platform: 'all',
-            minimumVersion: '1.0.0',
-            latestVersion: '1.0.0',
-            forceUpdate: false,
-            updateUrl: null,
-            releaseNotes: 'Initial production build',
-          },
-        ]);
-      })
+      .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -42,17 +32,17 @@ export const MobileVersionsPage: React.FC = () => {
   const handleSave = async (platform: string, v: MobileAppVersion) => {
     try {
       setIsSaving(true);
-      await mobileAdminClient.updateVersion(platform, {
+      await adminClient.updateVersion(platform, {
         minimumVersion: v.minimumVersion,
         latestVersion: v.latestVersion,
         forceUpdate: v.forceUpdate,
         updateUrl: v.updateUrl || null,
         releaseNotes: v.releaseNotes || null,
       });
-      setToast(`✅ Version policies saved for ${platform}`);
+      setToast(`Version policies updated for ${platform.toUpperCase()}`);
       setTimeout(() => setToast(null), 3000);
     } catch {
-      setToast(`❌ Failed to save version policies for ${platform}`);
+      setToast(`Failed to save version policies for ${platform}`);
       setTimeout(() => setToast(null), 3000);
     } finally {
       setIsSaving(false);
@@ -60,119 +50,116 @@ export const MobileVersionsPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-center text-slate-400">Loading version policies...</div>;
+    return <div className="p-8 text-center text-slate-400 text-xs">Loading app version controls...</div>;
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white tracking-tight">App Version Policy & Forced Updates</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Enforce minimum app version thresholds and notify or block outdated mobile clients.
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+          <IconGitBranch size={24} className="text-blue-500" />
+          Mobile App Versions & Force Update Policy
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          Enforce minimum versions, configure latest store releases, and trigger blocking force-update screens on iOS & Android.
         </p>
       </div>
 
       {toast && (
-        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm font-medium">
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium flex items-center gap-2">
+          <IconCheckCircle size={16} />
           {toast}
         </div>
       )}
 
-      <div className="space-y-4">
-        {versions.map((ver, idx) => (
+      <div className="space-y-6">
+        {versions.map((v, idx) => (
           <div
-            key={ver.platform}
-            className="p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4 shadow-xl"
+            key={v.platform}
+            className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-white text-base capitalize">
-                  Platform: {ver.platform}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                <span>Platform:</span>
+                <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 font-mono">
+                  {v.platform}
                 </span>
-                <span className="text-xs text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                  Global Rules
-                </span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => handleSave(v.platform, v)}
+                disabled={isSaving}
+                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition-all disabled:opacity-50"
+              >
+                {isSaving ? 'Saving...' : 'Save Policy'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Minimum Version Allowed
+                </label>
+                <input
+                  type="text"
+                  value={v.minimumVersion}
+                  onChange={(e) => updateVersionField(idx, 'minimumVersion', e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                />
               </div>
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-300 font-semibold cursor-pointer flex items-center gap-2">
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Latest Version in Store
+                </label>
+                <input
+                  type="text"
+                  value={v.latestVersion}
+                  onChange={(e) => updateVersionField(idx, 'latestVersion', e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Store Update Deep Link
+                </label>
+                <input
+                  type="url"
+                  value={v.updateUrl || ''}
+                  onChange={(e) => updateVersionField(idx, 'updateUrl', e.target.value)}
+                  placeholder="https://apps.apple.com/... or https://play.google.com/..."
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Release Notes Copy
+                </label>
+                <input
+                  type="text"
+                  value={v.releaseNotes || ''}
+                  onChange={(e) => updateVersionField(idx, 'releaseNotes', e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center pt-5">
+                <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={ver.forceUpdate}
+                    checked={v.forceUpdate}
                     onChange={(e) => updateVersionField(idx, 'forceUpdate', e.target.checked)}
-                    className="rounded border-slate-700 text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer"
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   />
-                  <span>Enforce Hard Update Block</span>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    Force Update (Blocking Modal)
+                  </span>
                 </label>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Minimum Required App Version
-                </label>
-                <input
-                  type="text"
-                  value={ver.minimumVersion}
-                  onChange={(e) => updateVersionField(idx, 'minimumVersion', e.target.value)}
-                  placeholder="1.0.0"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
-                />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Clients older than this version will be forced to upgrade.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Latest Published App Version
-                </label>
-                <input
-                  type="text"
-                  value={ver.latestVersion}
-                  onChange={(e) => updateVersionField(idx, 'latestVersion', e.target.value)}
-                  placeholder="1.1.0"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
-                />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Target version shown in upgrade prompts.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Store / Download URL (Optional)
-              </label>
-              <input
-                type="url"
-                value={ver.updateUrl || ''}
-                onChange={(e) => updateVersionField(idx, 'updateUrl', e.target.value || null)}
-                placeholder="https://apps.apple.com/... or https://play.google.com/..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Release Notes
-              </label>
-              <textarea
-                value={ver.releaseNotes || ''}
-                onChange={(e) => updateVersionField(idx, 'releaseNotes', e.target.value || null)}
-                placeholder="What's new in this release..."
-                rows={2}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <button
-              onClick={() => handleSave(ver.platform, ver)}
-              disabled={isSaving}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-5 py-2 rounded-xl text-xs shadow-md transition-all disabled:opacity-50"
-            >
-              {isSaving ? 'Saving...' : 'Apply Version Policies'}
-            </button>
           </div>
         ))}
       </div>

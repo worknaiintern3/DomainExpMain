@@ -15,9 +15,10 @@ import {
   ImageBackground,
   Share,
   Alert,
+  Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Radius, Spacing, Typography } from '../../constants/theme';
@@ -35,7 +36,7 @@ import {
   deleteEmailAccount,
   deduplicateProviderAccounts,
 } from '../../services/accounts';
-import { getEffectiveApiUrl, setCustomApiUrl, apiGet, apiPatch } from '../../services/api';
+import { getEffectiveApiUrl, setCustomApiUrl, apiGet, apiPatch, apiPost } from '../../services/api';
 import { syncConsoleAccount, syncDomainRegistrar, syncCloudServers, syncProviderAccount, syncAllConnectedProviders, sanitizeSingleApiKey, isInfrastructureDomain } from '../../services/providerSync';
 import { saveProviderToken, getProviderToken } from '../../services/storage';
 import { API_CONFIG } from '../../constants/config';
@@ -155,6 +156,7 @@ const MODAL_CONFIG: Record<
 
 export default function MoreScreen() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{ modal?: string }>();
   const insets = useSafeAreaInsets();
   const { colors, themeMode, setThemeMode, isDark, toggleTheme } = useTheme();
   const { user, logout, deleteAccount, updateUser, changePassword } = useAuth();
@@ -172,8 +174,41 @@ export default function MoreScreen() {
   } = useSettings();
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const currentPassInputRef = useRef<TextInput>(null);
-  const newPassInputRef = useRef<TextInput>(null);
+  const [isOpeningBillingPortal, setIsOpeningBillingPortal] = useState(false);
+
+  useEffect(() => {
+    if (routeParams?.modal && ['providers', 'profile', 'billing', 'settings', 'security', 'help', 'about'].includes(routeParams.modal)) {
+      setActiveModal(routeParams.modal as any);
+    }
+  }, [routeParams?.modal]);
+
+  const handleOpenStripeBillingPortal = async () => {
+    setIsOpeningBillingPortal(true);
+    try {
+      const returnUrl = typeof window !== 'undefined' && window.location?.href 
+        ? window.location.href 
+        : 'http://localhost:8081/more';
+      const res = await apiPost<{ url: string }>('/billing/portal-session', { returnUrl });
+      if (res?.url) {
+        const can = await Linking.canOpenURL(res.url).catch(() => true);
+        if (can) {
+          await Linking.openURL(res.url);
+        } else {
+          showFeedback('Billing Portal', `Please open this URL: ${res.url}`, 'info');
+        }
+      } else {
+        showFeedback('Billing Portal Error', 'No redirect URL returned by billing server.', 'error');
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Unable to open Stripe Billing Portal. Please verify backend STRIPE_SECRET_KEY configuration.';
+      showFeedback('Billing Portal Unavailable', msg, 'error');
+    } finally {
+      setIsOpeningBillingPortal(false);
+    }
+  };
+
+  const currentPassInputRef = useRef<any>(null);
+  const newPassInputRef = useRef<any>(null);
 
   // Production Expiry Push Notification Preferences
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>({
@@ -470,14 +505,30 @@ export default function MoreScreen() {
     try {
       const res = await syncAllConnectedProviders();
       await loadAccounts(true);
-      const totalDom = res.portfolioDomainsCount;
-      const totalSrv = res.portfolioServersCount;
-      const totalApp = res.portfolioAppsCount;
-      showFeedback(
-        'Portfolio Synced',
-        `Portfolio updated: ${totalDom} domains, ${totalSrv} servers, and ${totalApp} applications synced across connected providers.`,
-        'success'
-      );
+      const totalResults = res.results || [];
+      const successfulProviders = totalResults.filter((r) => r.success);
+      const failedProviders = totalResults.filter((r) => !r.success);
+
+      if (totalResults.length === 0) {
+        showFeedback(
+          'No Providers Configured',
+          'No external cloud providers or registrars with valid API credentials are connected.',
+          'info'
+        );
+      } else if (successfulProviders.length === 0 && failedProviders.length > 0) {
+        showFeedback(
+          'Synchronization Failed',
+          `Failed to sync ${failedProviders.length} connected provider(s). Please verify your API keys and credentials.`,
+          'error'
+        );
+      } else {
+        const failureNote = failedProviders.length > 0 ? ` (${failedProviders.length} provider(s) failed)` : '';
+        showFeedback(
+          'Portfolio Synced',
+          `Synchronized ${res.totalDomains} domains and ${res.totalServers} servers from ${successfulProviders.length} provider(s)${failureNote}.`,
+          'success'
+        );
+      }
     } catch (err: any) {
       showFeedback('Sync Error', err?.message || 'Failed to sync providers.', 'error');
     } finally {
@@ -1101,6 +1152,7 @@ export default function MoreScreen() {
     try {
       await deleteAccount();
       setShowDeleteConfirm(false);
+      showFeedback('Account Deleted', 'Your account has been deleted successfully.', 'success');
       router.replace('/(auth)/login');
     } catch (err: any) {
       showFeedback('Deletion Failed', err?.message || 'Could not delete account. Please try again.', 'error');
@@ -1118,14 +1170,18 @@ export default function MoreScreen() {
 
   const handleSaveProfile = () => {
     const finalName = draftName.trim();
-    const finalEmail = draftEmail.trim().toLowerCase();
     const finalOrg = draftOrg.trim() || 'Pulse Cloud Infrastructure';
+
+    if (!finalName) {
+      showFeedback('Missing Name', 'Please enter your full name.', 'error');
+      return;
+    }
+
     setProfileName(finalName);
-    setProfileEmail(finalEmail);
     setProfileOrg(finalOrg);
     setActiveModal(null);
     showFeedback('Profile Updated', 'Your profile changes have been saved successfully.', 'success');
-    updateUser({ displayName: finalName, email: finalEmail, organization: finalOrg });
+    updateUser({ displayName: finalName, organization: finalOrg });
   };
 
   const handleSavePassword = async () => {
@@ -1767,20 +1823,22 @@ export default function MoreScreen() {
                             styles.profileInputWrapper,
                             {
                               borderColor: colors.border,
-                              backgroundColor: isDark ? colors.surfaceHighlight : '#f8fafc',
+                              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#f1f5f9',
+                              opacity: 0.85,
                             },
                           ]}
                         >
                           <Ionicons name="mail-outline" size={17} color={colors.textMuted} style={{ marginRight: 8 }} />
                           <TextInput
-                            style={[styles.profileInput, { color: colors.text }]}
-                            value={draftEmail}
-                            onChangeText={setDraftEmail}
+                            style={[styles.profileInput, { color: colors.textSecondary }]}
+                            value={profileEmail}
+                            editable={false}
                             placeholder="email@example.com"
                             keyboardType="email-address"
                             autoCapitalize="none"
                             placeholderTextColor={colors.textMuted}
                           />
+                          <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} style={{ marginLeft: 6 }} />
                         </View>
 
                         <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.md }]}>
@@ -2192,8 +2250,8 @@ export default function MoreScreen() {
                                     >
                                       <Ionicons name="globe-outline" size={16} color={isDark ? '#38bdf8' : '#0284c7'} />
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                                         <Text style={[styles.accountDomainsCountText, { color: colors.text }]}>
                                           {accountDomains.length} {accountDomains.length === 1 ? 'Domain' : 'Domains'} Managed
                                         </Text>
@@ -2231,7 +2289,7 @@ export default function MoreScreen() {
                                   <View
                                     style={[
                                       styles.viewDomainsActionPill,
-                                      { backgroundColor: isDark ? 'rgba(2, 132, 199, 0.25)' : '#e0f2fe' },
+                                      { backgroundColor: isDark ? 'rgba(2, 132, 199, 0.25)' : '#e0f2fe', flexShrink: 0 },
                                     ]}
                                   >
                                     <Text style={[styles.viewDomainsActionText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
@@ -3085,50 +3143,6 @@ export default function MoreScreen() {
                             trackColor={{ false: '#cbd5e1', true: colors.primary }}
                           />
                         </View>
-
-                        {/* Test Notification Simulator */}
-                        <View
-                          style={{
-                            marginTop: Spacing.md,
-                            padding: 12,
-                            borderRadius: Radius.md,
-                            backgroundColor: isDark ? 'rgba(37, 99, 235, 0.12)' : '#eff6ff',
-                            borderWidth: 1,
-                            borderColor: isDark ? 'rgba(37, 99, 235, 0.3)' : '#bfdbfe',
-                          }}
-                        >
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>
-                            ⚡ Test Push Notification Simulation
-                          </Text>
-                          <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 10 }}>
-                            Daily check automatically runs at 9:00 AM IST. Test simulated alerts immediately:
-                          </Text>
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                            {[15, 7, 3, 1, 0].map((d) => (
-                              <TouchableOpacity
-                                key={d}
-                                onPress={() => handleTestAlert(d)}
-                                disabled={isSimulatingNotif}
-                                style={{
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 5,
-                                  borderRadius: Radius.sm,
-                                  backgroundColor: colors.primary,
-                                  opacity: isSimulatingNotif ? 0.6 : 1,
-                                }}
-                              >
-                                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '600' }}>
-                                  {d === 0 ? 'Today (0d)' : `${d}d Test`}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                          {simulationStatus && (
-                            <Text style={{ fontSize: 12, color: colors.primary, marginTop: 8, fontWeight: '600' }}>
-                              {simulationStatus}
-                            </Text>
-                          )}
-                        </View>
                       </View>
                     )}
 
@@ -3163,133 +3177,6 @@ export default function MoreScreen() {
                           </TouchableOpacity>
                         );
                       })}
-                    </View>
-
-                    <View style={[styles.divider, { backgroundColor: colors.borderSubtle, marginVertical: Spacing.lg }]} />
-
-                    {/* DomainPulse Backend API Configuration */}
-                    <View
-                      style={{
-                        backgroundColor: isDark ? colors.surfaceHighlight : '#f8fafc',
-                        borderRadius: 12,
-                        padding: 16,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={{ fontSize: 18 }}>🔌</Text>
-                          <Text style={{ fontWeight: '700', fontSize: 15, color: colors.text }}>DomainPulse Backend API</Text>
-                        </View>
-                        <View
-                          style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: 6,
-                            backgroundColor:
-                              apiConnectionStatus === 'online'
-                                ? 'rgba(34, 197, 94, 0.15)'
-                                : apiConnectionStatus === 'offline'
-                                ? 'rgba(239, 68, 68, 0.15)'
-                                : 'rgba(56, 189, 248, 0.15)',
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              fontWeight: '700',
-                              color:
-                                apiConnectionStatus === 'online'
-                                  ? '#22c55e'
-                                  : apiConnectionStatus === 'offline'
-                                  ? '#ef4444'
-                                  : '#0284c7',
-                            }}
-                          >
-                            {apiConnectionStatus === 'online'
-                              ? `ONLINE (${apiPingLatency}ms)`
-                              : apiConnectionStatus === 'offline'
-                              ? 'OFFLINE'
-                              : 'SYNC READY'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }}>
-                        Current Endpoint: <Text style={{ fontFamily: 'monospace', color: colors.primary }}>{currentApiUrl}</Text>
-                      </Text>
-
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            color: colors.text,
-                            borderColor: colors.border,
-                            fontSize: 13,
-                            fontFamily: 'monospace',
-                            marginBottom: 8,
-                          },
-                        ]}
-                        value={apiDraftUrl}
-                        onChangeText={setApiDraftUrl}
-                        placeholder="http://192.168.1.47:4000/api/v1"
-                        placeholderTextColor={colors.textMuted}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                        <TouchableOpacity
-                          style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 5,
-                            borderRadius: 6,
-                            backgroundColor: isDark ? colors.surfaceElevated : '#e2e8f0',
-                          }}
-                          onPress={() => handleSaveApiUrl(API_CONFIG.WIFI_IP_URL)}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>WiFi (192.168.1.47)</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 5,
-                            borderRadius: 6,
-                            backgroundColor: isDark ? colors.surfaceElevated : '#e2e8f0',
-                          }}
-                          onPress={() => handleSaveApiUrl(API_CONFIG.FALLBACK_LOCALHOST)}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>Localhost (127.0.0.1)</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 5,
-                            borderRadius: 6,
-                            backgroundColor: isDark ? colors.surfaceElevated : '#e2e8f0',
-                          }}
-                          onPress={() => handleSaveApiUrl(API_CONFIG.ANDROID_EMULATOR_URL)}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>Android (10.0.2.2)</Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#0284c7',
-                          paddingVertical: 10,
-                          borderRadius: 8,
-                          alignItems: 'center',
-                        }}
-                        onPress={() => handleSaveApiUrl()}
-                      >
-                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
-                          {apiConnectionStatus === 'testing' ? 'Testing Connection...' : 'Save & Test Connection'}
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 )}
@@ -3388,10 +3275,15 @@ export default function MoreScreen() {
                     </View>
 
                     <TouchableOpacity
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.primary, marginTop: Spacing.md }]}
-                      onPress={() => showFeedback('Subscription', 'Redirecting to Stripe Billing Portal...', 'info')}
+                      style={[styles.primaryActionBtn, { backgroundColor: colors.primary, marginTop: Spacing.md, opacity: isOpeningBillingPortal ? 0.7 : 1 }]}
+                      onPress={handleOpenStripeBillingPortal}
+                      disabled={isOpeningBillingPortal}
                     >
-                      <Text style={styles.primaryActionBtnText}>Manage Payment & Invoices</Text>
+                      {isOpeningBillingPortal ? (
+                        <ActivityIndicator size="small" color="#ffffff" />
+                      ) : (
+                        <Text style={styles.primaryActionBtnText}>Manage Payment & Invoices</Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                 )}
@@ -4770,7 +4662,9 @@ export default function MoreScreen() {
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={() => !isDeletingAccount && setShowDeleteConfirm(false)}
+        onRequestClose={() => {
+          if (!isDeletingAccount) setShowDeleteConfirm(false);
+        }}
       >
         <View style={styles.feedbackOverlay}>
           <View
@@ -6844,6 +6738,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   domainGlobeIconBadge: {
     width: 32,
@@ -6877,6 +6772,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 8,
+    flexShrink: 0,
   },
   viewDomainsActionText: {
     fontSize: 11,

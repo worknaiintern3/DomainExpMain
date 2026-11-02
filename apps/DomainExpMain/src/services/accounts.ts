@@ -85,7 +85,9 @@ async function getStoredProviderAccounts(): Promise<ProviderAccount[]> {
     const raw = await getUserItem(STORAGE_KEYS.PROVIDER_ACCOUNTS_LIST);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((p) => p?.id && !p.id.startsWith('pa-hostinger') && !p.id.startsWith('pa-cloudflare') && !p.id.startsWith('pa-aws') && !p.id.startsWith('pa-namecheap'));
+      }
     }
   } catch {}
   return [];
@@ -156,7 +158,8 @@ export async function fetchProviderAccountsList(options?: { forceRefresh?: boole
       try {
         const response = await apiGet<CursorPage<ProviderAccount>>('/provider-accounts?limit=100');
         if (response?.items && Array.isArray(response.items)) {
-          const deduped = deduplicateProviderAccounts(response.items);
+          const clean = response.items.filter((p) => p?.id && !p.id.startsWith('pa-hostinger') && !p.id.startsWith('pa-cloudflare') && !p.id.startsWith('pa-aws') && !p.id.startsWith('pa-namecheap'));
+          const deduped = deduplicateProviderAccounts(clean);
           await saveStoredProviderAccounts(deduped);
           return deduped;
         }
@@ -166,7 +169,7 @@ export async function fetchProviderAccountsList(options?: { forceRefresh?: boole
       const stored = await getStoredProviderAccounts();
       return deduplicateProviderAccounts(stored);
     },
-    { ttlMs: 30000, forceRefresh: options?.forceRefresh }
+    { ttlMs: 15000, forceRefresh: options?.forceRefresh }
   );
 }
 

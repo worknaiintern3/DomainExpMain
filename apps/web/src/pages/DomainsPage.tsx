@@ -5,7 +5,6 @@ import {
   fetchDomainsList,
   createDomain,
   deleteDomain,
-  toggleDomainAutoRenew,
   updateDomainWithWhois,
   syncAllProviders,
   type DomainItem,
@@ -31,7 +30,6 @@ export const DomainsPage: React.FC = () => {
   const [isDetectingRegistrar, setIsDetectingRegistrar] = useState(false);
   const [registrarDetectionSource, setRegistrarDetectionSource] = useState<string | null>(null);
   const [detectedWhois, setDetectedWhois] = useState<NormalizedWhoisData | null>(null);
-  const [newAutoRenew, setNewAutoRenew] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -227,7 +225,6 @@ export const DomainsPage: React.FC = () => {
       const created = await createDomain({
         name: domainInput,
         registrar: finalRegistrar,
-        autoRenew: newAutoRenew,
       });
 
       let initialItem = created;
@@ -281,13 +278,6 @@ export const DomainsPage: React.FC = () => {
     if (!confirm(`Are you sure you want to remove ${name} from your tracked portfolio?`)) return;
     setDomains((prev) => prev.filter((d) => d.id !== id));
     await deleteDomain(id);
-  };
-
-  const handleToggleAutoRenew = async (domain: DomainItem) => {
-    const updated = await toggleDomainAutoRenew(domain.id, !domain.autoRenew);
-    if (updated) {
-      setDomains((prev) => prev.map((d) => (d.id === domain.id ? updated : d)));
-    }
   };
 
   const filteredDomains = useMemo(() => {
@@ -456,15 +446,16 @@ export const DomainsPage: React.FC = () => {
 
               <div className="flex items-center justify-between rounded-xl border border-outline-variant/60 bg-surface-container-low p-3.5">
                 <div>
-                  <p className="text-sm font-semibold text-on-surface">Auto-Renewal</p>
-                  <p className="text-caption-xs text-secondary">Keep active before expiration</p>
+                  <p className="text-sm font-semibold text-on-surface">Registrar Auto-Renew</p>
+                  <p className="text-caption-xs text-secondary">Synchronized directly from domain registrar</p>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={newAutoRenew}
-                  onChange={(e) => setNewAutoRenew(e.target.checked)}
-                  className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
-                />
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-high px-2.5 py-1 text-xs font-semibold text-secondary border border-outline-variant/40 select-none cursor-default"
+                  title="Auto-renewal posture is configured with the domain registrar and synced automatically"
+                >
+                  <span className="material-symbols-outlined text-[14px] text-primary">sync</span>
+                  Registrar Sourced
+                </span>
               </div>
 
               <div className="mt-4 flex justify-end gap-2.5">
@@ -705,21 +696,37 @@ export const DomainsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleAutoRenew(d)}
-                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors border ${
-                          d.autoRenew
-                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20'
-                            : 'bg-surface-container-high text-secondary border-outline-variant/40 hover:bg-surface-container'
-                        }`}
-                        title="Click to toggle auto-renewal"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">
-                          {d.autoRenew ? 'check_circle' : 'cancel'}
+                      {d.autoRenew === true ? (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 select-none cursor-default"
+                          title="Auto-renewal is active at domain registrar"
+                        >
+                          <span className="material-symbols-outlined text-[14px] text-emerald-600 dark:text-emerald-400">
+                            check_circle
+                          </span>
+                          <span>Enabled</span>
                         </span>
-                        <span>{d.autoRenew ? 'Enabled' : 'Disabled'}</span>
-                      </button>
+                      ) : d.autoRenew === false ? (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold bg-surface-container-high text-secondary border border-outline-variant/40 select-none cursor-default"
+                          title="Auto-renewal is inactive at domain registrar"
+                        >
+                          <span className="material-symbols-outlined text-[14px] text-outline">
+                            cancel
+                          </span>
+                          <span>Disabled</span>
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold bg-surface-container text-secondary/70 border border-outline-variant/30 select-none cursor-default"
+                          title="Auto-renewal status not provided by registrar"
+                        >
+                          <span className="material-symbols-outlined text-[14px] text-outline">
+                            help
+                          </span>
+                          <span>Unknown</span>
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4">
