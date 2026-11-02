@@ -1,7 +1,7 @@
 {
   "name": "myfirstapp",
   "main": "expo-router/entry",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "dependencies": {
     "@expo/ui": "~58.0.25",
     "@expo/vector-icons": "^15.0.2",
