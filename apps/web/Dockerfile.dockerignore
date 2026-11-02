@@ -1,0 +1,13 @@
+# Keep this frontend build context separate from the backend's root ignore file.
+**
+!package.json
+!package-lock.json
+!apps/
+!apps/web/
+!apps/web/**
+apps/web/node_modules
+apps/web/dist
+apps/web/.env*
+!apps/web/.env.production
+apps/web/**/*.tsbuildinfo
+apps/web/**/*.log

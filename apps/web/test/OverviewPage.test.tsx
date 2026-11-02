@@ -1,241 +1,118 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import React from 'react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AuthProvider } from '@/auth/AuthContext';
-import { ApiError } from '@/api/client';
 import { OverviewPage } from '@/pages/OverviewPage';
+import type { DomainItem, PortfolioSummary } from '@/services/portfolioService';
 
-const { apiRequest } = vi.hoisted(() => ({
-  apiRequest: vi.fn(),
+const { portfolio, auth } = vi.hoisted(() => ({
+  portfolio: {
+    fetchPortfolioSummary: vi.fn(), fetchDomainsList: vi.fn(),
+    fetchServersList: vi.fn(), fetchApplicationsList: vi.fn(), syncAllProviders: vi.fn(),
+  },
+  auth: { user: { displayName: 'Test Owner', email: 'owner@example.test' } },
+}));
+vi.mock('@/auth/AuthContext', () => ({ useAuth: () => auth }));
+vi.mock('@/services/portfolioService', async () => ({
+  ...await vi.importActual<typeof import('@/services/portfolioService')>('@/services/portfolioService'),
+  ...portfolio,
 }));
 
-vi.mock('@/api/client', async () => {
-  const actual = await vi.importActual<typeof import('@/api/client')>('@/api/client');
-  return {
-    ...actual,
-    apiRequest,
-  };
-});
-
-const EMPTY_SUMMARY = {
-  applications: 0,
-  cloudResources: 0,
-  domains: 0,
-  emailAccounts: 0,
-  projects: 0,
-  providerAccounts: 0,
-  servers: 0,
+const summary: PortfolioSummary = {
+  totalDomains: 42, safeDomains: 40, warningDomains: 1, criticalDomains: 1,
+  totalServers: 30, healthyServers: 30, totalApps: 3, productionApps: 3,
+  totalWebsites: 9, totalProviders: 4, totalAlerts: 2, estimatedRenewalCost: 12000,
 };
+const domain: DomainItem = {
+  id: 'domain-1', name: 'example.com', tld: '.com', registrar: 'hostinger',
+  autoRenew: true, registrationDate: '2025-01-01', expiresAt: '2027-01-01',
+  daysRemaining: 60, renewalPrice: 1000, currency: 'INR', status: 'safe',
+  dnsProvider: 'Cloudflare', sslStatus: 'active', httpStatus: '200', rdapStatus: 'ok',
+  nameservers: [], tags: [],
+};
+const renderPage = () => render(<MemoryRouter><OverviewPage /></MemoryRouter>);
 
-function renderOverviewPage() {
-  return render(
-    <AuthProvider>
-      <MemoryRouter initialEntries={['/']}>
-        <OverviewPage />
-      </MemoryRouter>
-    </AuthProvider>,
-  );
-}
-
-describe('OverviewPage', () => {
+describe('OverviewPage portfolio dashboard', () => {
   beforeEach(() => {
-    apiRequest.mockReset();
+    vi.resetAllMocks();
+    auth.user.displayName = 'Test Owner';
+    portfolio.fetchPortfolioSummary.mockResolvedValue(summary);
+    portfolio.fetchDomainsList.mockResolvedValue([domain]);
+    portfolio.fetchServersList.mockResolvedValue([]);
+    portfolio.fetchApplicationsList.mockResolvedValue([]);
+    portfolio.syncAllProviders.mockResolvedValue({ message: 'Provider inventory refreshed.' });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('renders portfolio totals independently of the preview list length', async () => {
+    renderPage();
+    const domains = screen.getByRole('link', { name: /My Domains/ });
+    expect(await within(domains).findByText('42')).toBeInTheDocument();
+    expect(within(screen.getByRole('link', { name: /VPS & Servers/ })).getByText('30')).toBeInTheDocument();
+    expect(within(screen.getByRole('link', { name: /Mobile Apps/ })).getByText('3')).toBeInTheDocument();
+    expect(portfolio.fetchPortfolioSummary).toHaveBeenCalledWith({ forceRefresh: false });
   });
 
-  it('renders true workspace-wide totals, not a bounded page count', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') {
-        return Promise.resolve({
-          applications: 3,
-          cloudResources: 12,
-          domains: 42,
-          emailAccounts: 5,
-          projects: 2,
-          providerAccounts: 4,
-          servers: 30,
-        });
-      }
-      if (path === '/alerts/summary') {
-        return Promise.resolve({ open: 2 });
-      }
-      if (path === '/provider-connections') {
-        return Promise.resolve({ items: [] });
-      }
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument());
-    expect(screen.getByText('Domains')).toBeInTheDocument();
-    expect(screen.getByText('30')).toBeInTheDocument();
-    expect(screen.getByText('12')).toBeInTheDocument();
-
-    // The old "bounded page" / "first N loaded" language must be gone.
-    expect(screen.queryByText(/bounded snapshot/iu)).not.toBeInTheDocument();
-    expect(screen.queryByText(/more available/iu)).not.toBeInTheDocument();
-    expect(screen.getAllByText(/workspace-wide totals/iu).length).toBeGreaterThan(0);
+  it('preserves true zero counts instead of substituting populated defaults', async () => {
+    portfolio.fetchPortfolioSummary.mockResolvedValue(Object.fromEntries(Object.keys(summary).map((key) => [key, 0])));
+    portfolio.fetchDomainsList.mockResolvedValue([]);
+    renderPage();
+    expect(await within(screen.getByRole('link', { name: /My Domains/ })).findByText('0')).toBeInTheDocument();
+    expect(within(screen.getByRole('link', { name: /Websites/ })).getByText('0')).toBeInTheDocument();
+    expect(within(screen.getByRole('link', { name: /Connected Providers/ })).getByText('0')).toBeInTheDocument();
   });
 
-  it('shows a genuine empty state when every true total is zero, not fake data', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') return Promise.resolve(EMPTY_SUMMARY);
-      if (path === '/alerts/summary') return Promise.resolve({ open: 0 });
-      if (path === '/provider-connections') return Promise.resolve({ items: [] });
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() => expect(screen.getByText('Your inventory is empty')).toBeInTheDocument());
-    expect(screen.getByText('No open alerts.')).toBeInTheDocument();
+  it('uses the loaded domain list for preview and its view-all count', async () => {
+    renderPage();
+    expect(await screen.findByText('example.com')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /View all 1 domains/ })).toHaveAttribute('href', '/domains');
   });
 
-  it('renders the Mongo backend partial summary without NaN or invented account totals', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') {
-        return Promise.resolve({ domains: 4, servers: 2, applications: 1, cloudResources: 0, alerts: 0 });
-      }
-      if (path === '/alerts/summary') {
-        return Promise.reject(new ApiError({ detail: 'Not found', status: 404, title: 'Not Found' }));
-      }
-      if (path === '/alerts?limit=100&status=OPEN') {
-        return Promise.resolve({ items: [{ id: 'one' }, { id: 'two' }], nextCursor: null });
-      }
-      if (path === '/provider-connections') return Promise.resolve({ items: [] });
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() => expect(screen.getByText('Connected inventory')).toBeInTheDocument());
-    expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.queryByText('NaN')).not.toBeInTheDocument();
-    expect(screen.queryByText('Provider accounts')).not.toBeInTheDocument();
-    expect(screen.queryByText('Cloud resources')).not.toBeInTheDocument();
-    expect(screen.getByText(/Other totals are unavailable from this backend/u)).toBeInTheDocument();
-    expect(await screen.findByText('2 open alerts.')).toBeInTheDocument();
+  it('highlights domains within the immediate renewal window', async () => {
+    portfolio.fetchDomainsList.mockResolvedValue([{ ...domain, daysRemaining: 5, status: 'critical' }]);
+    renderPage();
+    expect(await screen.findByText('1 domain requires immediate renewal action')).toBeInTheDocument();
+    expect(screen.getByText('example.com (5d left)')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Review & Renew/ })).toHaveAttribute('href', '/domains');
   });
 
-  it('fills missing Mongo summary totals from every inventory page', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') return Promise.resolve({ domains: 4, servers: 2, applications: 1, cloudResources: 0 });
-      if (path === '/alerts/summary') return Promise.resolve({ open: 0 });
-      if (path === '/provider-connections') return Promise.resolve({ items: [] });
-      if (path.startsWith('/projects?') && path.includes('cursor=')) return Promise.resolve({ items: [{ id: 'p2' }], nextCursor: null });
-      if (path.startsWith('/projects?')) return Promise.resolve({ items: [{ id: 'p1' }], nextCursor: 'next' });
-      if (path.startsWith('/provider-accounts?')) return Promise.resolve({ items: [{ id: 'a1' }], nextCursor: null });
-      if (path.startsWith('/email-accounts?')) return Promise.resolve({ items: [], nextCursor: null });
-      if (path.startsWith('/cloud-resources?')) return Promise.resolve({ items: [{ id: 'c1' }], nextCursor: null });
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() => expect(screen.getByText('Cloud resources')).toBeInTheDocument());
-    expect(screen.getByText('Projects')).toBeInTheDocument();
-    expect(screen.getByText('Provider accounts')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /2 Projects/ })).toBeInTheDocument();
+  it('does not show a renewal warning for a domain outside the critical window', async () => {
+    renderPage();
+    await screen.findByText('example.com');
+    expect(screen.queryByText(/requires immediate renewal action/)).not.toBeInTheDocument();
   });
 
-  it('surfaces the true open-alert count from the summary endpoint', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') return Promise.resolve({ ...EMPTY_SUMMARY, domains: 1 });
-      if (path === '/alerts/summary') return Promise.resolve({ open: 7 });
-      if (path === '/provider-connections') return Promise.resolve({ items: [] });
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() => expect(screen.getByText('7 open alerts.')).toBeInTheDocument());
+  it('refreshes every portfolio source after provider sync succeeds', async () => {
+    renderPage();
+    await screen.findByText('example.com');
+    fireEvent.click(screen.getByRole('button', { name: /Sync All Providers/ }));
+    expect(await screen.findByText('Provider inventory refreshed.')).toBeInTheDocument();
+    expect(portfolio.syncAllProviders).toHaveBeenCalledOnce();
+    for (const load of [portfolio.fetchPortfolioSummary, portfolio.fetchDomainsList, portfolio.fetchServersList, portfolio.fetchApplicationsList]) {
+      expect(load).toHaveBeenLastCalledWith({ forceRefresh: true });
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(screen.queryByText('Provider inventory refreshed.')).not.toBeInTheDocument());
   });
 
-  it('distinguishes live provider connection health from manual provider-account inventory', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') return Promise.resolve({ ...EMPTY_SUMMARY, providerAccounts: 4 });
-      if (path === '/alerts/summary') return Promise.resolve({ open: 0 });
-      if (path === '/provider-connections') {
-        return Promise.resolve({
-          items: [
-            { connectionStatus: 'CONNECTED', syncStatus: 'SUCCESS', validationStatus: 'VALID' },
-            { connectionStatus: 'DISCONNECTED', syncStatus: 'IDLE', validationStatus: 'INVALID' },
-            { connectionStatus: 'CONNECTED', syncStatus: 'FAILED', validationStatus: 'VALID' },
-          ],
-        });
-      }
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() =>
-      expect(screen.getByText('2 of 3 live provider connections connected.')).toBeInTheDocument(),
-    );
-    expect(screen.getByText(/1 connection disconnected or failing credential validation\./iu)).toBeInTheDocument();
-    expect(screen.getByText(/1 connection with a failed sync\./iu)).toBeInTheDocument();
-    expect(screen.getByText(/distinct from the manually tracked/iu)).toBeInTheDocument();
+  it('shows sync failure feedback and allows another attempt', async () => {
+    portfolio.syncAllProviders.mockRejectedValue(new Error('Provider unavailable'));
+    renderPage();
+    await screen.findByText('example.com');
+    fireEvent.click(screen.getByRole('button', { name: /Sync All Providers/ }));
+    expect(await screen.findByText('Failed to sync provider resources.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sync All Providers/ })).toBeEnabled();
   });
 
-  it('describes DNS/TLS accurately instead of claiming it is not connected', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') return Promise.resolve(EMPTY_SUMMARY);
-      if (path === '/alerts/summary') return Promise.resolve({ open: 0 });
-      if (path === '/provider-connections') return Promise.resolve({ items: [] });
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() => expect(screen.getByText('Your inventory is empty')).toBeInTheDocument());
-    expect(screen.queryByText(/DNS, TLS, .* are not connected yet/iu)).not.toBeInTheDocument();
-    expect(screen.getByText(/DNS and TLS metadata is available per domain/iu)).toBeInTheDocument();
-    expect(screen.getByText(/not aggregated workspace-wide/iu)).toBeInTheDocument();
+  it('greets the signed-in owner', async () => {
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'Welcome back, Test Owner' })).toBeInTheDocument();
+    await screen.findByText('example.com');
   });
 
-  it('describes pricing, purchases, billing and renewals truthfully', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') return Promise.resolve(EMPTY_SUMMARY);
-      if (path === '/alerts/summary') return Promise.resolve({ open: 0 });
-      if (path === '/provider-connections') return Promise.resolve({ items: [] });
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() => expect(screen.getByText('Your inventory is empty')).toBeInTheDocument());
-    expect(
-      screen.getByText(/Domain pricing is available through supported registrar APIs/iu),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /Purchases, billing, and automatic renewals are handled externally by your registrars and are not managed by DomainPulse/iu,
-      ),
-    ).toBeInTheDocument();
-    // The stale claim that pricing is not connected to any backend is gone.
-    expect(screen.queryByText(/pricing, and billing analytics are not connected/iu)).not.toBeInTheDocument();
-    expect(screen.queryByText(/not connected to any backend/iu)).not.toBeInTheDocument();
-  });
-
-  it('shows an error state, not silently fabricated data, when the summary call fails', async () => {
-    apiRequest.mockImplementation((path: string) => {
-      if (path === '/inventory/summary') return Promise.reject(new Error('Inventory summary boom'));
-      if (path === '/alerts/summary') return Promise.resolve({ open: 0 });
-      if (path === '/provider-connections') return Promise.resolve({ items: [] });
-      return Promise.reject(new Error(`unexpected call: ${path}`));
-    });
-
-    renderOverviewPage();
-
-    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    expect(screen.getByText('Inventory summary boom')).toBeInTheDocument();
+  it('falls back to the email username when the display name is blank', async () => {
+    auth.user.displayName = '';
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'Welcome back, owner' })).toBeInTheDocument();
+    await screen.findByText('example.com');
   });
 });

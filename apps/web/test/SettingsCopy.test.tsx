@@ -106,9 +106,9 @@ describe('Settings production-truthfulness copy', () => {
     renderSettings();
     openTab(/Domain Discovery/u);
 
-    expect(screen.getByText('Default Extensions')).toBeInTheDocument();
-    expect(screen.getByText('Availability Check')).toBeInTheDocument();
-    expect(screen.getByText('Default Result Order')).toBeInTheDocument();
+    expect(screen.getByText('Default Extensions Scoping')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Selected Extensions Only/ })).toBeInTheDocument();
+    expect(screen.getByText('Default Result Ranking & Sorting')).toBeInTheDocument();
     expect(screen.queryByText(/Reference Dataset/iu)).not.toBeInTheDocument();
     expect(screen.queryByText(/Reference Preview/iu)).not.toBeInTheDocument();
     expect(screen.queryByText(/Suggestion Style/iu)).not.toBeInTheDocument();
@@ -151,17 +151,17 @@ describe('Settings production-truthfulness copy', () => {
     openTab(/Domain Discovery/u);
 
     fireEvent.click(screen.getByRole('checkbox', { name: /Remember Recent Searches/u }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save Discovery Settings' }));
+    fireEvent.click(screen.getByRole('button', { name: /Save Discovery Settings/ }));
 
     await waitFor(() => expect(preferences.saveDiscovery).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(localStorage.getItem('domainpulse.recent-searches')).toBeNull());
-    expect(screen.getByRole('button', { name: 'Clear history' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Clear history/ })).toBeDisabled();
   });
 
   it('warns before a browser unload while discovery changes are unsaved', () => {
     renderSettings();
     openTab(/Domain Discovery/u);
-    fireEvent.click(screen.getByRole('button', { name: '.in' }));
+    fireEvent.click(screen.getByRole('button', { name: /^\.in\s/ }));
 
     const event = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(event);
@@ -172,7 +172,7 @@ describe('Settings production-truthfulness copy', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderSettings();
     openTab(/Domain Discovery/u);
-    fireEvent.click(screen.getByRole('button', { name: '.in' }));
+    fireEvent.click(screen.getByRole('button', { name: /^\.in\s/ }));
 
     const link = document.createElement('a');
     link.href = '/overview';

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AlertsTab } from '@/features/settings/components/tabs/AlertsTab';
@@ -17,26 +18,27 @@ describe('Alerts Settings permissions and configuration', () => {
   });
 
   it('does not offer writes to workspace members', async () => {
-    render(<AlertsTab role="member" />);
-    expect(await screen.findAllByText('Not configured')).toHaveLength(7);
-    expect(screen.getByText(/Read-only: owner\/admin access/u)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Configure' })).not.toBeInTheDocument();
+    render(<MemoryRouter><AlertsTab role="member" /></MemoryRouter>);
+    expect(await screen.findAllByText('Default Active')).toHaveLength(7);
+    for (const control of screen.getAllByRole('combobox')) expect(control).toBeDisabled();
+    for (const button of screen.getAllByRole('button', { name: /Save Rule/ })) expect(button).toBeDisabled();
     expect(patchAlertRule).not.toHaveBeenCalled();
   });
 
-  it('requires a threshold before creating an expiry rule', async () => {
+  it('rejects a negative threshold before saving an expiry rule', async () => {
     patchAlertRule.mockResolvedValue({
-      key: 'DOMAIN_EXPIRY_CRITICAL', enabled: true, severity: 'INFO', thresholdDays: 7, thresholdCount: null,
+      key: 'DOMAIN_EXPIRY_CRITICAL', enabled: true, severity: 'CRITICAL', thresholdDays: 7, thresholdCount: null,
     });
-    render(<AlertsTab role="owner" />);
-    const configure = await screen.findAllByRole('button', { name: 'Configure' });
+    render(<MemoryRouter><AlertsTab role="owner" /></MemoryRouter>);
+    const configure = await screen.findAllByRole('button', { name: /Save Rule/ });
+    fireEvent.change(screen.getAllByPlaceholderText('7')[0]!, { target: { value: '-1' } });
     fireEvent.click(configure[0]!);
-    expect(screen.getByRole('alert')).toHaveTextContent('enter a valid threshold');
+    expect(screen.getByText(/enter a valid threshold/)).toBeInTheDocument();
     expect(patchAlertRule).not.toHaveBeenCalled();
-    fireEvent.change(screen.getAllByPlaceholderText('e.g. 7')[0]!, { target: { value: '7' } });
+    fireEvent.change(screen.getAllByPlaceholderText('7')[0]!, { target: { value: '7' } });
     fireEvent.click(configure[0]!);
     await waitFor(() => expect(patchAlertRule).toHaveBeenCalledWith('DOMAIN_EXPIRY_CRITICAL', {
-      enabled: true, severity: 'INFO', thresholdDays: 7,
+      enabled: true, severity: 'CRITICAL', thresholdDays: 7,
     }));
   });
 });

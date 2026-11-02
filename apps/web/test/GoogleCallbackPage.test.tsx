@@ -101,7 +101,7 @@ describe('GoogleCallbackPage', () => {
 
     renderCallbackPage();
 
-    await waitFor(() => expect(screen.getByText(/sign-in failed/iu)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/connection failed/iu)).toBeInTheDocument());
   });
 
   it('shows a cancelled state and never calls the backend when Google reports an error', async () => {
@@ -109,7 +109,7 @@ describe('GoogleCallbackPage', () => {
 
     renderCallbackPage();
 
-    await waitFor(() => expect(screen.getByText(/sign-in cancelled/iu)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/connection cancelled/iu)).toBeInTheDocument());
     expect(apiRequest).not.toHaveBeenCalledWith('/auth/google/callback', expect.anything());
     expect(apiRequest).not.toHaveBeenCalledWith('/auth/google/link/callback', expect.anything());
   });
@@ -119,7 +119,7 @@ describe('GoogleCallbackPage', () => {
 
     renderCallbackPage();
 
-    await waitFor(() => expect(screen.getByText(/sign-in failed/iu)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/connection failed/iu)).toBeInTheDocument());
     expect(apiRequest).not.toHaveBeenCalledWith('/auth/google/callback', expect.anything());
   });
 
@@ -130,7 +130,7 @@ describe('GoogleCallbackPage', () => {
 
     renderCallbackPage();
 
-    await waitFor(() => expect(screen.getByText(/sign-in failed/iu)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/connection failed/iu)).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /back to sign in/iu })).toBeInTheDocument();
     expect(apiRequest).not.toHaveBeenCalledWith('/auth/google/callback', expect.anything());
     expect(apiRequest).not.toHaveBeenCalledWith('/auth/google/link/callback', expect.anything());
@@ -144,7 +144,7 @@ describe('GoogleCallbackPage', () => {
 
     renderCallbackPage();
 
-    await waitFor(() => expect(screen.getByText(/sign-in failed/iu)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/connection failed/iu)).toBeInTheDocument());
     expect(apiRequest).not.toHaveBeenCalledWith('/auth/google/callback', expect.anything());
     expect(apiRequest).not.toHaveBeenCalledWith('/auth/google/link/callback', expect.anything());
   });
@@ -223,6 +223,6 @@ describe('GoogleCallbackPage', () => {
 
     renderCallbackPage();
 
-    await waitFor(() => expect(screen.getByText(/sign-in failed/iu)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/connection failed/iu)).toBeInTheDocument());
   });
 });

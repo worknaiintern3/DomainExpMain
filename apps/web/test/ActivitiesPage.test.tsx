@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ActivitiesPage } from '@/pages/ActivitiesPage';
 
-const { inventory, monitoring, notifications } = vi.hoisted(() => ({
-  inventory: { listInventory: vi.fn() },
+const { portfolio, monitoring, notifications } = vi.hoisted(() => ({
+  portfolio: { fetchDomainsList: vi.fn(), fetchServersList: vi.fn(), fetchApplicationsList: vi.fn(), fetchWebsitesList: vi.fn() },
   monitoring: { listAlerts: vi.fn() },
   notifications: { listNotificationHistory: vi.fn() },
 }));
 
-vi.mock('@/api/inventory', () => inventory);
+vi.mock('@/services/portfolioService', () => portfolio);
 vi.mock('@/api/monitoring', () => monitoring);
 vi.mock('@/api/notifications', () => notifications);
 
@@ -28,43 +28,16 @@ describe('ActivitiesPage', () => {
     vi.clearAllMocks();
     window.localStorage.clear();
 
-    vi.mocked(inventory.listInventory).mockImplementation(async (resource: string) => {
-      if (resource === 'domains') {
-        return {
-          items: [{
-            domainName: 'example.com',
-            expiresAt: iso(5 * 86_400_000),
-            id: 'domain-1',
-            provenance: 'RDAP_RETRIEVED',
-            updatedAt: iso(-60_000),
-          }],
-          nextCursor: null,
-        };
-      }
-      if (resource === 'servers') {
-        return {
-          items: [{
-            hostname: 'api.example.com',
-            id: 'server-1',
-            name: 'Production API',
-            primaryIp: '203.0.113.10',
-            provenance: 'PROVIDER_API',
-            updatedAt: iso(-120_000),
-          }],
-          nextCursor: null,
-        };
-      }
-      return {
-        items: [{
-          id: 'app-1',
-          kind: 'WEBSITE',
-          name: 'Marketing site',
-          primaryUrl: 'https://example.com',
-          updatedAt: iso(-180_000),
-        }],
-        nextCursor: null,
-      };
-    });
+    portfolio.fetchDomainsList.mockResolvedValue([{
+      name: 'example.com', expiresAt: iso(5 * 86_400_000), daysRemaining: 5, id: 'domain-1',
+    }]);
+    portfolio.fetchServersList.mockResolvedValue([{
+      id: 'server-1', name: 'Production API', status: 'healthy', cpuUsagePercent: 20, memoryUsagePercent: 30,
+    }]);
+    portfolio.fetchWebsitesList.mockResolvedValue([{
+      id: 'site-1', name: 'Marketing site', url: 'https://example.com', status: 'healthy',
+    }]);
+    portfolio.fetchApplicationsList.mockResolvedValue([]);
 
     vi.mocked(monitoring.listAlerts).mockResolvedValue({
       items: [{
@@ -100,10 +73,10 @@ describe('ActivitiesPage', () => {
     renderPage();
 
     expect(await screen.findByText('TLS certificate expires')).toBeInTheDocument();
-    expect(await screen.findByText('Domain expiring soon')).toBeInTheDocument();
+    expect(await screen.findByText(/Domain Expiring Soon/i)).toBeInTheDocument();
     expect(await screen.findByText('Expiry reminder delivered')).toBeInTheDocument();
-    expect(await screen.findByText('Server record updated')).toBeInTheDocument();
-    expect(await screen.findByText('Application record updated')).toBeInTheDocument();
+    expect(await screen.findByText('Server Active & Monitored')).toBeInTheDocument();
+    expect(await screen.findByText('Website Monitored')).toBeInTheDocument();
     expect(screen.getByText('Recent Activity')).toBeInTheDocument();
   });
 
