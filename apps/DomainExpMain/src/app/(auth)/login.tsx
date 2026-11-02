@@ -111,7 +111,7 @@ export default function LoginScreen() {
 
           {/* Heading - spaced below the globe */}
           <View style={styles.header}>
-            <Text style={styles.title}>Sign in to DomainPulse</Text>
+            <Text style={styles.title}>Sign in to DomainExpert</Text>
             <Text style={styles.subtitle}>
               Unified domain & infrastructure management
             </Text>

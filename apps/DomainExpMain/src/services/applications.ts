@@ -60,7 +60,7 @@ export function mapBackendApplicationToItem(b: BackendApplication): ApplicationI
     serverName: isPlay ? 'Google Play Console' : b.kind ? b.kind.split('_').join(' ') : 'Mobile Application',
     packageId: pkg || official?.packageId || undefined,
     version: official?.version || '1.0.0',
-    developerName: isPlay ? (official?.developerName || 'Google Play Console') : 'DomainPulse Workspace',
+    developerName: isPlay ? (official?.developerName || 'Google Play Console') : 'DomainExpert Workspace',
     releaseTrack: official?.releaseTrack || 'Production',
     iconUrl: official?.iconUrl,
     updatedAt: official?.updatedAt || b.updatedAt,

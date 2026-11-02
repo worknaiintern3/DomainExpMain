@@ -262,7 +262,7 @@ export const GooglePlayPage: React.FC = () => {
   return (
     <div className="flex w-full flex-col gap-unit-lg pb-unit-2xl">
       <PageHeader
-        description="Link a Google Play developer account to review the Android apps you publish. DomainPulse only reads the app list — it never edits store listings, pricing or releases."
+        description="Link a Google Play developer account to review the Android apps you publish. DomainExpert only reads the app list — it never edits store listings, pricing or releases."
         title="Google Play Console"
       />
 

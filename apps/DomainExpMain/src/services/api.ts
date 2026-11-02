@@ -309,7 +309,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
       isAbort ? 'Timeout' : 'Network Error',
       isAbort
         ? 'Request timed out. Please check your network connection.'
-        : 'Unable to connect to DomainPulse API server.',
+        : 'Unable to connect to DomainExpert API server.',
     );
   }
 }

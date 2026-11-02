@@ -32,7 +32,7 @@ export function MaintenanceBarrier() {
         </View>
 
         <Text style={[styles.title, { color: colors.text }]}>System Maintenance</Text>
-        <Text style={[styles.appName, { color: colors.primary }]}>{appBranding.appName || 'DomainPulse'}</Text>
+        <Text style={[styles.appName, { color: colors.primary }]}>{appBranding.appName || 'DomainExpert'}</Text>
 
         <Text style={[styles.message, { color: colors.textSecondary }]}>
           {maintenanceMessage ||
@@ -81,7 +81,7 @@ export function UpdateRequiredBarrier() {
         </View>
 
         <Text style={[styles.title, { color: colors.text }]}>Update Required</Text>
-        <Text style={[styles.appName, { color: colors.primary }]}>{appBranding.appName || 'DomainPulse'}</Text>
+        <Text style={[styles.appName, { color: colors.primary }]}>{appBranding.appName || 'DomainExpert'}</Text>
 
         <Text style={[styles.message, { color: colors.textSecondary }]}>
           A required security and feature update (v{versionPolicy.minimumVersion}) is now available. Please update to continue using {appBranding.appName}.

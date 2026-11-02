@@ -298,7 +298,7 @@ export default function GooglePlayConsoleScreen() {
       setTrackedPackageIds((prev) => new Set([...prev, app.packageId]));
       Alert.alert(
         'App Added!',
-        `"${app.name}" is now tracked in your DomainPulse applications inventory.`
+        `"${app.name}" is now tracked in your DomainExpert applications inventory.`
       );
     } catch (err: any) {
       Alert.alert('Notice', err?.message || 'Could not add app to workspace.');
@@ -1088,7 +1088,7 @@ export default function GooglePlayConsoleScreen() {
                   Connect Private Play Console Account
                 </Text>
                 <Text style={[styles.connectDesc, { color: colors.textSecondary }]}>
-                  Authorize DomainPulse with Google Play Developer OAuth API to securely sync your private release tracks, internal builds, and reporting metrics.
+                  Authorize DomainExpert with Google Play Developer OAuth API to securely sync your private release tracks, internal builds, and reporting metrics.
                 </Text>
 
                 <View style={styles.inputGroup}>

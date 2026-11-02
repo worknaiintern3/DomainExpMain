@@ -60,7 +60,7 @@ export const OverviewPage: React.FC = () => {
     }
   };
 
-  const greeting = user?.displayName?.trim() || user?.email?.split('@')[0] || 'DomainPulse Admin';
+  const greeting = user?.displayName?.trim() || user?.email?.split('@')[0] || 'DomainExpert Admin';
 
   const criticalDomains = domains.filter((d) => (d.daysRemaining || 999) <= 14);
 

@@ -536,7 +536,7 @@ export default function ServerDetailsScreen() {
               <Text style={[styles.cardHeading, { color: colors.text }]}>Deployed App Services</Text>
 
               {[
-                { name: 'DomainPulse Web & API Gateway', port: '443 / 80', runtime: 'Node.js 20 • Docker', status: 'Healthy' },
+                { name: 'DomainExpert Web & API Gateway', port: '443 / 80', runtime: 'Node.js 20 • Docker', status: 'Healthy' },
                 { name: 'PostgreSQL Database Engine', port: '5432', runtime: 'PostgreSQL 16.2', status: 'Healthy' },
                 { name: 'Redis Cache Layer', port: '6379', runtime: 'Redis 7.2 Alpine', status: 'Healthy' },
                 { name: 'Prometheus Node Exporter', port: '9100', runtime: 'Monitoring Daemon', status: 'Healthy' },

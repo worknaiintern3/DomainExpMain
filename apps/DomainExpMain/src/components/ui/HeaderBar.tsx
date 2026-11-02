@@ -13,7 +13,7 @@ interface HeaderBarProps {
   rightAction?: React.ReactNode;
 }
 
-export function HeaderBar({ title = 'DomainPulse', subtitle, rightAction }: HeaderBarProps) {
+export function HeaderBar({ title = 'DomainExpert', subtitle, rightAction }: HeaderBarProps) {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const { colors } = useTheme();

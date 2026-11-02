@@ -726,7 +726,7 @@ export default function DashboardScreen() {
             style={{ width: 26, height: 26, borderRadius: 6 }}
             resizeMode="contain"
           />
-          <Text style={[styles.brandText, { color: colors.text }]}>{appBranding.appName || 'DomainPulse'}</Text>
+          <Text style={[styles.brandText, { color: colors.text }]}>{appBranding.appName || 'DomainExpert'}</Text>
         </View>
 
         <View style={styles.headerRight}>

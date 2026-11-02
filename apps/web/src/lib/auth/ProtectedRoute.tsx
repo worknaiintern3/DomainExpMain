@@ -15,7 +15,7 @@ export const ProtectedRoute: React.FC = () => {
       >
         <div className="flex flex-col items-center gap-unit-sm">
           <div className="w-11 h-11 rounded-xl overflow-hidden shadow-micro border border-outline-variant/30 animate-pulse">
-            <img src="/logo.png" alt="DomainPulse" className="w-full h-full object-cover" />
+            <img src="/logo.png" alt="DomainExpert" className="w-full h-full object-cover" />
           </div>
           <span className="font-label-md text-label-md text-secondary">Restoring session…</span>
         </div>

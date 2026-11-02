@@ -83,7 +83,7 @@ export interface RemoteBootstrapConfig {
 
 const DEFAULT_CONFIG: RemoteBootstrapConfig = {
   app: {
-    appName: 'DomainPulse',
+    appName: 'DomainExpert',
     logoUrl: null,
     primaryColor: '#0284c7',
     secondaryColor: '#0f172a',
@@ -127,7 +127,7 @@ const DEFAULT_CONFIG: RemoteBootstrapConfig = {
     latestVersion: '1.0.4',
     forceUpdate: false,
     updateUrl: 'https://play.google.com/store/apps/details?id=com.domainpulse.mobile',
-    releaseNotes: 'Welcome to DomainPulse Mobile v1.0.4.',
+    releaseNotes: 'Welcome to DomainExpert Mobile v1.0.4.',
   },
   announcements: [],
 };

@@ -181,7 +181,7 @@ const SecurityCard: React.FC<React.PropsWithChildren> = ({ children }) => (
   <div className="flex flex-col w-full max-w-2xl pb-unit-2xl">
     <h1 className="text-headline-md font-semibold text-on-surface">Security</h1>
     <p className="text-body-sm text-secondary mt-1 mb-unit-lg">
-      Manage how you sign in to DomainPulse.
+      Manage how you sign in to DomainExpert.
     </p>
     <section className="rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm p-unit-lg">
       {children}

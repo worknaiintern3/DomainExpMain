@@ -137,7 +137,7 @@ export class MobileAdminService {
     if (!row) {
       const inserted: MobileAppConfigTable = {
         id: randomUUID(),
-        appName: 'DomainPulse',
+        appName: 'DomainExpert',
         logoUrl: null,
         primaryColor: '#2563EB',
         secondaryColor: '#1E293B',
@@ -1195,7 +1195,7 @@ export class MobileAdminService {
         id: d.id,
         domainName: d.domainName,
         ownerEmail: owner?.email || 'System / Platform',
-        ownerName: owner?.displayName || owner?.email?.split('@')[0] || 'DomainPulse Admin',
+        ownerName: owner?.displayName || owner?.email?.split('@')[0] || 'DomainExpert Admin',
         ownerUserId: owner?.id || null,
         status,
         sslStatus: ssl,
@@ -1252,7 +1252,7 @@ export class MobileAdminService {
         serverKind: s.serverKind || 'vps',
         providerLabel: p?.label || (s.serverKind === 'aws' ? 'AWS EC2' : 'Hostinger VPS'),
         ownerEmail: owner?.email || 'System / Platform',
-        ownerName: owner?.displayName || owner?.email?.split('@')[0] || 'DomainPulse Admin',
+        ownerName: owner?.displayName || owner?.email?.split('@')[0] || 'DomainExpert Admin',
         ownerUserId: owner?.id || null,
         status: s.inventoryState === 'ARCHIVED' ? 'archived' : (s.status || 'healthy'),
         uptimePercent: s.uptimePercent || 99.98,

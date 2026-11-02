@@ -5,8 +5,8 @@ const PRIVACY_HTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy - DomainPulse</title>
-  <meta name="description" content="Privacy Policy for DomainPulse mobile application and services, detailing data collection, Google API compliance, data security, and deletion policies.">
+  <title>Privacy Policy - DomainExpert</title>
+  <meta name="description" content="Privacy Policy for DomainExpert mobile application and services, detailing data collection, Google API compliance, data security, and deletion policies.">
   <style>
     :root {
       --bg: #0b1120;
@@ -147,23 +147,23 @@ const PRIVACY_HTML = `<!DOCTYPE html>
   <div class="container">
     <div class="header">
       <div class="badge">Official Legal Document</div>
-      <h1>Privacy Policy for DomainPulse</h1>
+      <h1>Privacy Policy for DomainExpert</h1>
       <div class="meta">
         <strong>Effective Date:</strong> October 7, 2026 &nbsp;|&nbsp; 
-        <strong>Application:</strong> DomainPulse &nbsp;|&nbsp; 
+        <strong>Application:</strong> DomainExpert &nbsp;|&nbsp; 
         <strong>Package:</strong> <code>com.domainpulse.mobile</code>
       </div>
     </div>
 
     <h2>1. Introduction</h2>
     <p>
-      Welcome to <strong>DomainPulse</strong> ("we," "our," or "us"). DomainPulse is a multi-cloud infrastructure, domain monitoring, and application telemetry platform developed to help developers, IT administrators, and digital teams monitor domain names, SSL certificates, cloud servers, and mobile applications from a single unified interface.
+      Welcome to <strong>DomainExpert</strong> ("we," "our," or "us"). DomainExpert is a multi-cloud infrastructure, domain monitoring, and application telemetry platform developed to help developers, IT administrators, and digital teams monitor domain names, SSL certificates, cloud servers, and mobile applications from a single unified interface.
     </p>
     <p>
-      This Privacy Policy explains how we collect, use, disclose, protect, and handle your information when you use our mobile application (<strong>DomainPulse</strong>, package name <code>com.domainpulse.mobile</code>) and related backend services hosted at <code>https://app.domainexprt.com</code> (collectively, the "Service").
+      This Privacy Policy explains how we collect, use, disclose, protect, and handle your information when you use our mobile application (<strong>DomainExpert</strong>, package name <code>com.domainpulse.mobile</code>) and related backend services hosted at <code>https://app.domainexprt.com</code> (collectively, the "Service").
     </p>
     <p>
-      By accessing or using DomainPulse, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with any part of this policy, please do not use the Service.
+      By accessing or using DomainExpert, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with any part of this policy, please do not use the Service.
     </p>
 
     <h2>2. Information We Collect</h2>
@@ -187,7 +187,7 @@ const PRIVACY_HTML = `<!DOCTYPE html>
     <div class="callout">
       <div class="callout-title">Google API Services User Data Policy Compliance</div>
       <p style="margin-bottom: 0;">
-        DomainPulse's use and transfer to any other app of information received from Google APIs adheres to the 
+        DomainExpert's use and transfer to any other app of information received from Google APIs adheres to the 
         <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, 
         including the <strong>Limited Use</strong> requirements. We never sell Google user data, never use it for advertising or marketing, and never use it to train artificial intelligence or machine learning models.
       </p>
@@ -227,7 +227,7 @@ const PRIVACY_HTML = `<!DOCTYPE html>
 
     <h2>7. Children's Privacy</h2>
     <p>
-      DomainPulse is an enterprise infrastructure monitoring tool intended for professionals and developers. It is not directed to children under 13 years of age. We do not knowingly collect personal information from children.
+      DomainExpert is an enterprise infrastructure monitoring tool intended for professionals and developers. It is not directed to children under 13 years of age. We do not knowingly collect personal information from children.
     </p>
 
     <h2>8. Your Rights (GDPR & CCPA)</h2>
@@ -241,11 +241,11 @@ const PRIVACY_HTML = `<!DOCTYPE html>
       <li><strong>Primary Email:</strong> <a href="mailto:support@domainpulse.io">support@domainpulse.io</a></li>
       <li><strong>Alternate Email:</strong> <a href="mailto:admin@domainexprt.com">admin@domainexprt.com</a></li>
       <li><strong>Service Host:</strong> <code>https://app.domainexprt.com</code></li>
-      <li><strong>Application:</strong> DomainPulse (<code>com.domainpulse.mobile</code>)</li>
+      <li><strong>Application:</strong> DomainExpert (<code>com.domainpulse.mobile</code>)</li>
     </ul>
 
     <div class="footer">
-      &copy; 2026 DomainPulse. All rights reserved. &bull; <a href="https://app.domainexprt.com/health">System Status</a>
+      &copy; 2026 DomainExpert. All rights reserved. &bull; <a href="https://app.domainexprt.com/health">System Status</a>
     </div>
   </div>
 </body>

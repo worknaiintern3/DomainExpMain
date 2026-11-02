@@ -8,7 +8,7 @@ import { AccessTokenService } from '../auth/access-token';
 import { generateRefreshToken, hashRefreshToken } from '../auth/crypto';
 
 const DEFAULT_APP_CONFIG = {
-  appName: 'DomainPulse',
+  appName: 'DomainExpert',
   logoUrl: null,
   primaryColor: '#2563EB',
   secondaryColor: '#1E293B',

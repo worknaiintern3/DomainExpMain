@@ -138,7 +138,7 @@ export default function RegisterScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>
-              Get started with DomainPulse portfolio intelligence
+              Get started with DomainExpert portfolio intelligence
             </Text>
           </View>
 

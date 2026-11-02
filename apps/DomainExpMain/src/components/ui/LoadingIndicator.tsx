@@ -6,7 +6,7 @@ interface LoadingIndicatorProps {
   message?: string;
 }
 
-export function LoadingIndicator({ message = 'Loading DomainPulse data...' }: LoadingIndicatorProps) {
+export function LoadingIndicator({ message = 'Loading DomainExpert data...' }: LoadingIndicatorProps) {
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={Colors.dark.primary} />

@@ -68,7 +68,7 @@ export default function InAppSplashScreen() {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, user } = useAuth();
   const { appBranding } = useRemoteConfig();
-  const appName = appBranding.appName || 'DomainPulse';
+  const appName = appBranding.appName || 'DomainExpert';
 
   // Animation controllers
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -275,7 +275,7 @@ export default function InAppSplashScreen() {
             <Text style={styles.topCapsuleText}>INFRASTRUCTURE TELEMETRY • LIVE</Text>
           </Animated.View>
 
-          {/* Central Hero: DomainPulse Hub */}
+          {/* Central Hero: DomainExpert Hub */}
           <View style={styles.centerHero}>
             {/* Animated Glow Radar Ring */}
             <Animated.View

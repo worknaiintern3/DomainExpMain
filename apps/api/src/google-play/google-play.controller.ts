@@ -268,7 +268,7 @@ export class GooglePlayController {
       return this.renderHtmlResult(
         reply,
         true,
-        `Google account ${connection.googleAccountEmail} successfully connected to DomainPulse!`,
+        `Google account ${connection.googleAccountEmail} successfully connected to DomainExpert!`,
         'Connected',
         connection.googleAccountEmail,
       );
@@ -377,7 +377,7 @@ export class GooglePlayController {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DomainPulse - Google Play Console</title>
+  <title>DomainExpert - Google Play Console</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -452,7 +452,7 @@ export class GooglePlayController {
     <div class="icon">${success ? '✓' : '✕'}</div>
     <h1>${title}</h1>
     <p>${message}</p>
-    <a href="${deepLinkUrl}" class="btn">Return to DomainPulse App</a>
+    <a href="${deepLinkUrl}" class="btn">Return to DomainExpert App</a>
   </div>
 </body>
 </html>`;

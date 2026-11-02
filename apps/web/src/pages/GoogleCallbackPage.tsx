@@ -90,7 +90,7 @@ export const GoogleCallbackPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handles the LINK return once the existing DomainPulse session has had a
+  // Handles the LINK return once the existing DomainExpert session has had a
   // chance to restore from the refresh token already in sessionStorage
   useEffect(() => {
     if (intentRef.current !== 'link') return;
