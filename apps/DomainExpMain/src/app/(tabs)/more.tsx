@@ -1464,8 +1464,8 @@ export default function MoreScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Profile Card */}
-          <TouchableOpacity
+          {/* User Info Card (Display only - Profile menu item below opens the edit modal) */}
+          <View
             style={[
               styles.profileCard,
               {
@@ -1473,8 +1473,6 @@ export default function MoreScreen() {
                 borderColor: isDark ? colors.border : 'rgba(226, 232, 240, 0.9)',
               },
             ]}
-            onPress={openProfileModal}
-            activeOpacity={0.85}
           >
             <View style={styles.profileLeft}>
               <View style={styles.avatarWrapper}>
@@ -1491,8 +1489,7 @@ export default function MoreScreen() {
                 <Text style={[styles.profileEmail, { color: colors.textMuted }]}>{profileEmail}</Text>
               </View>
             </View>
-            <Text style={[styles.arrowIcon, { color: colors.textMuted }]}>›</Text>
-          </TouchableOpacity>
+          </View>
 
           {/* Individual Menu Item Cards */}
           <View style={styles.menuCardsList}>
