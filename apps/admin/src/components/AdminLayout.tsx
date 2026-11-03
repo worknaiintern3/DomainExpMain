@@ -475,16 +475,6 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
                 >
                   {loading ? 'Authenticating...' : 'Sign In with Backend'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('admin@domainpulse.com');
-                    setPassword('Admin@123');
-                  }}
-                  className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold border border-slate-200 dark:border-slate-700"
-                >
-                  Autofill Super Admin
-                </button>
               </div>
             </form>
 

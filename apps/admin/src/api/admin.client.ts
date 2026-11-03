@@ -40,34 +40,8 @@ try {
   // ignore
 }
 
-async function fetchAdminSessionToken(): Promise<string | null> {
-  try {
-    const res = await fetch(`${API_PREFIX}/platform/session`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({}),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.accessToken) {
-        localStorage.setItem(TOKEN_KEY, data.accessToken);
-        return data.accessToken;
-      }
-    }
-  } catch (err) {
-    console.error('Failed to fetch admin session token:', err);
-  }
-  return null;
-}
-
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  let token = localStorage.getItem(TOKEN_KEY);
-  if (!token) {
-    token = await fetchAdminSessionToken();
-  }
+  const token = localStorage.getItem(TOKEN_KEY);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -79,21 +53,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  let response = await fetch(path, {
+  const response = await fetch(path, {
     ...options,
     headers,
   });
 
-  // If 401 Unauthorized, token might be expired. Re-authenticate once and retry.
+  // Expired sessions require an explicit sign-in; never mint an admin session.
   if (response.status === 401) {
-    const freshToken = await fetchAdminSessionToken();
-    if (freshToken) {
-      headers.Authorization = `Bearer ${freshToken}`;
-      response = await fetch(path, {
-        ...options,
-        headers,
-      });
-    }
+    localStorage.removeItem(TOKEN_KEY);
   }
 
   if (!response.ok) {
