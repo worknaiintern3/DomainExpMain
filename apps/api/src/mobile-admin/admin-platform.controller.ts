@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Inject,
-  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -17,11 +16,6 @@ export class AdminPlatformController {
     @Inject(MobileAdminService)
     private readonly adminService: MobileAdminService,
   ) {}
-
-  @Post('session')
-  async getOrCreateAdminSession() {
-    return this.adminService.getOrCreateAdminSession();
-  }
 
   @Get('stats')
   @UseGuards(AccessTokenGuard, PlatformRolesGuard)

@@ -23,7 +23,6 @@ import type {
 } from '@domainpulse/contracts';
 
 import { DatabaseService } from '../database/database.service';
-import { AccessTokenService } from '../auth/access-token';
 
 function formatRegistrarName(raw?: string | null): string {
   if (!raw) return 'Hostinger';
@@ -104,8 +103,6 @@ export class MobileAdminService {
   constructor(
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
-    @Inject(AccessTokenService)
-    private readonly accessTokenService: AccessTokenService,
   ) {}
 
   private async logAudit(
@@ -913,67 +910,6 @@ export class MobileAdminService {
         ipAddress: a.ipAddress,
         createdAt: a.createdAt,
       })),
-    };
-  }
-
-  async getOrCreateAdminSession(): Promise<{ accessToken: string; user: any }> {
-    const cols = this.databaseService.collections;
-    if (!cols) throw new Error('MongoDB collections not available');
-
-    let adminUser: any = await cols.users.findOne({
-      platformRole: { $in: ['SUPER_ADMIN', 'ADMIN'] },
-    } as any);
-
-    if (!adminUser) {
-      adminUser = await cols.users.findOne({ email: 'admin@domainpulse.com' } as any);
-      if (adminUser) {
-        await cols.users.updateOne(
-          { id: adminUser.id },
-          { $set: { platformRole: 'SUPER_ADMIN' } },
-        );
-        adminUser.platformRole = 'SUPER_ADMIN';
-      } else {
-        const now = new Date();
-        const newAdmin = {
-          id: randomUUID(),
-          email: 'admin@domainpulse.com',
-          normalizedEmail: 'admin@domainpulse.com',
-          displayName: 'System Super Admin',
-          platformRole: 'SUPER_ADMIN',
-          personalWorkspaceId: randomUUID(),
-          createdAt: now,
-          updatedAt: now,
-        };
-        await cols.users.insertOne(newAdmin as any);
-        adminUser = newAdmin as any;
-      }
-    }
-
-    const sessionId = randomUUID();
-    const now = new Date();
-    const sessionDoc = {
-      id: sessionId,
-      userId: adminUser.id,
-      createdAt: now,
-      updatedAt: now,
-      revokedAt: null,
-      lastSeenAt: now,
-    };
-    await cols.sessions.insertOne(sessionDoc as any);
-
-    const token = this.accessTokenService.issue({
-      sessionId,
-      userId: adminUser.id,
-    });
-
-    return {
-      accessToken: token.token,
-      user: {
-        id: adminUser.id,
-        email: adminUser.email,
-        displayName: adminUser.displayName || 'System Admin',
-        platformRole: adminUser.platformRole || 'SUPER_ADMIN',
-      },
     };
   }
 
