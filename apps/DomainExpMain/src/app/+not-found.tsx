@@ -5,14 +5,11 @@ import { Stack, useRouter } from 'expo-router';
 export default function NotFoundScreen() {
   const router = useRouter();
 
-  // Automatic failsafe: redirect to home dashboard so users never get permanently stuck
+  // Automatic failsafe: immediately redirect to root splash screen if not found is reached on cold launch
   useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        router.replace('/(tabs)/dashboard');
-      } catch {}
-    }, 600);
-    return () => clearTimeout(timer);
+    try {
+      router.replace('/');
+    } catch {}
   }, [router]);
 
   return (
