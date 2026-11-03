@@ -19,14 +19,17 @@ import type { PlatformStats } from '../types/admin.types';
 export const PlatformOverviewPage: React.FC = () => {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchStats = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await adminClient.getPlatformStats();
       setStats(data);
     } catch (err) {
-      console.error(err);
+      setStats(null);
+      setError(err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setLoading(false);
     }
@@ -36,12 +39,22 @@ export const PlatformOverviewPage: React.FC = () => {
     fetchStats();
   }, []);
 
-  if (loading || !stats) {
+  if (loading) {
     return (
-      <div className="p-16 text-center text-slate-400 text-xs flex flex-col items-center gap-3">
+      <div role="status" className="p-16 text-center text-slate-400 text-xs flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         <span>Aggregating cross-platform metrics...</span>
       </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <section role="alert" className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-3">
+        <h1 className="text-lg font-bold text-slate-900 dark:text-white">Unable to load platform overview</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{error || 'No overview data was returned. Please try again.'}</p>
+        <button type="button" onClick={fetchStats} className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">Try again</button>
+      </section>
     );
   }
 

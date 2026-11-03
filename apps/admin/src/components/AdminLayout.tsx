@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { adminClient } from '../api/admin.client';
+import { adminClient, ADMIN_SESSION_CHANGED_EVENT } from '../api/admin.client';
 import { useTheme } from '../context/ThemeContext';
 import {
   IconActivity,
@@ -39,6 +39,16 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
   const [manualToken, setManualToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const updateSession = () => setHasToken(adminClient.hasToken());
+    window.addEventListener(ADMIN_SESSION_CHANGED_EVENT, updateSession);
+    window.addEventListener('storage', updateSession);
+    return () => {
+      window.removeEventListener(ADMIN_SESSION_CHANGED_EVENT, updateSession);
+      window.removeEventListener('storage', updateSession);
+    };
+  }, []);
 
   // Global search modal (Ctrl+K)
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -413,7 +423,16 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
         {/* MAIN BODY */}
         <main className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">{children}</div>
+          <div className="max-w-7xl mx-auto">
+            {hasToken ? children : (
+              <section className="mx-auto my-12 max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4" aria-labelledby="admin-sign-in-heading">
+                <IconShield size={28} className="text-blue-500" />
+                <h1 id="admin-sign-in-heading" className="text-xl font-bold text-slate-900 dark:text-white">Sign in to Admin Center</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400" role="status">Sign in with your administrator account to view live data. If your session expired, sign in again.</p>
+                <button type="button" onClick={() => setShowAuthModal(true)} className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">Sign in</button>
+              </section>
+            )}
+          </div>
         </main>
       </div>
 
@@ -509,7 +528,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
                 onClick={() => setShowAuthModal(false)}
                 className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 font-medium"
               >
-                Stay in Local Dev Sandbox
+                Cancel
               </button>
             </div>
           </div>

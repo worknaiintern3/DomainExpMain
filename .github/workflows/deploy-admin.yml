@@ -50,6 +50,8 @@ jobs:
           node --test apps/admin/deploy/test/*.test.mjs
       - name: Typecheck and build production frontend
         run: npm run build --workspace=@domainpulse/contracts && npm run build --workspace=@domainpulse/admin
+      - name: Test admin sign-in and loading recovery
+        run: npm run test --workspace=@domainpulse/admin
       - name: Package exact revision
         id: package
         run: node apps/admin/deploy/package.mjs

@@ -20,6 +20,13 @@ import type {
 
 const TOKEN_KEY = 'domainpulse_admin_token';
 const API_PREFIX = '/api/v1/admin';
+export const ADMIN_SESSION_CHANGED_EVENT = 'domainpulse:admin-session-changed';
+
+function storeToken(token: string | null): void {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event(ADMIN_SESSION_CHANGED_EVENT));
+}
 
 // Clean up any legacy sandbox keys from previous versions
 try {
@@ -53,29 +60,48 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(path, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 15_000);
+  const abort = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) abort();
+  else options.signal?.addEventListener('abort', abort, { once: true });
 
-  // Expired sessions require an explicit sign-in; never mint an admin session.
-  if (response.status === 401) {
-    localStorage.removeItem(TOKEN_KEY);
-  }
+  try {
+    const response = await fetch(path, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    let errorMsg = `HTTP Error ${response.status}: ${response.statusText}`;
-    try {
-      const errJson = await response.json();
-      if (errJson?.detail) errorMsg = errJson.detail;
-      else if (errJson?.message) errorMsg = errJson.message;
-    } catch {
-      // ignore
+    // Ignore a stale response if another request has already signed in again.
+    if (response.status === 401 && localStorage.getItem(TOKEN_KEY) === token) {
+      storeToken(null);
     }
-    throw new Error(errorMsg);
-  }
 
-  return response.json() as Promise<T>;
+    if (!response.ok) {
+      let errorMsg = `HTTP Error ${response.status}: ${response.statusText}`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.detail) errorMsg = errJson.detail;
+        else if (errJson?.message) errorMsg = errJson.message;
+      } catch {
+        // Keep the HTTP error if the server did not send JSON.
+      }
+      throw new Error(errorMsg);
+    }
+
+    return await response.json() as T;
+  } catch (error) {
+    if (timedOut) throw new Error('The request timed out. Check your connection and try again.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    options.signal?.removeEventListener('abort', abort);
+  }
 }
 
 export class AdminClient {
@@ -88,11 +114,11 @@ export class AdminClient {
   }
 
   setToken(token: string): void {
-    localStorage.setItem(TOKEN_KEY, token);
+    storeToken(token);
   }
 
   clearToken(): void {
-    localStorage.removeItem(TOKEN_KEY);
+    storeToken(null);
   }
 
   async login(email: string, password: string): Promise<{ accessToken: string; user: any }> {
