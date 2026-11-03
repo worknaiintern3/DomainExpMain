@@ -66,3 +66,15 @@ there as root for first setup. Normal automated updates should use GitHub Action
 Renewal is managed by `/etc/cron.d/domainexp-admin-ssl`, invoking
 `/usr/local/sbin/domainexp-admin-renew-ssl`. It renews only the admin certificate
 and gracefully reloads Nginx only when the certificate changed and `nginx -t` passes.
+
+## Production verification
+
+On 2026-11-03 the API authentication fix deployed successfully in
+[production run 41597730212](https://github.com/worknaiintern3/DomainExpMain/actions/runs/41597730212).
+The first admin build, packaged Docker smoke tests, certificate issuance, domain
+installation, renewal setup and public deployment checks succeeded in
+[admin setup run 41598114803](https://github.com/worknaiintern3/DomainExpMain/actions/runs/41598114803).
+Independent public checks returned HTTPS 200 with the admin identity header,
+JSON from the API proxy, 401 for anonymous admin stats and invalid credentials,
+and 404 for the removed privileged session issuer. Successful sign-in with a real
+administrator account has not been exercised because no credentials were supplied.
