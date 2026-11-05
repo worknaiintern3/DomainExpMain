@@ -4,13 +4,13 @@ const PRODUCTION_API_URL = 'https://app.domainexprt.com/api/v1';
 const LOCAL_BACKEND_URL = 'http://192.168.1.39:4000/api/v1';
 
 const getInitialApiUrl = (): string => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:4000/api/v1';
-  }
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  return 'http://localhost:4000/api/v1';
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:4000/api/v1';
+  }
+  return PRODUCTION_API_URL;
 };
 
 export const API_CONFIG = {

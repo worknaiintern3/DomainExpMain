@@ -566,20 +566,26 @@ export default function MoreScreen() {
 
   const testApiConnection = async (targetUrl?: string) => {
     const urlToTest = (targetUrl || apiDraftUrl || currentApiUrl).trim();
+    if (!urlToTest) return;
     setApiConnectionStatus('testing');
     setApiPingLatency(null);
     const start = Date.now();
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6000);
-      const res = await fetch(`${urlToTest.replace(/\/+$/, '')}/domains?limit=1`, {
+      const cleanUrl = urlToTest.replace(/\/+$/, '');
+      const healthUrl = cleanUrl.endsWith('/api/v1')
+        ? `${cleanUrl}/mobile/config`
+        : `${cleanUrl}/health`;
+
+      const res = await fetch(healthUrl, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         signal: controller.signal,
       });
       clearTimeout(timeout);
       const latency = Date.now() - start;
-      if (res.ok || res.status === 401 || res.status === 200) {
+      if (res.ok || res.status === 200 || res.status === 304 || res.status === 401) {
         setApiConnectionStatus('online');
         setApiPingLatency(latency);
         showFeedback('Connection Successful', `Connected to DomainExpert API in ${latency}ms!`, 'success');
@@ -589,7 +595,7 @@ export default function MoreScreen() {
       }
     } catch (err: any) {
       setApiConnectionStatus('offline');
-      showFeedback('Connection Failed', 'Could not reach DomainExpert API at this address. Check if server is running.', 'error');
+      showFeedback('Connection Failed', `Could not reach DomainExpert API at this address. Check if server is running.`, 'error');
     }
   };
 
@@ -3271,6 +3277,161 @@ export default function MoreScreen() {
                           </TouchableOpacity>
                         );
                       })}
+                    </View>
+                    {/* BACKEND & API SERVER CONFIGURATION */}
+                    <View style={{ marginTop: Spacing.lg, padding: Spacing.md, backgroundColor: colors.surfaceHighlight, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                          🌐 Backend & API Environment
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 4,
+                              backgroundColor:
+                                apiConnectionStatus === 'online'
+                                  ? '#10b981'
+                                  : apiConnectionStatus === 'testing'
+                                  ? '#f59e0b'
+                                  : apiConnectionStatus === 'offline'
+                                  ? '#ef4444'
+                                  : '#94a3b8',
+                            }}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '600',
+                              color:
+                                apiConnectionStatus === 'online'
+                                  ? '#10b981'
+                                  : apiConnectionStatus === 'offline'
+                                  ? '#ef4444'
+                                  : colors.textMuted,
+                            }}
+                          >
+                            {apiConnectionStatus === 'online'
+                              ? `Online (${apiPingLatency ?? 0}ms)`
+                              : apiConnectionStatus === 'testing'
+                              ? 'Testing...'
+                              : apiConnectionStatus === 'offline'
+                              ? 'Offline'
+                              : 'Not checked'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: Spacing.sm }}>
+                        Active target: {currentApiUrl}
+                      </Text>
+
+                      {/* Quick Switch Presets */}
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: Spacing.sm }}>
+                        {[
+                          {
+                            label: '🌐 Live Cloud',
+                            url: 'https://app.domainexprt.com/api/v1',
+                          },
+                          {
+                            label: '💻 Localhost (4000)',
+                            url: 'http://localhost:4000/api/v1',
+                          },
+                          {
+                            label: '📱 LAN / WiFi (192.168.1.39)',
+                            url: 'http://192.168.1.39:4000/api/v1',
+                          },
+                          {
+                            label: '🤖 Android Emulator',
+                            url: 'http://10.0.2.2:4000/api/v1',
+                          },
+                        ].map((preset) => {
+                          const isActive = currentApiUrl === preset.url;
+                          return (
+                            <TouchableOpacity
+                              key={preset.url}
+                              onPress={() => handleSaveApiUrl(preset.url)}
+                              activeOpacity={0.7}
+                              style={{
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                backgroundColor: isActive ? colors.primary : colors.surfaceElevated,
+                                borderWidth: 1,
+                                borderColor: isActive ? colors.primary : colors.border,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: isActive ? '700' : '500',
+                                  color: isActive ? '#ffffff' : colors.text,
+                                }}
+                              >
+                                {isActive ? `✓ ${preset.label}` : preset.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Custom API URL Input */}
+                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                        <TextInput
+                          value={apiDraftUrl}
+                          onChangeText={setApiDraftUrl}
+                          placeholder="https://app.domainexprt.com/api/v1"
+                          placeholderTextColor={colors.textMuted}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          style={{
+                            flex: 1,
+                            height: 38,
+                            paddingHorizontal: 10,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            backgroundColor: colors.surface,
+                            color: colors.text,
+                            fontSize: 12,
+                          }}
+                        />
+                        <TouchableOpacity
+                          onPress={() => testApiConnection()}
+                          activeOpacity={0.7}
+                          style={{
+                            paddingHorizontal: 12,
+                            height: 38,
+                            borderRadius: 8,
+                            backgroundColor: colors.surfaceElevated,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>
+                            Test
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleSaveApiUrl()}
+                          activeOpacity={0.7}
+                          style={{
+                            paddingHorizontal: 12,
+                            height: 38,
+                            borderRadius: 8,
+                            backgroundColor: colors.primary,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#ffffff' }}>
+                            Apply
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
                 )}
