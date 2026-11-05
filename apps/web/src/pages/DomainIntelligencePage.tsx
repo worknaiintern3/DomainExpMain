@@ -80,7 +80,9 @@ export const DomainIntelligencePage: React.FC = () => {
     setAvailabilityLoading(true);
     setAvailabilityError(null);
     try {
-      setAvailability(await checkWhoisAvailability(domain.split('.')[0] ?? domain, TLDS));
+      const ext = domain.includes('.') ? '.' + domain.split('.').slice(1).join('.') : null;
+      const tldList = ext && !TLDS.includes(ext) ? [ext, ...TLDS] : TLDS;
+      setAvailability(await checkWhoisAvailability(domain.split('.')[0] ?? domain, tldList));
     } catch (error) {
       setAvailabilityError(message(error));
     } finally {

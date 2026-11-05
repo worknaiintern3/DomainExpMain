@@ -90,4 +90,22 @@ describe('FindDomainPage availability search', () => {
     expect(screen.getAllByText('example.in').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Check failed').length).toBeGreaterThan(0);
   });
+
+  it('searches full domain with custom extension like mobilepay.cafe', async () => {
+    searchMock.mockResolvedValue([
+      availability('mobilepay.cafe', false),
+      availability('mobilepay.com', false),
+      availability('mobilepay.in', true),
+    ]);
+    renderPage();
+    searchFor('mobilepay.cafe');
+
+    await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(1));
+    expect(searchMock.mock.calls[0]?.[0]).toBe('mobilepay');
+    expect(searchMock.mock.calls[0]?.[1]).toContain('.cafe');
+    await waitFor(() => {
+      expect(screen.getAllByText('mobilepay.cafe').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('mobilepay.in').length).toBeGreaterThan(0);
+    });
+  });
 });

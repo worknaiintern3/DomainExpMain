@@ -12,6 +12,7 @@ const TLD_PRICES: Record<string, number> = {
   '.co': 1899,
   '.io': 3200,
   '.ai': 5800,
+  '.cafe': 1299,
 };
 
 const dnsMemoryCache = new Map<string, { result: { isRegistered: boolean; nameservers: string[] }; timestamp: number }>();
@@ -164,12 +165,18 @@ export async function searchMultipleTlds(
 ): Promise<DomainSearchResult[]> {
   const cleanKeyword = keyword.trim().toLowerCase().replace(/^https?:\/\//, '');
   const firstSegment = cleanKeyword.split('/')[0] ?? '';
-  const base = firstSegment.replace(/\.[a-z0-9.]+$/i, '');
+  const lastDot = firstSegment.lastIndexOf('.');
+  const explicitExt = lastDot >= 0 ? firstSegment.slice(lastDot) : null;
+  const base = explicitExt ? firstSegment.slice(0, lastDot) : firstSegment;
   if (!base) return [];
+
+  const effectiveTlds = explicitExt && !selectedTlds.includes(explicitExt)
+    ? [explicitExt, ...selectedTlds]
+    : selectedTlds;
 
   // 1. Blazing-fast backend native UDP DNS (< 100ms)
   try {
-    const tldParam = selectedTlds.join(',');
+    const tldParam = effectiveTlds.join(',');
     const backendResults = await apiGet<
       Array<{ domain: string; tld: string; available: boolean; nameservers: string[] }>
     >(`/whois/availability?query=${encodeURIComponent(base)}&tlds=${encodeURIComponent(tldParam)}`, {
@@ -211,7 +218,7 @@ export async function searchMultipleTlds(
   }
 
   // 2. Client-side DNS check fallback with progressive reporting
-  const promises = selectedTlds.map(async (tld) => {
+  const promises = effectiveTlds.map(async (tld) => {
     const fullDomain = `${base}${tld.startsWith('.') ? tld : `.${tld}`}`;
     const result = await searchDomainAvailability(fullDomain);
     if (onPartialResult) onPartialResult(result);

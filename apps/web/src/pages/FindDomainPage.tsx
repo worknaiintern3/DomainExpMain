@@ -26,6 +26,9 @@ import { usePreferences } from '@/preferences/PreferencesContext';
 import { getActiveCurrency } from '@/lib/currency';
 
 import { useSearchParams } from 'react-router-dom';
+import { WhoisDetailsModal } from '@/components/whois/WhoisDetailsModal';
+import { lookupWhois } from '@/api/whois';
+import type { NormalizedWhoisData } from '@/api/whois.types';
 
 interface LiveRow {
   item: TldAvailabilityItem;
@@ -36,14 +39,21 @@ interface LiveRow {
 function expandSearchDomains(input: string, tlds: string[]): string[] {
   const trimmed = input.trim().toLowerCase().replace(/\.$/u, '');
   if (trimmed.length === 0) return [];
-  if (trimmed.includes('.')) return [trimmed];
+  if (trimmed.includes('.')) {
+    const lastDot = trimmed.lastIndexOf('.');
+    const base = trimmed.slice(0, lastDot).replace(/[^a-z0-9-]/gu, '');
+    const explicitTld = trimmed.slice(lastDot);
+    if (!base) return [];
+    const others = tlds.filter((tld) => tld !== explicitTld).map((tld) => `${base}${tld}`);
+    return [`${base}${explicitTld}`, ...others];
+  }
   const keyword = trimmed.replace(/[^a-z0-9-]/gu, '');
   if (keyword.length === 0) return [];
   return tlds.map((tld) => `${keyword}${tld}`);
 }
 
 function tldOf(domain: string): string {
-  const dot = domain.indexOf('.');
+  const dot = domain.lastIndexOf('.');
   return dot >= 0 ? domain.slice(dot) : '';
 }
 
@@ -179,6 +189,24 @@ export const FindDomainPage: React.FC = () => {
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [whoisModalDomain, setWhoisModalDomain] = useState<string | null>(null);
+  const [whoisData, setWhoisData] = useState<NormalizedWhoisData | null>(null);
+  const [whoisLoading, setWhoisLoading] = useState(false);
+  const [whoisError, setWhoisError] = useState<string | null>(null);
+
+  const handleOpenWhois = async (domainName: string) => {
+    setWhoisModalDomain(domainName);
+    setWhoisLoading(true);
+    setWhoisError(null);
+    try {
+      const data = await lookupWhois(domainName);
+      setWhoisData(data);
+    } catch (err: any) {
+      setWhoisError(err?.message || 'Failed to fetch WHOIS record');
+    } finally {
+      setWhoisLoading(false);
+    }
+  };
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const initialSearchTriggeredRef = useRef(false);
@@ -277,7 +305,7 @@ export const FindDomainPage: React.FC = () => {
     let nextRows: LiveRow[];
     try {
       const firstDomain = domains[0] as string;
-      const base = firstDomain.slice(0, firstDomain.indexOf('.'));
+      const base = firstDomain.slice(0, firstDomain.lastIndexOf('.'));
       const results = await searchDomainAvailabilityAcrossTlds(
         base,
         domains.map(tldOf),
@@ -476,6 +504,7 @@ export const FindDomainPage: React.FC = () => {
               onSelectDomain={handleSelectDomain}
               onToggleWatchlist={handleToggleWatchlist}
               onCompareRegistrars={handleSelectDomain}
+              onOpenWhois={handleOpenWhois}
             />
           </div>
 
@@ -489,6 +518,7 @@ export const FindDomainPage: React.FC = () => {
                 requestError={inspectorError}
                 onToggleWatchlist={handleToggleWatchlistFromInspector}
                 isSaved={savedSet.has(inspectorDomain)}
+                onOpenWhois={handleOpenWhois}
               />
             )}
 
@@ -545,6 +575,17 @@ export const FindDomainPage: React.FC = () => {
 
       {/* State 3: Empty State */}
       {searchState === 'empty' && <SearchEmptyState onSelectPrompt={handleSearch} />}
+
+      {whoisModalDomain && (
+        <WhoisDetailsModal
+          data={whoisData}
+          isOpen={Boolean(whoisModalDomain)}
+          onClose={() => setWhoisModalDomain(null)}
+          loading={whoisLoading}
+          error={whoisError}
+          onRefresh={() => whoisModalDomain && void handleOpenWhois(whoisModalDomain)}
+        />
+      )}
 
       {/* State 4: Error State */}
       {searchState === 'error' && (

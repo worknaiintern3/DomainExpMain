@@ -7,6 +7,7 @@ interface TldAvailabilityResultsProps {
   onSelectDomain: (domain: string, status: DomainAvailabilityStatus) => void;
   onToggleWatchlist: (item: TldAvailabilityItem) => void;
   onCompareRegistrars: (domain: string) => void;
+  onOpenWhois?: (domain: string) => void;
 }
 
 export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
@@ -15,6 +16,7 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
   onSelectDomain,
   onToggleWatchlist,
   onCompareRegistrars,
+  onOpenWhois,
 }) => {
   const [filterType, setFilterType] = useState<'all' | 'available' | 'registered'>('all');
 
@@ -253,6 +255,16 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                         </button>
                       ) : (
                         <>
+                          {onOpenWhois && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenWhois(item.domain)}
+                              className="h-7 px-2.5 rounded bg-primary/10 hover:bg-primary/20 text-primary font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer"
+                              title="Inspect Live WHOIS Data"
+                            >
+                              WHOIS
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => onSelectDomain(item.domain, 'registered')}
@@ -277,6 +289,13 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                 </tr>
               );
             })}
+            {filteredItems.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-unit-md py-8 text-center text-secondary text-body-sm">
+                  No extensions match the selected &quot;{filterType}&quot; filter.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

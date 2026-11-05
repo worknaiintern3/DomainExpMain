@@ -16,6 +16,7 @@ interface DomainLiveInspectorProps {
   requestError: string | null;
   onToggleWatchlist?: (domain: string) => void;
   isSaved?: boolean;
+  onOpenWhois?: (domain: string) => void;
 }
 
 function stateBadge(state: DomainAvailabilityResult['state']): string {
@@ -57,6 +58,7 @@ export const DomainLookupInspector: React.FC<DomainLiveInspectorProps> = ({
   requestError,
   onToggleWatchlist,
   isSaved,
+  onOpenWhois,
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const isAvailable = status === 'available';
@@ -161,6 +163,16 @@ export const DomainLookupInspector: React.FC<DomainLiveInspectorProps> = ({
 
           {/* Action Buttons */}
           <div className="grid grid-cols-1 gap-unit-xs pt-1">
+            {status === 'registered' && onOpenWhois && (
+              <button
+                type="button"
+                onClick={() => onOpenWhois(domain)}
+                className="h-8 px-2 rounded-lg font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">fingerprint</span>
+                <span>View Full WHOIS &amp; DNS Details</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onToggleWatchlist && onToggleWatchlist(domain)}

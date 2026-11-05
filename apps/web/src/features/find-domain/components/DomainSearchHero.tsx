@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FindDomainSummary } from '../findDomain.types';
 import { SUPPORTED_TLDS, RECENT_SEARCH_KEYWORDS } from '../findDomain.reference';
 
@@ -24,6 +24,10 @@ export const DomainSearchHero: React.FC<DomainSearchHeroProps> = ({
   showSummary,
 }) => {
   const [inputValue, setInputValue] = useState(query);
+
+  useEffect(() => {
+    setInputValue(query);
+  }, [query]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -130,7 +134,7 @@ export const DomainSearchHero: React.FC<DomainSearchHeroProps> = ({
                   key={kw}
                   type="button"
                   onClick={() => handleRecentClick(kw)}
-                  className="px-2 py-0.5 rounded bg-surface-container-low hover:bg-surface-container text-on-surface font-label-mono text-[11px] transition-colors border border-outline-variant/20 cursor-pointer"
+                  className="rounded-md bg-surface-container px-2 py-0.5 text-secondary hover:bg-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                 >
                   {kw}
                 </button>
@@ -140,24 +144,10 @@ export const DomainSearchHero: React.FC<DomainSearchHeroProps> = ({
         </form>
       </div>
 
-      {/* Search Summary Metric Strip */}
-      {showSummary && (
-        <div className="w-full bg-surface-container-lowest rounded-xl shadow-sm px-unit-md py-2.5 flex flex-wrap items-center justify-between gap-unit-sm border border-outline-variant/30">
-          <div className="flex items-center flex-wrap gap-unit-md text-caption-xs font-caption-xs">
-            <div className="flex items-center gap-unit-xs">
-              <span className="text-secondary">Active Query:</span>
-              <span className="font-label-mono font-semibold text-body-sm text-primary">
-                {summary.activeQuery}
-              </span>
-            </div>
-            <div className="h-3 w-px bg-outline-variant hidden sm:block"></div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-              <span className="text-on-surface font-medium">
-                {summary.extensionsCheckedCount} extensions checked
-              </span>
-            </div>
-            <div className="h-3 w-px bg-outline-variant hidden sm:block"></div>
+      {/* Live Search Quick Metrics Sub-bar */}
+      {showSummary && summary && (
+        <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-unit-md py-unit-xs shadow-xs flex flex-wrap items-center justify-between gap-unit-sm text-caption-xs font-caption-xs animate-in fade-in duration-200">
+          <div className="flex flex-wrap items-center gap-unit-md">
             <div className="flex items-center gap-unit-xs">
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-caption-xs font-semibold bg-emerald-50 text-emerald-800 shadow-sm border border-emerald-200/50">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
@@ -174,7 +164,9 @@ export const DomainSearchHero: React.FC<DomainSearchHeroProps> = ({
               <span className="font-label-mono text-on-surface font-semibold text-emerald-700">
                 {summary.lowestRegPriceFormatted}
               </span>
-              <span className="text-outline">{summary.lowestRegDetails}</span>
+              {summary.lowestRegDetails && (
+                <span className="text-[10px] text-outline">{summary.lowestRegDetails}</span>
+              )}
             </div>
           </div>
           <span className="text-[11px] font-mono text-secondary bg-surface-container-low px-2 py-0.5 rounded">

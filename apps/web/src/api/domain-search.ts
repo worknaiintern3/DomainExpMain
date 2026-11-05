@@ -152,6 +152,12 @@ export const TLD_PRICING: Record<string, TldPricingMap> = {
     namecheap: { registration: 298, renewal: 4998, transfer: 298 },
     godaddy: { registration: 399, renewal: 5499, transfer: 399 },
   },
+  '.cafe': {
+    cloudflare: { registration: 2800, renewal: 2800, transfer: 2800 },
+    hostinger: { registration: 1299, renewal: 3499, transfer: 1299 },
+    namecheap: { registration: 2798, renewal: 3298, transfer: 2798 },
+    godaddy: { registration: 3299, renewal: 4499, transfer: 3299 },
+  },
   '.info': {
     cloudflare: { registration: 1600, renewal: 1900, transfer: 1600 },
     hostinger: { registration: 399, renewal: 2299, transfer: 399 },

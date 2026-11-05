@@ -290,10 +290,13 @@ export const DomainsPage: React.FC = () => {
         d.dnsProvider.toLowerCase().includes(q) ||
         d.tags.some((t) => t.toLowerCase().includes(q));
 
-      if (filter === 'Critical') return matchesSearch && d.status === 'critical';
-      if (filter === 'Warning') return matchesSearch && d.status === 'warning';
-      if (filter === 'Safe') return matchesSearch && d.status === 'safe';
-      return matchesSearch;
+      if (!matchesSearch) return false;
+      if (!q) {
+        if (filter === 'Critical') return d.status === 'critical';
+        if (filter === 'Warning') return d.status === 'warning';
+        if (filter === 'Safe') return d.status === 'safe';
+      }
+      return true;
     });
   }, [domains, search, filter]);
 
