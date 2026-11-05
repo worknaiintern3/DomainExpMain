@@ -144,7 +144,7 @@ export function presentInventoryRecord(
     case 'provider-account':
       return {
         ...metadata(result.record),
-        externalAccountId: result.record.externalAccountId,
+        externalAccountId: sanitizeExternalAccountId(result.record.externalAccountId),
         label: result.record.label,
         loginEmailAccountId: result.record.loginEmailAccountId,
         notes: result.record.notes,
@@ -200,6 +200,19 @@ export function presentInventoryRecord(
         projectId: result.record.projectId,
       };
   }
+}
+
+function sanitizeExternalAccountId(extId?: string | null): string | null {
+  if (!extId) return null;
+  const trimmed = extId.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.accessKeyId) return parsed.accessKeyId;
+    } catch {}
+    return 'Configured';
+  }
+  return trimmed;
 }
 
 export class InventoryResourceHttpHandler<TCreate, TUpdate> {

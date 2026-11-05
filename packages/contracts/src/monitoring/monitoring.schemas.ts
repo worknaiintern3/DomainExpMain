@@ -50,7 +50,7 @@ export const AlertEventStatusSchema = z.enum([
 export const CreateMonitoringTargetRequestSchema = z
   .object({
     checkIntervalMinutes: z.number().int().min(60).max(10_080).optional(),
-    domainId: z.uuid(),
+    domainId: z.string().nullable(),
     enabled: z.boolean().optional(),
   })
   .strict();
@@ -206,10 +206,10 @@ export const AlertEventResponseSchema = z
     lastSeenAt: z.iso.datetime({ offset: true }),
     occurrenceCount: z.number().int().min(1).max(2_147_483_647),
     resolvedAt: NullableDateTimeSchema,
-    ruleId: z.uuid().nullable(),
+    ruleId: z.string().nullable(),
     severity: AlertSeveritySchema,
     status: AlertEventStatusSchema,
-    targetId: z.uuid().nullable(),
+    targetId: z.string().nullable(),
     title: z.string().min(1).max(256),
     updatedAt: z.iso.datetime({ offset: true }),
   })

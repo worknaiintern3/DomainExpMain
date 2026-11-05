@@ -94,3 +94,15 @@ export function archiveInventory(
     method: 'DELETE',
   });
 }
+
+
+export function deleteInventory(
+  resource: InventoryResource,
+  id: string,
+  hard: boolean = true,
+): Promise<void> {
+  const query = hard ? '?hard=true' : '';
+  return apiRequest('/' + resource + '/' + encodeURIComponent(id) + query, {
+    method: 'DELETE',
+  });
+}

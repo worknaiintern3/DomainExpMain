@@ -1219,9 +1219,9 @@ export default function ApplicationsScreen() {
 
   const handleDeleteWebsite = async (site: WebsiteItem) => {
     try {
-      await deleteWebsite(site.id);
+      await deleteWebsite(site.id, site.name, site.url);
       setSelectedWebMenu(null);
-      setWebsites((prev) => prev.filter((w) => w.id !== site.id));
+      setWebsites((prev) => prev.filter((w) => w.id !== site.id && w.url !== site.url && w.name !== site.name));
       showFeedback('Website Removed', `"${site.name}" was removed from your websites list.`, 'info');
     } catch (err: any) {
       showFeedback('Delete Failed', err?.message || 'Could not remove website.', 'error');

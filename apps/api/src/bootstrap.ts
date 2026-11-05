@@ -43,8 +43,23 @@ export async function createApplication(): Promise<NestFastifyApplication> {
   );
   const config = app.get(AppConfigService);
 
-  const fastifyInstance = app.getHttpAdapter().getInstance();
+    const fastifyInstance = app.getHttpAdapter().getInstance();
   fastifyInstance.addHook('onRequest', (req: any, _reply: any, done: () => void) => {
+    // Strip Content-Type on DELETE, GET, HEAD or when body/content-length is empty to prevent FST_ERR_CTP_EMPTY_JSON_BODY
+    const method = req?.raw?.method?.toUpperCase();
+    const contentLength = req?.raw?.headers?.['content-length'];
+    if (
+      method === 'DELETE' ||
+      method === 'GET' ||
+      method === 'HEAD' ||
+      contentLength === '0' ||
+      contentLength === 0
+    ) {
+      if (req?.raw?.headers && req.raw.headers['content-type']) {
+        delete req.raw.headers['content-type'];
+      }
+    }
+
     if (req?.raw && typeof req.raw.url === 'string') {
       if (req.raw.url.startsWith('/api/google-play/')) {
         req.raw.url = req.raw.url.replace('/api/google-play/', '/api/v1/google-play/');

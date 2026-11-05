@@ -1,3 +1,4 @@
+import { listProviderConnections, triggerProviderConnectionSync } from '../api/provider-connections';
 import { listInventory, createInventory, updateInventory, archiveInventory } from '../api/inventory';
 import {
   syncPlayStoreDeveloper,
@@ -1204,6 +1205,7 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
             tags: ['Live', `${extractedRegistrar} Portfolio`],
             notes: b.notes || undefined,
             logoUrl: `https://www.google.com/s2/favicons?domain=${cleanName}&sz=128`,
+            providerAccountId: (b as any).registrarProviderAccountId || (b as any).dnsProviderAccountId || undefined,
             providerLabel: extractedRegistrar,
             ...(isHostingerVps ? {
               serverName: 'srv1357339.hstgr.cloud',
@@ -1217,7 +1219,11 @@ export async function fetchDomainsList(options?: { forceRefresh?: boolean }): Pr
           const locName = (loc.name || '').toLowerCase().trim();
           const existsById = Array.from(map.values()).some((d) => d.id === loc.id);
           if (locName && !map.has(locName) && !existsById) {
-            map.set(locName, loc);
+            // Never resurrect backend items or provider items that were deleted from the backend
+            const isBackendId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(loc.id);
+            if (!isBackendId && !loc.providerAccountId && !loc.tags?.some((t) => t.includes('Portfolio'))) {
+              map.set(locName, loc);
+            }
           }
         }
         const merged = Array.from(map.values());
@@ -1412,6 +1418,7 @@ export async function fetchServersList(options?: { forceRefresh?: boolean }): Pr
             memoryUsagePercent: ramUsage,
             diskUsagePercent: diskUsage,
             connectedDomains: Array.from(new Set([...uniqueDomains, ...(localMatch?.connectedDomains || [])])),
+            providerAccountId: (b as any).providerAccountId || undefined,
             sshPort: 22,
             sshStatus: isSuspended ? 'suspended' : 'protected',
           });
@@ -1422,7 +1429,10 @@ export async function fetchServersList(options?: { forceRefresh?: boolean }): Pr
           const locKey = (loc.name || '').toLowerCase().trim();
           const existsById = Array.from(map.values()).some((s) => s.id === loc.id);
           if (locKey && !map.has(locKey) && !existsById) {
-            map.set(locKey, loc);
+            const isBackendId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(loc.id);
+            if (!isBackendId && !(loc as any).providerAccountId && loc.providerKey !== 'hostinger') {
+              map.set(locKey, loc);
+            }
           }
         }
 
@@ -1558,11 +1568,16 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
     const local = getLocal<WebsiteItem[]>(STORAGE_KEYS.WEBSITES, []);
     const cleanLocal = local.filter((w) => {
       if (!w?.id) return false;
-      if (w.id.startsWith('web-worknai') || w.id.startsWith('web-hrms') || w.id.startsWith('web-aitourism') || w.id.startsWith('web-goairclass') || w.id.startsWith('web-blooddonation') || w.id.startsWith('web-gymproplus')) return false;
       const idKey = (w.id || '').toLowerCase().trim();
       const nameKey = (w.name || '').toLowerCase().trim();
       const domKey = (w.domain || '').toLowerCase().trim();
-      if (deletedKeys.has(idKey) || deletedKeys.has(nameKey) || (domKey && deletedKeys.has(domKey))) {
+      const urlKey = (w.url || '').toLowerCase().trim();
+      if (
+        deletedKeys.has(idKey) ||
+        deletedKeys.has(nameKey) ||
+        (domKey && deletedKeys.has(domKey)) ||
+        (urlKey && deletedKeys.has(urlKey))
+      ) {
         return false;
       }
       return true;
@@ -1579,11 +1594,30 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
       if (appRes?.items && Array.isArray(appRes.items)) {
         for (const app of appRes.items) {
           if ((app as any).kind === 'MOBILE_APPLICATION' || (app as any).provenance === 'PLAY_STORE_SYNC') continue;
-          const dom = ((app as any).domainId || app.name || '').toLowerCase().trim();
+          if ((app as any).inventoryState === 'ARCHIVED') continue;
+
+          let appUrl = app.primaryUrl || '';
+          let dom = '';
+          if (appUrl) {
+            try {
+              dom = new URL(appUrl).hostname.toLowerCase();
+            } catch {}
+          }
+          if (!dom) dom = ((app as any).domainId || app.name || '').toLowerCase().trim();
           if (!dom) continue;
+
           const appId = (app.id || '').toLowerCase().trim();
           const appName = (app.name || '').toLowerCase().trim();
-          if (deletedKeys.has(appId) || deletedKeys.has(appName) || deletedKeys.has(dom)) continue;
+          const normAppUrl = appUrl.toLowerCase().trim();
+
+          if (
+            deletedKeys.has(appId) ||
+            deletedKeys.has(appName) ||
+            deletedKeys.has(dom) ||
+            (normAppUrl && deletedKeys.has(normAppUrl))
+          ) {
+            continue;
+          }
 
           map.set(dom, {
             id: app.id,
@@ -1606,10 +1640,13 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
 
       if (domRes?.items && Array.isArray(domRes.items)) {
         for (const d of domRes.items) {
+          if (d.inventoryState === 'ARCHIVED') continue;
           const dom = (d.domainName || '').toLowerCase().trim();
           if (!dom || map.has(dom)) continue;
           const dId = (d.id || '').toLowerCase().trim();
-          if (deletedKeys.has(dId) || deletedKeys.has(dom)) continue;
+          const dUrl = `https://${dom}`.toLowerCase();
+
+          if (deletedKeys.has(dId) || deletedKeys.has(dom) || deletedKeys.has(dUrl)) continue;
 
           map.set(dom, {
             id: d.id,
@@ -1630,16 +1667,46 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
         }
       }
 
-      // Merge cleanLocal websites that aren't already represented from backend
+      // Merge cleanLocal websites, preserving any custom user updates (category, notes, server, etc.)
       for (const loc of cleanLocal) {
         const locKey = (loc.domain || loc.name || '').toLowerCase().trim();
-        const existsById = Array.from(map.values()).some((w) => w.id === loc.id);
-        if (locKey && !map.has(locKey) && !existsById) {
-          map.set(locKey, loc);
+        if (!locKey) continue;
+        const locId = (loc.id || '').toLowerCase().trim();
+        const locUrl = (loc.url || '').toLowerCase().trim();
+        if (deletedKeys.has(locId) || deletedKeys.has(locKey) || (locUrl && deletedKeys.has(locUrl))) continue;
+
+        if (map.has(locKey)) {
+          const existing = map.get(locKey)!;
+          map.set(locKey, {
+            ...existing,
+            name: loc.name || existing.name,
+            category: loc.category || existing.category,
+            notes: loc.notes !== undefined ? loc.notes : existing.notes,
+            serverName: loc.serverName || existing.serverName,
+            serverIp: loc.serverIp || existing.serverIp,
+            url: loc.url || existing.url,
+          });
+        } else {
+          const isBackendId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(loc.id);
+          if (!isBackendId && !loc.tags?.some((t) => t.includes('Hostinger'))) {
+            map.set(locKey, loc);
+          }
         }
       }
 
-      const merged = Array.from(map.values());
+      const merged = Array.from(map.values()).filter((w) => {
+        const wId = (w.id || '').toLowerCase().trim();
+        const wName = (w.name || '').toLowerCase().trim();
+        const wDomain = (w.domain || '').toLowerCase().trim();
+        const wUrl = (w.url || '').toLowerCase().trim();
+        return (
+          !deletedKeys.has(wId) &&
+          !deletedKeys.has(wName) &&
+          !deletedKeys.has(wDomain) &&
+          !deletedKeys.has(wUrl)
+        );
+      });
+
       setLocal(STORAGE_KEYS.WEBSITES, merged);
       setMemoryCache(cacheKey, merged);
       return merged;
@@ -1769,7 +1836,17 @@ export async function syncAllProviders(): Promise<{
   totalWebsites: number;
   message: string;
 }> {
-  // Simulate live provider discovery and update storage
+  try {
+    const { items: connections } = await listProviderConnections();
+    const connected = connections.filter((c) => c.connectionStatus === 'CONNECTED');
+    if (connected.length > 0) {
+      await Promise.allSettled(
+        connected.map((c) => triggerProviderConnectionSync(c.id, crypto.randomUUID()))
+      );
+    }
+  } catch {}
+
+  // Fetch updated live inventory across all collections
   const domains = await fetchDomainsList({ forceRefresh: true });
   const servers = await fetchServersList({ forceRefresh: true });
   const apps = await fetchApplicationsList({ forceRefresh: true });
@@ -1798,6 +1875,16 @@ export async function syncSingleProvider(accountId: string): Promise<{
   totalApps: number;
   message: string;
 }> {
+  try {
+    const { items: connections } = await listProviderConnections();
+    const matching = connections.find(
+      (c) => (c.providerAccountId === accountId || c.id === accountId) && c.connectionStatus === 'CONNECTED'
+    );
+    if (matching) {
+      await triggerProviderConnectionSync(matching.id, crypto.randomUUID());
+    }
+  } catch {}
+
   const domains = await fetchDomainsList({ forceRefresh: true });
   const servers = await fetchServersList({ forceRefresh: true });
   const apps = await fetchApplicationsList();
@@ -2083,6 +2170,8 @@ export async function createWebsite(data: {
   url: string;
   category: 'Production' | 'Client' | 'Personal' | 'Staging' | 'Tools';
   notes?: string;
+  serverName?: string;
+  serverIp?: string;
 }): Promise<WebsiteItem> {
   let cleanUrl = data.url.trim();
   if (!/^https?:\/\//i.test(cleanUrl)) cleanUrl = `https://${cleanUrl}`;
@@ -2097,9 +2186,10 @@ export async function createWebsite(data: {
   const deleted = getLocal<string[]>(STORAGE_KEYS.DELETED_WEBSITES, []);
   const cleanNameLower = data.name.trim().toLowerCase();
   const domainLower = domain.toLowerCase();
+  const urlLower = cleanUrl.toLowerCase();
   setLocal(
     STORAGE_KEYS.DELETED_WEBSITES,
-    deleted.filter((k) => k !== cleanNameLower && k !== domainLower)
+    deleted.filter((k) => k !== cleanNameLower && k !== domainLower && k !== urlLower)
   );
 
   const isValidUrl = /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(cleanUrl);
@@ -2124,8 +2214,8 @@ export async function createWebsite(data: {
     category: data.category,
     status: 'healthy',
     domain,
-    serverName: 'srv1357339.hstgr.cloud',
-    serverIp: '76.13.185.120',
+    serverName: data.serverName || 'srv1357339.hstgr.cloud',
+    serverIp: data.serverIp || '76.13.185.120',
     sslActive: true,
     httpStatus: '200 OK',
     responseTimeMs: 28,
@@ -2141,7 +2231,8 @@ export async function createWebsite(data: {
       (w) =>
         w.id !== newSite.id &&
         (w.name || '').toLowerCase() !== newSite.name.toLowerCase() &&
-        (w.domain || '').toLowerCase() !== newSite.domain.toLowerCase(),
+        (w.domain || '').toLowerCase() !== newSite.domain.toLowerCase() &&
+        (w.url || '').toLowerCase() !== newSite.url.toLowerCase(),
     ),
   ];
   setLocal(STORAGE_KEYS.WEBSITES, updated);
@@ -2151,69 +2242,150 @@ export async function createWebsite(data: {
   return newSite;
 }
 
-export async function deleteWebsite(id: string, name?: string, domain?: string): Promise<void> {
+export async function updateWebsite(
+  id: string,
+  patch: {
+    name?: string;
+    url?: string;
+    category?: 'Production' | 'Client' | 'Personal' | 'Staging' | 'Tools';
+    notes?: string;
+    serverName?: string;
+    serverIp?: string;
+  }
+): Promise<WebsiteItem | null> {
+  const currentLocal = getLocal<WebsiteItem[]>(STORAGE_KEYS.WEBSITES, []);
+  const index = currentLocal.findIndex((w) => w.id === id);
+
+  let cleanUrl = patch.url?.trim();
+  let domain = '';
+  if (cleanUrl) {
+    if (!/^https?:\/\//i.test(cleanUrl)) cleanUrl = `https://${cleanUrl}`;
+    try {
+      domain = new URL(cleanUrl).hostname;
+    } catch {
+      domain = cleanUrl;
+    }
+  }
+
+  // Remove updated values from deleted tombstone
+  const deleted = getLocal<string[]>(STORAGE_KEYS.DELETED_WEBSITES, []);
+  const unblockKeys = new Set(
+    [
+      patch.name?.toLowerCase().trim(),
+      domain?.toLowerCase().trim(),
+      cleanUrl?.toLowerCase().trim(),
+    ].filter(Boolean) as string[]
+  );
+  if (unblockKeys.size > 0) {
+    setLocal(
+      STORAGE_KEYS.DELETED_WEBSITES,
+      deleted.filter((k) => !unblockKeys.has(k))
+    );
+  }
+
+  const existing = index !== -1 ? currentLocal[index] : null;
+  const updatedItem: WebsiteItem = {
+    id,
+    name: patch.name !== undefined ? patch.name.trim() : (existing?.name || 'Website'),
+    url: cleanUrl || existing?.url || `https://${domain || 'example.com'}`,
+    category: patch.category || existing?.category || 'Production',
+    status: existing?.status || 'healthy',
+    domain: domain || existing?.domain || (cleanUrl ? new URL(cleanUrl).hostname : ''),
+    serverName: patch.serverName !== undefined ? patch.serverName : (existing?.serverName || 'Hostinger VPS'),
+    serverIp: patch.serverIp !== undefined ? patch.serverIp : (existing?.serverIp || '76.13.185.120'),
+    sslActive: existing?.sslActive ?? true,
+    httpStatus: existing?.httpStatus || '200 OK',
+    responseTimeMs: existing?.responseTimeMs || 28,
+    tags: existing?.tags || ['Live Website', patch.category || 'Production'],
+    logoUrl: domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : existing?.logoUrl,
+    notes: patch.notes !== undefined ? patch.notes : existing?.notes,
+  };
+
+  const updatedList = index !== -1
+    ? currentLocal.map((w, idx) => (idx === index ? updatedItem : w))
+    : [updatedItem, ...currentLocal];
+
+  setLocal(STORAGE_KEYS.WEBSITES, updatedList);
+  setMemoryCache('websites_list', updatedList);
+  INFLIGHT_REQUESTS.delete('websites_list');
+
+  // Backend sync if UUID
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    const isValidUrl = cleanUrl ? /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(cleanUrl) : false;
+    await updateInventory('applications', id, {
+      name: patch.name ? patch.name.trim() : undefined,
+      primaryUrl: isValidUrl ? cleanUrl : undefined,
+      notes: patch.notes !== undefined ? patch.notes : undefined,
+    }).catch(() => {});
+  }
+
+  notifyPortfolioUpdated();
+  return updatedItem;
+}
+
+export async function deleteWebsite(id: string, name?: string, domain?: string, url?: string): Promise<void> {
   const cleanId = (id || '').toLowerCase().trim();
   const cleanName = (name || '').toLowerCase().trim();
-  const cleanDomain = (domain || '').toLowerCase().trim();
+  let cleanDomain = (domain || '').toLowerCase().trim();
+  let cleanUrl = (url || '').toLowerCase().trim();
+
+  if (!cleanDomain && cleanUrl) {
+    try {
+      cleanDomain = new URL(cleanUrl).hostname.toLowerCase();
+    } catch {}
+  }
 
   // Add to deleted keys tombstone
   const deleted = getLocal<string[]>(STORAGE_KEYS.DELETED_WEBSITES, []);
-  const toAdd = [cleanId, cleanName, cleanDomain].filter(Boolean);
-  setLocal(STORAGE_KEYS.DELETED_WEBSITES, Array.from(new Set([...deleted, ...toAdd])));
+  const toAdd = [
+    cleanId,
+    cleanName,
+    cleanDomain,
+    cleanUrl,
+    cleanUrl.replace(/^https?:\/\//i, '').replace(/\/+$/, ''),
+  ].filter(Boolean);
+  const updatedDeleted = Array.from(new Set([...deleted, ...toAdd]));
+  setLocal(STORAGE_KEYS.DELETED_WEBSITES, updatedDeleted);
 
   try {
-    // 1. Direct UUID archive
+    // 1. Direct UUID archive on applications
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
       await archiveInventory('applications', id).catch(() => {});
-      await archiveInventory('domains', id).catch(() => {});
     }
 
-    // 2. Query backend to find matching record by id, name or url domain and archive it
-    const [appRes, domRes] = await Promise.all([
-      listInventory('applications', { limit: 100 }).catch(() => null),
-      listInventory('domains', { limit: 100 }).catch(() => null),
-    ]);
-
+    // 2. Query backend applications to find matching record by id, name or url domain and archive it
+    const appRes = await listInventory('applications', { limit: 100 }).catch(() => null);
     if (appRes?.items && Array.isArray(appRes.items)) {
+      const tombstoneSet = new Set(updatedDeleted);
       const matches = appRes.items.filter((b: any) => {
         const bId = (b.id || '').toLowerCase().trim();
         const bName = (b.name || '').toLowerCase().trim();
         const bUrl = (b.primaryUrl || '').toLowerCase();
+        let bDom = '';
+        try {
+          if (bUrl) bDom = new URL(bUrl).hostname.toLowerCase();
+        } catch {}
         return (
-          bId === cleanId ||
-          (cleanName && bName === cleanName) ||
-          (cleanDomain && (bUrl.includes(cleanDomain) || bName === cleanDomain))
+          tombstoneSet.has(bId) ||
+          tombstoneSet.has(bName) ||
+          (bUrl && tombstoneSet.has(bUrl)) ||
+          (bDom && tombstoneSet.has(bDom))
         );
       });
       await Promise.allSettled(matches.map((m: any) => archiveInventory('applications', m.id).catch(() => {})));
-    }
-
-    if (domRes?.items && Array.isArray(domRes.items)) {
-      const matches = domRes.items.filter((d: any) => {
-        const dId = (d.id || '').toLowerCase().trim();
-        const dName = (d.domainName || '').toLowerCase().trim();
-        return (
-          dId === cleanId ||
-          (cleanName && dName === cleanName) ||
-          (cleanDomain && dName === cleanDomain)
-        );
-      });
-      await Promise.allSettled(matches.map((m: any) => archiveInventory('domains', m.id).catch(() => {})));
     }
   } catch (err) {
     console.warn('Backend archiveInventory failed:', err);
   }
 
   const currentLocal = getLocal<WebsiteItem[]>(STORAGE_KEYS.WEBSITES, []);
+  const tombstoneSet = new Set(updatedDeleted);
   const updated = currentLocal.filter((w) => {
     const wId = (w.id || '').toLowerCase().trim();
     const wName = (w.name || '').toLowerCase().trim();
     const wDomain = (w.domain || '').toLowerCase().trim();
-    return (
-      wId !== cleanId &&
-      (!cleanName || wName !== cleanName) &&
-      (!cleanDomain || wDomain !== cleanDomain)
-    );
+    const wUrl = (w.url || '').toLowerCase().trim();
+    return !tombstoneSet.has(wId) && !tombstoneSet.has(wName) && !tombstoneSet.has(wDomain) && !tombstoneSet.has(wUrl);
   });
   setLocal(STORAGE_KEYS.WEBSITES, updated);
   setMemoryCache('websites_list', updated);
@@ -2338,4 +2510,78 @@ export async function deleteApplication(id: string, name?: string, packageId?: s
   setMemoryCache('applications_list', updated);
   INFLIGHT_REQUESTS.delete('applications_list');
   notifyPortfolioUpdated();
+}
+
+
+export function cleanupDisconnectedProvider(providerAccountId: string, _providerKey?: string): void {
+  if (!providerAccountId && !_providerKey) return;
+  const pAccId = (providerAccountId || '').toLowerCase().trim();
+
+  // 1. Clean Domains
+  const domains = getLocal<DomainItem[]>(STORAGE_KEYS.DOMAINS, []);
+  const removedDomainNames: string[] = [];
+  const remainingDomains = domains.filter((d) => {
+    const dAccId = (d.providerAccountId || '').toLowerCase().trim();
+    const matchesAccId = pAccId && (dAccId === pAccId || (d as any).registrarProviderAccountId === pAccId || (d as any).dnsProviderAccountId === pAccId);
+    if (matchesAccId) {
+      if (d.name) removedDomainNames.push(d.name.toLowerCase().trim());
+      return false;
+    }
+    return true;
+  });
+  setLocal(STORAGE_KEYS.DOMAINS, remainingDomains);
+
+  // 2. Clean Servers
+  const servers = getLocal<ServerItem[]>(STORAGE_KEYS.SERVERS, []);
+  const remainingServers = servers.filter((s) => {
+    const sAccId = ((s as any).providerAccountId || '').toLowerCase().trim();
+    const matchesAccId = pAccId && sAccId === pAccId;
+    if (matchesAccId) {
+      return false;
+    }
+    return true;
+  });
+  setLocal(STORAGE_KEYS.SERVERS, remainingServers);
+
+  // 3. Clean Websites that originated from the removed domains
+  const websites = getLocal<WebsiteItem[]>(STORAGE_KEYS.WEBSITES, []);
+  const remainingWebsites = websites.filter((w) => {
+    const wDomain = (w.domain || '').toLowerCase().trim();
+    const wName = (w.name || '').toLowerCase().trim();
+    if (removedDomainNames.includes(wDomain) || removedDomainNames.includes(wName)) {
+      return false;
+    }
+    return true;
+  });
+  setLocal(STORAGE_KEYS.WEBSITES, remainingWebsites);
+
+  // 4. Update Providers list in local storage
+  const providers = getLocal<ProviderAccountItem[]>(STORAGE_KEYS.PROVIDERS, []);
+  const updatedProviders = providers.map((p) => {
+    if (p.id === providerAccountId) {
+      return {
+        ...p,
+        syncedDomainsCount: 0,
+        syncedServersCount: 0,
+        lastSynced: 'Disconnected',
+      };
+    }
+    return p;
+  });
+  setLocal(STORAGE_KEYS.PROVIDERS, updatedProviders);
+
+  // 5. Invalidate memory cache and trigger portfolio updated notification
+  invalidatePortfolioCache();
+  notifyPortfolioUpdated();
+}
+
+
+export async function deleteProviderAccount(accountId: string): Promise<void> {
+  if (!accountId) return;
+  const { deleteInventory } = await import('@/api/inventory');
+  await deleteInventory('provider-accounts', accountId, true);
+  cleanupDisconnectedProvider(accountId);
+  INFLIGHT_REQUESTS.clear();
+  notifyPortfolioUpdated();
+  window.dispatchEvent(new Event('domainpulse:provider-connections-changed'));
 }

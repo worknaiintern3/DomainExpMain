@@ -57,3 +57,5 @@ backups/
 artifacts/
 *.dump
 scratch/
+
+*.zip

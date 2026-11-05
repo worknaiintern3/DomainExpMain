@@ -140,59 +140,16 @@ export interface WhoisAvailabilityItem {
   nameservers: string[];
 }
 
-export function getLiveWhois(
-  domain: string,
-  domainId?: string,
-  signal?: AbortSignal,
-): Promise<LiveWhoisData> {
-  const search = new URLSearchParams({ domain });
-  if (domainId) search.set('domainId', domainId);
-  return apiRequest(`/whois/live?${search}`, { signal });
-}
-
-export function getLiveDns(
-  domain: string,
-  signal?: AbortSignal,
-): Promise<LiveDnsData> {
-  const search = new URLSearchParams({ domain });
-  return apiRequest(`/whois/dns?${search}`, { signal });
-}
-
-export function getLiveSsl(
-  domain: string,
-  signal?: AbortSignal,
-): Promise<LiveSslData> {
-  const search = new URLSearchParams({ domain });
-  return apiRequest(`/whois/ssl?${search}`, { signal });
-}
-
-export function getHistoricalWhois(domain: string, signal?: AbortSignal): Promise<HistoricalWhoisData> {
-  return apiRequest(`/whois/historical?${new URLSearchParams({ domain })}`, { signal });
-}
-
-export function checkWhoisAvailability(
-  query: string,
-  tlds: readonly string[],
-  signal?: AbortSignal,
-): Promise<WhoisAvailabilityItem[]> {
-  return apiRequest(`/whois/availability?${new URLSearchParams({ query, tlds: tlds.join(',') })}`, { signal });
-}
-
-export function getWhoisHistory(limit = 20, signal?: AbortSignal): Promise<LiveWhoisData[]> {
-  return apiRequest(`/whois/history?${new URLSearchParams({ limit: String(limit) })}`, { signal });
-}
-
-export function refreshWhois(domainId: string): Promise<LiveWhoisData> {
-  return apiRequest(`/whois/${encodeURIComponent(domainId)}/refresh`, { method: 'POST' });
-}
-
 const FALLBACK_API_KEY =
   (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.['VITE_WHOISFREAKS_API_KEY'] ||
   '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
 
-const WHOIS_CACHE = new Map<string, { data: NormalizedWhoisData; timestamp: number }>();
-const WHOIS_INFLIGHT = new Map<string, Promise<NormalizedWhoisData>>();
-const WHOIS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+function getWhoisFreaksBaseUrl(): string {
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return '/whoisfreaks-api';
+  }
+  return 'https://api.whoisfreaks.com';
+}
 
 function calculateDaysRemaining(expiryStr?: string | null): number | null {
   if (!expiryStr) return null;
@@ -202,7 +159,7 @@ function calculateDaysRemaining(expiryStr?: string | null): number | null {
 }
 
 function normalizeRawWhoisResponse(domain: string, raw: any): NormalizedWhoisData {
-  const isRegistered = raw.domain_registered === 'yes';
+  const isRegistered = raw.domain_registered === 'yes' || raw.domain_registered === 'true' || Boolean(raw.expiry_date);
   const regData = raw.registry_data || {};
   const effectiveRegistrar = raw.domain_registrar || regData.domain_registrar;
 
@@ -253,6 +210,161 @@ function normalizeRawWhoisResponse(domain: string, raw: any): NormalizedWhoisDat
   };
 }
 
+function mapRawToLiveWhoisData(domain: string, raw: any): LiveWhoisData {
+  const norm = normalizeRawWhoisResponse(domain, raw);
+  return {
+    id: norm.id,
+    domainName: norm.domainName,
+    isRegistered: norm.isRegistered,
+    queryTime: norm.queryTime,
+    registeredAt: norm.registeredAt,
+    expiresAt: norm.expiresAt,
+    updatedDate: norm.updatedDate,
+    daysRemaining: norm.daysRemaining,
+    registrar: norm.registrar,
+    registrant: norm.registrant,
+    technicalContact: norm.technicalContact,
+    administrativeContact: norm.administrativeContact,
+    nameservers: norm.nameservers,
+    statuses: norm.statuses,
+    rawWhois: norm.rawWhois,
+    savedToDatabase: norm.savedToDatabase,
+    retrievedAt: norm.retrievedAt,
+  };
+}
+
+export async function getLiveWhois(
+  domain: string,
+  domainId?: string,
+  signal?: AbortSignal,
+): Promise<LiveWhoisData> {
+  const clean = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  try {
+    const baseUrl = getWhoisFreaksBaseUrl();
+    const url = `${baseUrl}/v1.0/whois?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&whois=live&domainName=${encodeURIComponent(clean)}`;
+    const res = await fetch(url, { signal });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && (json.status === true || json.domain_name)) {
+        return mapRawToLiveWhoisData(clean, json);
+      }
+    }
+  } catch (err) {
+    console.warn('Direct WhoisFreaks live query failed, falling back to backend:', err);
+  }
+  const search = new URLSearchParams({ domain: clean });
+  if (domainId) search.set('domainId', domainId);
+  return apiRequest(`/whois/live?${search}`, { signal });
+}
+
+export async function getLiveDns(
+  domain: string,
+  signal?: AbortSignal,
+): Promise<LiveDnsData> {
+  const clean = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  try {
+    const baseUrl = getWhoisFreaksBaseUrl();
+    const url = `${baseUrl}/v1.0/dns/live?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&type=all&domainName=${encodeURIComponent(clean)}`;
+    const res = await fetch(url, { signal });
+    if (res.ok) {
+      const json = await res.json();
+      return json as LiveDnsData;
+    }
+  } catch (err) {
+    console.warn('Direct WhoisFreaks DNS query failed, falling back to backend:', err);
+  }
+  const search = new URLSearchParams({ domain: clean });
+  return apiRequest(`/whois/dns?${search}`, { signal });
+}
+
+export async function getLiveSsl(
+  domain: string,
+  signal?: AbortSignal,
+): Promise<LiveSslData> {
+  const clean = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  try {
+    const baseUrl = getWhoisFreaksBaseUrl();
+    const url = `${baseUrl}/v1.0/ssl/live?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&domainName=${encodeURIComponent(clean)}`;
+    const res = await fetch(url, { signal });
+    if (res.ok) {
+      const json = await res.json();
+      return json as LiveSslData;
+    }
+  } catch (err) {
+    console.warn('Direct WhoisFreaks SSL query failed, falling back to backend:', err);
+  }
+  const search = new URLSearchParams({ domain: clean });
+  return apiRequest(`/whois/ssl?${search}`, { signal });
+}
+
+export async function getHistoricalWhois(domain: string, signal?: AbortSignal): Promise<HistoricalWhoisData> {
+  const clean = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  try {
+    const baseUrl = getWhoisFreaksBaseUrl();
+    const url = `${baseUrl}/v1.0/whois?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&whois=historical&domainName=${encodeURIComponent(clean)}`;
+    const res = await fetch(url, { signal });
+    if (res.ok) {
+      const json = await res.json();
+      return json as HistoricalWhoisData;
+    }
+  } catch (err) {
+    console.warn('Direct WhoisFreaks Historical query failed, falling back to backend:', err);
+  }
+  return apiRequest(`/whois/historical?${new URLSearchParams({ domain: clean })}`, { signal });
+}
+
+export async function checkWhoisAvailability(
+  query: string,
+  tlds: readonly string[],
+  signal?: AbortSignal,
+): Promise<WhoisAvailabilityItem[]> {
+  const clean = query.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').split('.')[0];
+  try {
+    const baseUrl = getWhoisFreaksBaseUrl();
+    const checks = await Promise.allSettled(
+      tlds.map(async (tld) => {
+        const fullDomain = `${clean}${tld.startsWith('.') ? tld : `.${tld}`}`;
+        const url = `${baseUrl}/v1.0/domain/availability?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&domain=${encodeURIComponent(fullDomain)}`;
+        const res = await fetch(url, { signal });
+        if (res.ok) {
+          const data = await res.json();
+          return {
+            domain: fullDomain,
+            tld,
+            available: Boolean(data.domainAvailability),
+            nameservers: [],
+          };
+        }
+        throw new Error('Not available via WhoisFreaks');
+      })
+    );
+    const results: WhoisAvailabilityItem[] = [];
+    checks.forEach((c) => {
+      if (c.status === 'fulfilled') {
+        results.push(c.value);
+      }
+    });
+    if (results.length === tlds.length) {
+      return results;
+    }
+  } catch (err) {
+    console.warn('Direct WhoisFreaks Availability query failed, falling back to backend:', err);
+  }
+  return apiRequest(`/whois/availability?${new URLSearchParams({ query: clean, tlds: tlds.join(',') })}`, { signal });
+}
+
+export function getWhoisHistory(limit = 20, signal?: AbortSignal): Promise<LiveWhoisData[]> {
+  return apiRequest(`/whois/history?${new URLSearchParams({ limit: String(limit) })}`, { signal });
+}
+
+export function refreshWhois(domainId: string): Promise<LiveWhoisData> {
+  return apiRequest(`/whois/${encodeURIComponent(domainId)}/refresh`, { method: 'POST' });
+}
+
+const WHOIS_CACHE = new Map<string, { data: NormalizedWhoisData; timestamp: number }>();
+const WHOIS_INFLIGHT = new Map<string, Promise<NormalizedWhoisData>>();
+const WHOIS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+
 export async function getSavedWhois(
   domain: string,
   signal?: AbortSignal,
@@ -288,7 +400,30 @@ export async function lookupWhois(
   }
 
   const promise = (async () => {
-    // 1. Primary path: Use backend API which automatically persists to database
+    // 1. PRIMARY PATH: Direct live query to WhoisFreaks using the active API key
+    try {
+      const baseUrl = getWhoisFreaksBaseUrl();
+      const wfUrl = `${baseUrl}/v1.0/whois?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&whois=live&domainName=${encodeURIComponent(cleanDomain)}`;
+      const response = await fetch(wfUrl, { signal });
+      if (response.ok) {
+        const json = await response.json();
+        if (json && (json.status === true || json.domain_name)) {
+          const normalized = normalizeRawWhoisResponse(cleanDomain, json);
+          WHOIS_CACHE.set(cleanDomain, { data: normalized, timestamp: Date.now() });
+
+          // Also asynchronously sync to backend so the database and workspace cache are updated
+          void apiRequest<NormalizedWhoisData>(`/whois/live?domain=${encodeURIComponent(cleanDomain)}${domainId ? `&domainId=${domainId}` : ''}`, {
+            authenticated: true,
+          }).catch(() => {});
+
+          return normalized;
+        }
+      }
+    } catch (wfErr) {
+      console.warn('WhoisFreaks direct live query failed, trying backend / fallback:', wfErr);
+    }
+
+    // 2. Secondary path: Query backend /whois/live
     try {
       const queryParams = new URLSearchParams({ domain: cleanDomain });
       if (domainId) queryParams.set('domainId', domainId);
@@ -301,23 +436,7 @@ export async function lookupWhois(
         WHOIS_CACHE.set(cleanDomain, { data: res, timestamp: Date.now() });
         return res;
       }
-    } catch {
-      // 2. Fallback: If backend is busy/restarting, use direct Vite proxy to WhoisFreaks
-      try {
-        const proxyUrl = `/whoisfreaks-api/v2.0/whois/live?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&domainName=${encodeURIComponent(
-          cleanDomain,
-        )}&format=json`;
-        const response = await fetch(proxyUrl, { signal });
-        if (response.ok) {
-          const json = await response.json();
-          const normalized = normalizeRawWhoisResponse(cleanDomain, json);
-          WHOIS_CACHE.set(cleanDomain, { data: normalized, timestamp: Date.now() });
-          return normalized;
-        }
-      } catch {
-        // Fallback failed too
-      }
-    }
+    } catch {}
 
     // Return cached if available, else throw
     const stale = WHOIS_CACHE.get(cleanDomain);

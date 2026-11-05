@@ -61,15 +61,23 @@ export const MobileAnnouncementsPage: React.FC = () => {
     }
   };
 
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this announcement?')) {
+      return;
+    }
     try {
+      setDeletingId(id);
       await adminClient.deleteAnnouncement(id);
-      setAnnouncements(announcements.filter((a) => a.id !== id));
-      setToast('Announcement deleted');
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      setToast('Announcement deleted successfully');
       setTimeout(() => setToast(null), 3000);
-    } catch {
-      setToast('Failed to delete announcement');
+    } catch (err: any) {
+      setToast(err?.message || 'Failed to delete announcement');
       setTimeout(() => setToast(null), 3000);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -244,7 +252,8 @@ export const MobileAnnouncementsPage: React.FC = () => {
 
               <button
                 onClick={() => handleDelete(item.id)}
-                className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                disabled={deletingId === item.id}
+                className="p-2 text-slate-400 hover:text-rose-500 transition-colors disabled:opacity-50"
                 title="Delete Announcement"
               >
                 <IconTrash size={15} />

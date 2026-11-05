@@ -325,7 +325,39 @@ export function getFriendlyBrandName(domain: string): string {
   return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
+export async function getDeletedWebsiteKeys(): Promise<string[]> {
+  try {
+    const raw = await getUserItem(STORAGE_KEYS.DELETED_WEBSITES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((k) => String(k).trim().toLowerCase()).filter(Boolean);
+      }
+    }
+  } catch {}
+  return [];
+}
+
+export async function addDeletedWebsiteKeys(keys: string[]): Promise<void> {
+  try {
+    const current = await getDeletedWebsiteKeys();
+    const cleanKeys = keys.map((k) => String(k).trim().toLowerCase()).filter(Boolean);
+    const merged = Array.from(new Set([...current, ...cleanKeys]));
+    await setUserItem(STORAGE_KEYS.DELETED_WEBSITES, JSON.stringify(merged));
+  } catch {}
+}
+
+export async function removeDeletedWebsiteKeys(keys: string[]): Promise<void> {
+  try {
+    const current = await getDeletedWebsiteKeys();
+    const toRemove = new Set(keys.map((k) => String(k).trim().toLowerCase()).filter(Boolean));
+    const filtered = current.filter((k) => !toRemove.has(k));
+    await setUserItem(STORAGE_KEYS.DELETED_WEBSITES, JSON.stringify(filtered));
+  } catch {}
+}
+
 export async function syncDiscoveredWebsites(domains: string[], providerLabel: string): Promise<WebsiteItem[]> {
+  const deletedKeys = new Set(await getDeletedWebsiteKeys());
   const current = await getStoredWebsites();
   const webMap = new Map<string, WebsiteItem>();
   for (const w of current) {
@@ -337,6 +369,9 @@ export async function syncDiscoveredWebsites(domains: string[], providerLabel: s
   for (const dom of domains) {
     const cleanDom = dom.toLowerCase().trim();
     if (!cleanDom || !cleanDom.includes('.')) continue;
+    if (deletedKeys.has(cleanDom) || deletedKeys.has(`https://${cleanDom}`) || deletedKeys.has(`http://${cleanDom}`)) {
+      continue;
+    }
 
     if (!webMap.has(cleanDom)) {
       const siteName = getFriendlyBrandName(cleanDom);
@@ -368,7 +403,14 @@ export async function syncDiscoveredWebsites(domains: string[], providerLabel: s
     }
   }
 
-  const updatedList = Array.from(webMap.values());
+  const updatedList = Array.from(webMap.values()).filter((w) => {
+    const wId = (w.id || '').trim().toLowerCase();
+    const wName = (w.name || '').trim().toLowerCase();
+    const wUrl = (w.url || '').trim().toLowerCase();
+    const wDom = extractDomainFromUrl(w.url).trim().toLowerCase();
+    return !deletedKeys.has(wId) && !deletedKeys.has(wName) && !deletedKeys.has(wUrl) && !deletedKeys.has(wDom);
+  });
+
   if (hasChanges || current.length === 0) {
     await saveStoredWebsites(updatedList);
     invalidateCache('websites_list');
@@ -378,11 +420,20 @@ export async function syncDiscoveredWebsites(domains: string[], providerLabel: s
 
 export async function getStoredWebsites(): Promise<WebsiteItem[]> {
   try {
+    const deletedKeys = new Set(await getDeletedWebsiteKeys());
     const raw = await getUserItem(STORAGE_KEYS.WEBSITES_LIST);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const cleaned = parsed.filter(isWebsiteItem);
+        const cleaned = parsed
+          .filter(isWebsiteItem)
+          .filter((w) => {
+            const wId = (w.id || '').trim().toLowerCase();
+            const wName = (w.name || '').trim().toLowerCase();
+            const wUrl = (w.url || '').trim().toLowerCase();
+            const wDom = extractDomainFromUrl(w.url).trim().toLowerCase();
+            return !deletedKeys.has(wId) && !deletedKeys.has(wName) && !deletedKeys.has(wUrl) && !deletedKeys.has(wDom);
+          });
         return cleaned;
       }
     }
@@ -392,7 +443,16 @@ export async function getStoredWebsites(): Promise<WebsiteItem[]> {
 
 export async function saveStoredWebsites(items: WebsiteItem[]): Promise<void> {
   try {
-    const websitesOnly = items.filter(isWebsiteItem);
+    const deletedKeys = new Set(await getDeletedWebsiteKeys());
+    const websitesOnly = items
+      .filter(isWebsiteItem)
+      .filter((w) => {
+        const wId = (w.id || '').trim().toLowerCase();
+        const wName = (w.name || '').trim().toLowerCase();
+        const wUrl = (w.url || '').trim().toLowerCase();
+        const wDom = extractDomainFromUrl(w.url).trim().toLowerCase();
+        return !deletedKeys.has(wId) && !deletedKeys.has(wName) && !deletedKeys.has(wUrl) && !deletedKeys.has(wDom);
+      });
     await setUserItem(STORAGE_KEYS.WEBSITES_LIST, JSON.stringify(websitesOnly));
   } catch {}
 }
@@ -401,7 +461,17 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
   return fetchWithCache(
     'websites_list',
     async () => {
-      const localList = (await getStoredWebsites()).filter(isWebsiteItem);
+      const deletedKeysList = await getDeletedWebsiteKeys();
+      const deletedKeys = new Set(deletedKeysList);
+
+      const localList = (await getStoredWebsites()).filter(isWebsiteItem).filter((w) => {
+        const wId = (w.id || '').trim().toLowerCase();
+        const wName = (w.name || '').trim().toLowerCase();
+        const wUrl = (w.url || '').trim().toLowerCase();
+        const wDom = extractDomainFromUrl(w.url).trim().toLowerCase();
+        return !deletedKeys.has(wId) && !deletedKeys.has(wName) && !deletedKeys.has(wUrl) && !deletedKeys.has(wDom);
+      });
+
       try {
         const [appRes, domRes] = await Promise.all([
           apiGet<CursorPage<BackendApplication>>('/applications?limit=100').catch(() => null),
@@ -414,15 +484,35 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
         if (appRes?.items && Array.isArray(appRes.items)) {
           const websiteAppsOnly = appRes.items.filter(isWebsiteItem);
           for (const a of websiteAppsOnly) {
+            // Strictly exclude soft-deleted or archived applications
+            if (a.inventoryState === 'ARCHIVED') continue;
+
             const url = normalizeWebsiteUrl(a.primaryUrl || `https://${a.name}`);
             const domain = extractDomainFromUrl(url);
             if (!domain || domain.includes('play.google.com') || domain.startsWith('com.')) continue;
-            webMap.set(domain.toLowerCase(), {
+
+            const aId = (a.id || '').trim().toLowerCase();
+            const aName = (a.name || '').trim().toLowerCase();
+            const aUrl = url.trim().toLowerCase();
+            const aDom = domain.toLowerCase();
+            const aRawUrl = (a.primaryUrl || '').trim().toLowerCase();
+
+            if (
+              deletedKeys.has(aId) ||
+              deletedKeys.has(aName) ||
+              deletedKeys.has(aUrl) ||
+              deletedKeys.has(aDom) ||
+              (aRawUrl && deletedKeys.has(aRawUrl))
+            ) {
+              continue;
+            }
+
+            webMap.set(aDom, {
               id: a.id,
               name: a.name,
               url,
               category: a.kind === 'WEBSITE' ? 'Production' : a.kind === 'WEB_APPLICATION' ? 'Production' : 'Client',
-              status: a.inventoryState === 'ARCHIVED' ? 'error' : 'healthy',
+              status: 'healthy',
               sslStatus: 'active',
               httpStatus: '200 OK',
               responseTimeMs: Math.floor(Math.random() * 20) + 15,
@@ -435,11 +525,27 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
           }
         }
 
-        // 2. Domains as live production websites (mirroring Web portfolio service)
+        // 2. Domains as live production websites
         if (domRes?.items && Array.isArray(domRes.items)) {
           for (const d of domRes.items) {
+            if (d.inventoryState === 'ARCHIVED') continue;
             const dom = (d.domainName || '').toLowerCase().trim();
             if (!dom || webMap.has(dom)) continue;
+
+            const dId = (d.id || '').trim().toLowerCase();
+            const dName = getFriendlyBrandName(dom).trim().toLowerCase();
+            const dUrl = `https://${dom}`.toLowerCase();
+
+            if (
+              deletedKeys.has(dId) ||
+              deletedKeys.has(dom) ||
+              deletedKeys.has(dName) ||
+              deletedKeys.has(dUrl) ||
+              deletedKeys.has(`http://${dom}`.toLowerCase())
+            ) {
+              continue;
+            }
+
             webMap.set(dom, {
               id: d.id,
               name: getFriendlyBrandName(dom),
@@ -458,17 +564,48 @@ export async function fetchWebsitesList(options?: { forceRefresh?: boolean }): P
           }
         }
 
-        // 3. Merge local websites that aren't already represented
+        // 3. Merge local websites, preserving any custom user updates
         for (const loc of localList) {
-          if (isWebsiteItem(loc)) {
-            const dom = extractDomainFromUrl(loc.url).toLowerCase();
-            if (dom && !webMap.has(dom)) {
-              webMap.set(dom, loc);
-            }
+          if (!isWebsiteItem(loc)) continue;
+          const dom = extractDomainFromUrl(loc.url).toLowerCase();
+          if (!dom) continue;
+
+          const locId = (loc.id || '').trim().toLowerCase();
+          const locName = (loc.name || '').trim().toLowerCase();
+          const locUrl = (loc.url || '').trim().toLowerCase();
+
+          if (
+            deletedKeys.has(locId) ||
+            deletedKeys.has(locName) ||
+            deletedKeys.has(locUrl) ||
+            deletedKeys.has(dom)
+          ) {
+            continue;
+          }
+
+          if (webMap.has(dom)) {
+            const existing = webMap.get(dom)!;
+            webMap.set(dom, {
+              ...existing,
+              name: loc.name || existing.name,
+              category: loc.category || existing.category,
+              notes: loc.notes !== undefined ? loc.notes : existing.notes,
+              logoUrl: loc.logoUrl || existing.logoUrl,
+              url: loc.url || existing.url,
+            });
+          } else {
+            webMap.set(dom, loc);
           }
         }
 
-        const mergedWebsites = Array.from(webMap.values());
+        const mergedWebsites = Array.from(webMap.values()).filter((w) => {
+          const wId = (w.id || '').trim().toLowerCase();
+          const wName = (w.name || '').trim().toLowerCase();
+          const wUrl = (w.url || '').trim().toLowerCase();
+          const wDom = extractDomainFromUrl(w.url).trim().toLowerCase();
+          return !deletedKeys.has(wId) && !deletedKeys.has(wName) && !deletedKeys.has(wUrl) && !deletedKeys.has(wDom);
+        });
+
         await saveStoredWebsites(mergedWebsites);
         return mergedWebsites;
       } catch {
@@ -491,13 +628,24 @@ export async function createWebsite(data: {
   const normalizedUrl = normalizeWebsiteUrl(data.url);
   const domain = extractDomainFromUrl(normalizedUrl);
   const logoUrl = getDomainLogoUrl(domain);
+  const cleanName = data.name.trim() || domain || 'My Website';
+
+  // Remove from deleted tombstones if re-created
+  await removeDeletedWebsiteKeys([
+    cleanName,
+    domain,
+    normalizedUrl,
+    normalizedUrl.replace(/^https?:\/\//i, '').replace(/\/+$/, ''),
+  ]);
+
   let backendId = `web-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+  const isValidUrl = /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(normalizedUrl);
   try {
     const res = await apiPost<BackendApplication>('/applications', {
-      name: data.name.trim() || domain || 'My Website',
+      name: cleanName,
       kind: 'WEBSITE',
-      primaryUrl: normalizedUrl,
+      primaryUrl: isValidUrl ? normalizedUrl : null,
       notes: data.notes?.trim() || null,
     });
     if (res?.id) {
@@ -507,7 +655,7 @@ export async function createWebsite(data: {
 
   const newWebsite: WebsiteItem = {
     id: backendId,
-    name: data.name.trim() || domain || 'My Website',
+    name: cleanName,
     url: normalizedUrl,
     category: data.category || 'Production',
     status: 'healthy',
@@ -522,7 +670,10 @@ export async function createWebsite(data: {
   };
 
   const current = await getStoredWebsites();
-  const updated = [newWebsite, ...current.filter((w) => w.url.toLowerCase() !== normalizedUrl.toLowerCase())];
+  const updated = [
+    newWebsite,
+    ...current.filter((w) => w.url.toLowerCase() !== normalizedUrl.toLowerCase() && w.id !== backendId),
+  ];
   await saveStoredWebsites(updated);
   invalidateCache('websites_list');
   return newWebsite;
@@ -539,6 +690,16 @@ export async function updateWebsite(id: string, patch: Partial<WebsiteItem>): Pr
     patch.logoUrl = getDomainLogoUrl(domain);
   }
 
+  // Remove new identifying values from deleted tombstones
+  const unblockKeys = [
+    patch.name,
+    patch.url,
+    patch.url ? extractDomainFromUrl(patch.url) : '',
+  ].filter(Boolean) as string[];
+  if (unblockKeys.length > 0) {
+    await removeDeletedWebsiteKeys(unblockKeys);
+  }
+
   const updated: WebsiteItem = {
     ...current[index],
     ...patch,
@@ -549,22 +710,76 @@ export async function updateWebsite(id: string, patch: Partial<WebsiteItem>): Pr
   await saveStoredWebsites(current);
   invalidateCache('websites_list');
 
-  apiPatch(`/applications/${encodeURIComponent(id)}`, {
-    name: patch.name,
-    primaryUrl: patch.url,
-    notes: patch.notes,
-  }).catch(() => {});
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+  if (isUuid) {
+    const isValidUrl = patch.url ? /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(patch.url) : false;
+    apiPatch(`/applications/${encodeURIComponent(id)}`, {
+      name: patch.name ? patch.name.trim() : undefined,
+      primaryUrl: isValidUrl ? patch.url : undefined,
+      notes: patch.notes !== undefined ? patch.notes : undefined,
+    }).catch(() => {});
+  }
 
   return updated;
 }
 
-export async function deleteWebsite(id: string): Promise<void> {
+export async function deleteWebsite(id: string, name?: string, url?: string): Promise<void> {
   const current = await getStoredWebsites();
-  const updated = current.filter((w) => w.id !== id);
+  const matched = current.find((w) => w.id === id || (url && w.url === url) || (name && w.name === name));
+
+  const siteUrl = url || matched?.url || '';
+  const siteName = name || matched?.name || '';
+  const domain = siteUrl ? extractDomainFromUrl(siteUrl) : '';
+  const cleanId = (id || '').trim().toLowerCase();
+  const cleanName = siteName.trim().toLowerCase();
+  const cleanUrl = siteUrl.trim().toLowerCase();
+  const cleanDomain = domain.trim().toLowerCase();
+
+  // 1. Tombstone all identifying keys permanently
+  const keysToTombstone = [cleanId, cleanName, cleanUrl, cleanDomain].filter(Boolean);
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    keysToTombstone.push(cleanUrl.replace(/^https?:\/\//i, '').replace(/\/+$/, ''));
+  }
+  await addDeletedWebsiteKeys(keysToTombstone);
+
+  // 2. Remove from local stored websites list
+  const tombstoneSet = new Set(keysToTombstone);
+  const updated = current.filter((w) => {
+    const wId = (w.id || '').trim().toLowerCase();
+    const wName = (w.name || '').trim().toLowerCase();
+    const wUrl = (w.url || '').trim().toLowerCase();
+    const wDom = extractDomainFromUrl(w.url).trim().toLowerCase();
+    return !tombstoneSet.has(wId) && !tombstoneSet.has(wName) && !tombstoneSet.has(wUrl) && !tombstoneSet.has(wDom);
+  });
   await saveStoredWebsites(updated);
   invalidateCache('websites_list');
+
+  // 3. Direct backend archive if ID is a UUID
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+  if (isUuid) {
+    await apiDelete(`/applications/${encodeURIComponent(id)}`).catch(() => {});
+  }
+
+  // 4. Query backend applications and archive any record that matches this website
   try {
-    await apiDelete(`/applications/${encodeURIComponent(id)}`);
+    const appRes = await apiGet<CursorPage<BackendApplication>>('/applications?limit=100').catch(() => null);
+    if (appRes?.items && Array.isArray(appRes.items)) {
+      const matches = appRes.items.filter((a) => {
+        const aId = (a.id || '').trim().toLowerCase();
+        const aName = (a.name || '').trim().toLowerCase();
+        const aUrl = (a.primaryUrl || '').trim().toLowerCase();
+        const aDom = aUrl ? extractDomainFromUrl(aUrl).trim().toLowerCase() : '';
+        return (
+          tombstoneSet.has(aId) ||
+          tombstoneSet.has(aName) ||
+          (aUrl && tombstoneSet.has(aUrl)) ||
+          (aDom && tombstoneSet.has(aDom))
+        );
+      });
+      await Promise.allSettled(
+        matches.map((m) => apiDelete(`/applications/${encodeURIComponent(m.id)}`).catch(() => {}))
+      );
+    }
   } catch {}
 }
 

@@ -20,7 +20,7 @@ import {
   type ProviderSyncRunResponse,
 } from '@/api/provider-connections';
 
-import { PROVIDER_LOGOS } from '@/services/portfolioService';
+import { PROVIDER_LOGOS, notifyPortfolioUpdated, cleanupDisconnectedProvider, deleteProviderAccount } from '@/services/portfolioService';
 import { formatDateTime } from '@/lib/format';
 const RESOURCE_SUMMARY_LABELS = [
   ['DOMAIN', 'Domains'],
@@ -377,6 +377,27 @@ const ProviderConnectionCard: React.FC<{
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [accountOptionsError, setAccountOptionsError] = useState<string | null>(null);
   const [rotatingExtraId, setRotatingExtraId] = useState<string | null>(null);
+  const [isDeletingConnection, setIsDeletingConnection] = useState(false);
+
+  async function handleDeleteConnectionAccount(targetAccountId?: string): Promise<void> {
+    const accId = targetAccountId ?? connection?.providerAccountId;
+    if (!accId) return;
+    const accountName = availableAccounts.find(a => a.id === accId)?.label || config.displayName;
+    if (!window.confirm(`Permanently delete provider account "${accountName}" and all associated domains, servers, websites, and connections from the database?`)) {
+      return;
+    }
+    setIsDeletingConnection(true);
+    try {
+      await deleteProviderAccount(accId);
+      await load();
+      notifyPortfolioUpdated();
+      window.dispatchEvent(new Event('domainpulse:provider-connections-changed'));
+    } catch (err: any) {
+      alert(err?.message || 'Failed to delete provider account');
+    } finally {
+      setIsDeletingConnection(false);
+    }
+  }
   const [extraActionError, setExtraActionError] = useState<Record<string, string | null>>({});
   const [extraSyncing, setExtraSyncing] = useState<Record<string, boolean>>({});
   const [extraValidating, setExtraValidating] = useState<Record<string, boolean>>({});
@@ -527,6 +548,7 @@ const ProviderConnectionCard: React.FC<{
           const updated = items.find((item) => item.id === connectionId);
           if (primary) setConnection(updated ?? null);
           else if (updated) setExtraConnections((prev) => prev.map((item) => item.id === connectionId ? updated : item));
+          notifyPortfolioUpdated();
         } catch (error) {
           if (!mountedRef.current) return;
           const message = safeErrorMessage(error, 'Could not check the sync result. Refresh this tab to try again.');
@@ -620,6 +642,7 @@ const ProviderConnectionCard: React.FC<{
       setAddAccountError(null);
       clearCredentialInputs();
       window.dispatchEvent(new Event('domainpulse:provider-connections-changed'));
+      notifyPortfolioUpdated();
     } catch (error) {
       const errorMsg = error instanceof Error && error.message.startsWith('This saved account')
         ? error.message
@@ -737,14 +760,25 @@ const ProviderConnectionCard: React.FC<{
       setExtraDisconnecting((prev) => ({ ...prev, [id]: true }));
     }
     try {
+      const connToDisconnect = isPrimary
+        ? connection
+        : extraConnections.find((c) => c.id === id);
+      const providerAccountId = connToDisconnect?.providerAccountId;
+
       await disconnectProviderConnection(id);
       const timeout = pollTimeoutsRef.current.get(id);
       if (timeout) clearTimeout(timeout);
       pollTimeoutsRef.current.delete(id);
       if (isPrimary) setPrimarySyncing(false);
       else setExtraSyncing((prev) => ({ ...prev, [id]: false }));
+
+      if (providerAccountId) {
+        cleanupDisconnectedProvider(providerAccountId, config.providerKey);
+      }
+
       await load();
       window.dispatchEvent(new Event('domainpulse:provider-connections-changed'));
+      notifyPortfolioUpdated();
     } catch (error) {
       const errorMsg = safeErrorMessage(error, 'Could not disconnect.');
       if (isPrimary) setActionError(errorMsg);
@@ -1054,6 +1088,16 @@ const ProviderConnectionCard: React.FC<{
               >
                 {actionState === 'disconnecting' ? 'Disconnecting…' : 'Disconnect'}
               </button>
+              <button
+                className="h-9 px-unit-md rounded-lg bg-error/10 text-error border border-error/30 hover:bg-error hover:text-on-error shadow-micro font-label-md text-label-md cursor-pointer inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                disabled={actionState === 'disconnecting' || isDeletingConnection}
+                onClick={() => void handleDeleteConnectionAccount()}
+                type="button"
+                title="Delete this provider account and all its data"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                Delete
+              </button>
             </div>
           )}
 
@@ -1172,6 +1216,16 @@ const ProviderConnectionCard: React.FC<{
                   >
                     {extraDisconnecting[extra.id] ? 'Disconnecting…' : 'Disconnect'}
                   </button>
+                  <button
+                    className="h-8 px-unit-sm rounded-lg bg-error/10 text-error border border-error/30 hover:bg-error hover:text-on-error shadow-micro text-[12px] font-medium cursor-pointer inline-flex items-center gap-1 transition-colors disabled:opacity-50"
+                    disabled={extraDisconnecting[extra.id] || isDeletingConnection}
+                    onClick={() => void handleDeleteConnectionAccount(extra.providerAccountId)}
+                    type="button"
+                    title="Delete this provider account and all its data"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Delete
+                  </button>
                 </div>
               ) : (
                 <form
@@ -1286,6 +1340,7 @@ const SavedAccountsPanel: React.FC = () => {
   const [connections, setConnections] = useState<ProviderConnectionResponse[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -1350,7 +1405,33 @@ const SavedAccountsPanel: React.FC = () => {
                     <a className="block truncate text-label-md font-semibold text-on-surface hover:text-primary" href={`/accounts/${encodeURIComponent(account.id)}`}>{account.label}</a>
                     <p className="text-caption-xs text-secondary">{account.providerKey}</p>
                   </div>
-                  <span className="shrink-0 text-caption-xs text-secondary">{status}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-caption-xs text-secondary">{status}</span>
+                    <button
+                      type="button"
+                      title={`Delete ${account.label} and all its data`}
+                      disabled={deletingId === account.id}
+                      className="p-1 text-secondary hover:text-error hover:bg-error/10 rounded transition-colors disabled:opacity-50"
+                      onClick={async () => {
+                        if (!window.confirm(`Permanently delete "${account.label}" and all associated domains, servers, websites, and connections from the database?`)) {
+                          return;
+                        }
+                        setDeletingId(account.id);
+                        try {
+                          await deleteProviderAccount(account.id);
+                          await load();
+                        } catch (err: any) {
+                          alert(err?.message || 'Failed to delete account');
+                        } finally {
+                          setDeletingId(null);
+                        }
+                      }}
+                    >
+                      <span className={`material-symbols-outlined text-[16px] ${deletingId === account.id ? 'animate-spin' : ''}`}>
+                        {deletingId === account.id ? 'sync' : 'delete'}
+                      </span>
+                    </button>
+                  </div>
                 </li>;
               })}
             </ul>}
@@ -1392,6 +1473,7 @@ export const IntegrationsTab: React.FC = () => {
       setSyncAllFeedback(
         `${queued} provider ${queued === 1 ? 'sync' : 'syncs'} queued${failed ? `; ${failed} failed to queue` : ''}. Refresh this tab to see results.`,
       );
+      notifyPortfolioUpdated();
     } catch (error) {
       setSyncAllFeedback(safeErrorMessage(error, 'Could not load connected providers for sync.'));
     } finally {

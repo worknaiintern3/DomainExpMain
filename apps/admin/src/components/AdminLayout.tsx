@@ -111,7 +111,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-sm tracking-tight text-slate-900 dark:text-white">
-                  DomainPulse
+             DomainExpert    
                 </span>
                 <span className="text-[10px] font-black uppercase px-1.5 py-0.2 rounded bg-blue-600 text-white">
                   Admin

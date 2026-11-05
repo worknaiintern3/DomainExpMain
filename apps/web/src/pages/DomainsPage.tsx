@@ -89,7 +89,7 @@ export const DomainsPage: React.FC = () => {
     setWhoisLoading(true);
     setWhoisError(null);
     try {
-      const result = await lookupWhois(clean);
+      const result = await lookupWhois(clean, undefined, undefined, { forceRefresh: true });
       setWhoisData(result);
       if (result && result.isRegistered) {
         const updated = updateDomainWithWhois(clean, result);

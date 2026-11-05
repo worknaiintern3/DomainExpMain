@@ -51,13 +51,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
+    Accept: "application/json",
     ...(options.headers as Record<string, string>),
   };
 
+  // Only send Content-Type header if there is an actual request body
+  if (options.body !== undefined && options.body !== null) {
+    headers["Content-Type"] = "application/json";
+  }
+
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    headers.Authorization = "Bearer " + token;
   }
 
   const controller = new AbortController();
@@ -94,7 +98,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       throw new Error(errorMsg);
     }
 
-    return await response.json() as T;
+    if (response.status === 204) {
+      return undefined as unknown as T;
+    }
+
+    const text = await response.text();
+    if (!text || !text.trim()) {
+      return undefined as unknown as T;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return text as unknown as T;
+    }
   } catch (error) {
     if (timedOut) throw new Error('The request timed out. Check your connection and try again.');
     throw error;

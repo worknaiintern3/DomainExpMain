@@ -6,6 +6,7 @@ import {
   fetchWebsitesList,
   createWebsite,
   deleteWebsite,
+  updateWebsite,
   createApplication,
   deleteApplication,
   getConsoleDeveloperName,
@@ -48,6 +49,54 @@ export const WebsitesPage: React.FC = () => {
   const [newWebCategory, setNewWebCategory] = useState<'Production' | 'Client' | 'Personal' | 'Staging' | 'Tools'>('Production');
   const [newWebNotes, setNewWebNotes] = useState('');
 
+  // Edit Website state
+  const [isEditWebModalOpen, setIsEditWebModalOpen] = useState(false);
+  const [editingWebsite, setEditingWebsite] = useState<WebsiteItem | null>(null);
+  const [editWebName, setEditWebName] = useState('');
+  const [editWebUrl, setEditWebUrl] = useState('');
+  const [editWebCategory, setEditWebCategory] = useState<'Production' | 'Client' | 'Personal' | 'Staging' | 'Tools'>('Production');
+  const [editWebNotes, setEditWebNotes] = useState('');
+  const [editWebServerName, setEditWebServerName] = useState('');
+  const [editWebServerIp, setEditWebServerIp] = useState('');
+  const [isUpdatingWeb, setIsUpdatingWeb] = useState(false);
+
+  const handleOpenEditWebsite = (site: WebsiteItem) => {
+    setEditingWebsite(site);
+    setEditWebName(site.name);
+    setEditWebUrl(site.url);
+    setEditWebCategory(site.category);
+    setEditWebNotes(site.notes || '');
+    setEditWebServerName(site.serverName || '');
+    setEditWebServerIp(site.serverIp || '');
+    setIsEditWebModalOpen(true);
+  };
+
+  const handleUpdateWebsite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWebsite || !editWebName.trim() || !editWebUrl.trim()) return;
+    setIsUpdatingWeb(true);
+    try {
+      const updated = await updateWebsite(editingWebsite.id, {
+        name: editWebName.trim(),
+        url: editWebUrl.trim(),
+        category: editWebCategory,
+        notes: editWebNotes.trim() || undefined,
+        serverName: editWebServerName.trim() || undefined,
+        serverIp: editWebServerIp.trim() || undefined,
+      });
+      if (updated) {
+        setWebsites((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+        setFeedback(`Website "${updated.name}" was successfully updated.`);
+      }
+      setIsEditWebModalOpen(false);
+      setEditingWebsite(null);
+    } catch {
+      setFeedback('Failed to update website details.');
+    } finally {
+      setIsUpdatingWeb(false);
+    }
+  };
+
   // Selected App detail modal
   const [selectedApp, setSelectedApp] = useState<ApplicationItem | null>(null);
 
@@ -64,6 +113,7 @@ export const WebsitesPage: React.FC = () => {
     id: string;
     name: string;
     extra?: string;
+    url?: string;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -144,8 +194,8 @@ export const WebsitesPage: React.FC = () => {
     setFeedback(`Website "${created.name}" was successfully added to your portfolio and database.`);
   };
 
-  const handleDeleteWebsite = (id: string, name: string, domain?: string) => {
-    setDeleteTarget({ type: 'website', id, name, extra: domain });
+  const handleDeleteWebsite = (id: string, name: string, domain?: string, url?: string) => {
+    setDeleteTarget({ type: 'website', id, name, extra: domain, url });
   };
 
   const handleDeleteApp = (id: string, name: string, packageId?: string) => {
@@ -172,7 +222,7 @@ export const WebsitesPage: React.FC = () => {
         setFeedback(`Application "${deleteTarget.name}" was successfully deleted from your portfolio and database.`);
       } else {
         setWebsites((prev) => prev.filter((w) => w.id !== deleteTarget.id && w.name !== deleteTarget.name));
-        await deleteWebsite(deleteTarget.id, deleteTarget.name, deleteTarget.extra);
+        await deleteWebsite(deleteTarget.id, deleteTarget.name, deleteTarget.extra, deleteTarget.url);
         setFeedback(`Website "${deleteTarget.name}" was successfully deleted from your portfolio and database.`);
       }
     } finally {
@@ -466,6 +516,128 @@ export const WebsitesPage: React.FC = () => {
                   className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90"
                 >
                   Add Website
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Website Modal */}
+      {isEditWebModalOpen && editingWebsite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-outline-variant/40 pb-3">
+              <h3 className="text-title-md font-bold text-on-surface">Edit Website</h3>
+              <button
+                type="button"
+                onClick={() => setIsEditWebModalOpen(false)}
+                className="text-secondary hover:text-on-surface"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleUpdateWebsite} className="mt-4 flex flex-col gap-4">
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Website Title
+                </label>
+                <input
+                  type="text"
+                  value={editWebName}
+                  onChange={(e) => setEditWebName(e.target.value)}
+                  placeholder="My Website"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  URL
+                </label>
+                <input
+                  type="url"
+                  value={editWebUrl}
+                  onChange={(e) => setEditWebUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Category
+                </label>
+                <select
+                  value={editWebCategory}
+                  onChange={(e) => setEditWebCategory(e.target.value as 'Production' | 'Client' | 'Personal' | 'Staging' | 'Tools')}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+                >
+                  <option value="Production">Production</option>
+                  <option value="Client">Client</option>
+                  <option value="Personal">Personal</option>
+                  <option value="Staging">Staging</option>
+                  <option value="Tools">Tools</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Server Name
+                </label>
+                <input
+                  type="text"
+                  value={editWebServerName}
+                  onChange={(e) => setEditWebServerName(e.target.value)}
+                  placeholder="e.g. VPS-01"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Server IP
+                </label>
+                <input
+                  type="text"
+                  value={editWebServerIp}
+                  onChange={(e) => setEditWebServerIp(e.target.value)}
+                  placeholder="e.g. 192.168.1.1"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-caption-xs font-semibold text-secondary uppercase tracking-wider mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={editWebNotes}
+                  onChange={(e) => setEditWebNotes(e.target.value)}
+                  placeholder="Optional notes..."
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none resize-none"
+                  rows={2}
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsEditWebModalOpen(false)}
+                  className="rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-secondary hover:bg-surface-container"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingWeb}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isUpdatingWeb ? (
+                    <>
+                      <span className="material-symbols-outlined text-[16px] animate-spin">refresh</span>
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -1077,7 +1249,15 @@ export const WebsitesPage: React.FC = () => {
                           </a>
                           <button
                             type="button"
-                            onClick={() => handleDeleteWebsite(w.id, w.name, w.domain)}
+                            onClick={() => handleOpenEditWebsite(w)}
+                            className="rounded-lg p-1.5 text-secondary hover:bg-surface-container hover:text-primary transition-colors"
+                            title="Edit Website"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteWebsite(w.id, w.name, w.domain, w.url)}
                             className="rounded-lg p-1.5 text-secondary hover:bg-error/10 hover:text-error transition-colors"
                             title="Delete Website"
                           >

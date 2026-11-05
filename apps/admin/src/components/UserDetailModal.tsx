@@ -31,6 +31,27 @@ interface Props {
   onUserDeleted: (userId: string) => void;
 }
 
+function formatExternalAccountId(id?: string | null): string {
+  if (!id) return 'Default';
+  const trimmed = id.trim();
+  if (!trimmed) return 'Default';
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.accessKeyId) {
+        const key = parsed.accessKeyId;
+        const region = Array.isArray(parsed.regions) && parsed.regions[0] ? ` (${parsed.regions[0]})` : '';
+        return `${key}${region}`;
+      }
+    } catch {}
+    return 'Configured';
+  }
+  if (trimmed.length > 28 && !trimmed.includes(' ') && !trimmed.includes('-')) {
+    return `••••${trimmed.slice(-4)}`;
+  }
+  return trimmed;
+}
+
 export type TabType = 'overview' | 'web' | 'apps' | 'providers' | 'mobile' | 'audit' | 'actions';
 
 export const UserDetailModal: React.FC<Props> = ({
@@ -976,8 +997,8 @@ export const UserDetailModal: React.FC<Props> = ({
                         <h4 className="text-xs font-bold text-slate-900 dark:text-white">
                           {prov.label || prov.providerKey}
                         </h4>
-                        <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-1 truncate">
-                          Ext ID: {prov.externalAccountId || 'Default'}
+                        <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-1 truncate" title={formatExternalAccountId(prov.externalAccountId)}>
+                          Ext ID: {formatExternalAccountId(prov.externalAccountId)}
                         </div>
                       </div>
 

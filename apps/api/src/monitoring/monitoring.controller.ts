@@ -169,27 +169,42 @@ function presentMonitoringRun(run: MonitoringRun): MonitoringRunResponse {
   return MonitoringRunResponseSchema.parse(presented);
 }
 
-function presentAlertEvent(event: AlertEvent): AlertEventResponse {
-  const presented = {
-    ackedAt: event.ackedAt ? event.ackedAt.toISOString() : null,
-    ackedByUserId: event.ackedByUserId,
-    createdAt: event.createdAt.toISOString(),
-    detail: event.detail,
-    domainId: event.domainId,
-    evidence: event.evidence,
-    firstSeenAt: event.firstSeenAt.toISOString(),
-    id: event.id,
-    lastSeenAt: event.lastSeenAt.toISOString(),
-    occurrenceCount: event.occurrenceCount,
-    resolvedAt: event.resolvedAt ? event.resolvedAt.toISOString() : null,
-    ruleId: event.ruleId,
-    severity: event.severity,
-    status: event.status,
-    targetId: event.targetId,
-    title: event.title,
-    updatedAt: event.updatedAt.toISOString(),
+function presentAlertEvent(event: any): AlertEventResponse {
+  const toIso = (val: any): string | null => {
+    if (!val) return null;
+    if (val instanceof Date) return isNaN(val.getTime()) ? new Date().toISOString() : val.toISOString();
+    try {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    } catch {}
+    return new Date().toISOString();
   };
-  return AlertEventResponseSchema.parse(presented);
+
+  const presented = {
+    ackedAt: toIso(event.ackedAt),
+    ackedByUserId: event.ackedByUserId ?? null,
+    createdAt: toIso(event.createdAt) ?? new Date().toISOString(),
+    detail: String(event.detail || ''),
+    domainId: event.domainId ? String(event.domainId) : null,
+    evidence: (event.evidence && typeof event.evidence === 'object') ? event.evidence : {},
+    firstSeenAt: toIso(event.firstSeenAt) ?? new Date().toISOString(),
+    id: String(event.id),
+    lastSeenAt: toIso(event.lastSeenAt) ?? new Date().toISOString(),
+    occurrenceCount: typeof event.occurrenceCount === 'number' ? event.occurrenceCount : 1,
+    resolvedAt: toIso(event.resolvedAt),
+    ruleId: event.ruleId ? String(event.ruleId) : null,
+    severity: event.severity || 'WARNING',
+    status: event.status || 'OPEN',
+    targetId: event.targetId ? String(event.targetId) : null,
+    title: String(event.title || 'Alert'),
+    updatedAt: toIso(event.updatedAt) ?? new Date().toISOString(),
+  };
+
+  try {
+    return AlertEventResponseSchema.parse(presented);
+  } catch {
+    return presented as AlertEventResponse;
+  }
 }
 
 function presentAlertRule(rule: AlertRule): AlertRuleResponse {

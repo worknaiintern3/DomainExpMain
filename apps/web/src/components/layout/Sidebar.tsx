@@ -79,9 +79,9 @@ export const Sidebar: React.FC<{ mobileOpen?: boolean; onClose?: () => void }> =
     alerts: 0,
   });
 
-  const loadCounts = async () => {
+  const loadCounts = async (force = false) => {
     try {
-      const summary = await fetchPortfolioSummary();
+      const summary = await fetchPortfolioSummary({ forceRefresh: force });
       setCounts({
         domains: summary.totalDomains,
         servers: summary.totalServers,
@@ -96,16 +96,18 @@ export const Sidebar: React.FC<{ mobileOpen?: boolean; onClose?: () => void }> =
     void loadCounts();
     let timer: ReturnType<typeof setTimeout> | null = null;
     const onPortfolioUpdated = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        void loadCounts();
-      }, 1000);
+        void loadCounts(true);
+      }, 50);
     };
     window.addEventListener('domainpulse:portfolio-updated', onPortfolioUpdated);
+    window.addEventListener('domainpulse:provider-connections-changed', onPortfolioUpdated);
     return () => {
       if (timer) clearTimeout(timer);
       window.removeEventListener('domainpulse:portfolio-updated', onPortfolioUpdated);
+      window.removeEventListener('domainpulse:provider-connections-changed', onPortfolioUpdated);
     };
   }, []);
 
@@ -144,7 +146,7 @@ export const Sidebar: React.FC<{ mobileOpen?: boolean; onClose?: () => void }> =
             alt="DomainPulse"
             className="w-8 h-8 rounded-lg object-cover shadow-micro shrink-0 border border-outline-variant/30"
           />
-          {!compact && <span className="font-headline-sm text-headline-sm text-on-surface tracking-tight font-semibold">DomainPulse</span>}
+          {!compact && <span className="font-headline-sm text-headline-sm text-on-surface tracking-tight font-semibold">DomainExpert</span>}
           {mobileOpen && <button aria-label="Close navigation" className="ml-auto rounded-lg p-1 text-secondary hover:bg-surface-container md:hidden" onClick={onClose} type="button"><span className="material-symbols-outlined">close</span></button>}
         </div>
 

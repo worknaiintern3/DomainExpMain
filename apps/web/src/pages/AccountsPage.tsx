@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-import { archiveInventory, updateInventory } from '@/api/inventory';
+import { archiveInventory, updateInventory, deleteInventory } from '@/api/inventory';
 import type { EmailAccount, ProviderAccount } from '@/api/types';
 import { Button } from '@/components/common/Button';
 import { InventoryState, ResourceFormModal, StatePanel } from '@/components/integration/InventoryWorkspace';
@@ -13,6 +13,7 @@ import {
   syncAllProviders,
   syncSingleProvider,
   fetchPortfolioSummary,
+  deleteProviderAccount,
 } from '@/services/portfolioService';
 
 type AccountView = 'providers' | 'emails';
@@ -33,6 +34,27 @@ const ResolvedLoginEmail: React.FC<{ id: string }> = ({ id }) => {
   );
 };
 
+function formatExternalAccountId(id?: string | null): string {
+  if (!id) return 'Default';
+  const trimmed = id.trim();
+  if (!trimmed) return 'Default';
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.accessKeyId) {
+        const key = parsed.accessKeyId;
+        const region = Array.isArray(parsed.regions) && parsed.regions[0] ? ` (${parsed.regions[0]})` : '';
+        return `${key}${region}`;
+      }
+    } catch {}
+    return 'Configured';
+  }
+  if (trimmed.length > 28 && !trimmed.includes(' ') && !trimmed.includes('-')) {
+    return `••••${trimmed.slice(-4)}`;
+  }
+  return trimmed;
+}
+
 export const AccountsPage: React.FC = () => {
   const [view, setView] = useState<AccountView>('providers');
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -43,6 +65,9 @@ export const AccountsPage: React.FC = () => {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingProvider, setDeletingProvider] = useState<ProviderAccount | null>(null);
+  const [deletingEmail, setDeletingEmail] = useState<EmailAccount | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [portfolioStats, setPortfolioStats] = useState<{
     domains: number;
     servers: number;
@@ -319,17 +344,28 @@ export const AccountsPage: React.FC = () => {
                       </div>
                       <div className="min-w-0">
                         <h2 className="truncate text-title-md font-semibold text-on-surface">{account.label}</h2>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="font-mono text-caption-xs text-secondary uppercase bg-surface-container px-1.5 py-0.5 rounded">
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="font-mono text-caption-xs text-secondary uppercase bg-surface-container px-1.5 py-0.5 rounded font-semibold">
                             {account.providerKey}
                           </span>
-                          <span className="text-caption-xs text-secondary">
-                            ID: {account.externalAccountId || 'Default'}
+                          <span className="font-mono text-caption-xs text-secondary bg-surface-container-high/60 px-2 py-0.5 rounded border border-outline-variant/30 max-w-[280px] truncate" title={formatExternalAccountId(account.externalAccountId)}>
+                            ID: {formatExternalAccountId(account.externalAccountId)}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <InventoryState state={account.inventoryState} />
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <InventoryState state={account.inventoryState} />
+                      <button
+                        type="button"
+                        title={`Delete ${account.label}`}
+                        disabled={busyId === account.id || isDeleting}
+                        onClick={() => setDeletingProvider(account)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-secondary hover:bg-error/10 hover:text-error transition-colors disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                      </button>
+                    </div>
                   </div>
                   <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 border-t border-outline-variant/30 pt-3">
                     <div>
@@ -384,6 +420,16 @@ export const AccountsPage: React.FC = () => {
                       >
                         {account.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}
                       </Button>
+                      <button
+                        type="button"
+                        disabled={busyId === account.id || isDeleting}
+                        onClick={() => setDeletingProvider(account)}
+                        title={`Delete ${account.label}`}
+                        className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-caption-xs font-semibold text-error hover:bg-error/10 transition-colors disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -404,7 +450,18 @@ export const AccountsPage: React.FC = () => {
                       <p className="truncate text-body-sm text-secondary font-mono text-caption-xs">{account.email}</p>
                     </div>
                   </div>
-                  <InventoryState state={account.inventoryState} />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <InventoryState state={account.inventoryState} />
+                    <button
+                      type="button"
+                      title={`Delete ${account.email}`}
+                      disabled={busyId === account.id || isDeleting}
+                      onClick={() => setDeletingEmail(account)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-secondary hover:bg-error/10 hover:text-error transition-colors disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">delete</span>
+                    </button>
+                  </div>
                 </div>
                 {account.notes && <p className="mt-3 line-clamp-2 text-body-sm text-secondary">{account.notes}</p>}
                 <div className="mt-4 flex justify-end gap-1 border-t border-outline-variant/30 pt-3">
@@ -419,6 +476,16 @@ export const AccountsPage: React.FC = () => {
                   >
                     {account.inventoryState === 'TRACKED' ? 'Archive' : 'Restore'}
                   </Button>
+                  <button
+                    type="button"
+                    disabled={busyId === account.id || isDeleting}
+                    onClick={() => setDeletingEmail(account)}
+                    title={`Delete ${account.email}`}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-caption-xs font-semibold text-error hover:bg-error/10 transition-colors disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Delete
+                  </button>
                 </div>
               </article>
             ))}
@@ -484,6 +551,97 @@ export const AccountsPage: React.FC = () => {
               >
                 Done
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Provider Confirmation Modal */}
+      {deletingProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6 shadow-2xl">
+            <div className="flex items-center gap-3 text-error">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-error/10">
+                <span className="material-symbols-outlined text-[24px]">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="text-title-md font-semibold text-on-surface">Delete Provider Account</h3>
+                <p className="text-caption-xs text-secondary font-mono">{deletingProvider.label}</p>
+              </div>
+            </div>
+            <p className="mt-4 text-body-sm text-secondary">
+              Are you sure you want to permanently delete <strong className="text-on-surface">{deletingProvider.label}</strong>?
+              This will remove the account and all associated domains, servers, websites, and connections from the database.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="ghost" disabled={isDeleting} onClick={() => setDeletingProvider(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="bg-error text-on-error hover:bg-error/90"
+                disabled={isDeleting}
+                onClick={async () => {
+                  setIsDeleting(true);
+                  try {
+                    await deleteProviderAccount(deletingProvider.id);
+                    providers.remove(deletingProvider.id);
+                    setDeletingProvider(null);
+                    await loadSummaryStats();
+                  } catch (err: any) {
+                    setActionError(err?.message || 'Failed to delete provider account');
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+              >
+                {isDeleting ? 'Deleting…' : 'Delete Permanently'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Email Confirmation Modal */}
+      {deletingEmail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6 shadow-2xl">
+            <div className="flex items-center gap-3 text-error">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-error/10">
+                <span className="material-symbols-outlined text-[24px]">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="text-title-md font-semibold text-on-surface">Delete Email Account</h3>
+                <p className="text-caption-xs text-secondary font-mono">{deletingEmail.email}</p>
+              </div>
+            </div>
+            <p className="mt-4 text-body-sm text-secondary">
+              Are you sure you want to permanently delete <strong className="text-on-surface">{deletingEmail.email}</strong>?
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="ghost" disabled={isDeleting} onClick={() => setDeletingEmail(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="bg-error text-on-error hover:bg-error/90"
+                disabled={isDeleting}
+                onClick={async () => {
+                  setIsDeleting(true);
+                  try {
+                    await deleteInventory('email-accounts', deletingEmail.id, true);
+                    emails.remove(deletingEmail.id);
+                    setDeletingEmail(null);
+                    await loadSummaryStats();
+                  } catch (err: any) {
+                    setActionError(err?.message || 'Failed to delete email account');
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+              >
+                {isDeleting ? 'Deleting…' : 'Delete Permanently'}
+              </Button>
             </div>
           </div>
         </div>

@@ -1089,6 +1089,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   cancelBtn: {
+    
     marginTop: 6,
     paddingVertical: 13,
     borderRadius: 14,
