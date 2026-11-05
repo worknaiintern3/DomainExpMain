@@ -153,6 +153,7 @@ export const STORAGE_KEYS = {
   CONSOLE_ACCOUNT: 'dp_console_account',
   PROVIDER_TOKENS_MAP: 'dp_provider_tokens_map',
   EXPO_PUSH_TOKEN: 'dp_expo_push_token',
+  PUSH_NOTIFICATION_HISTORY: 'dp_push_notification_history_v2',
 };
 
 let currentActiveUserId: string | null = null;

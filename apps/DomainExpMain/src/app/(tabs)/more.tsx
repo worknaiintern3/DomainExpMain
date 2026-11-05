@@ -300,7 +300,7 @@ export default function MoreScreen() {
           title,
           `${body}\n\n✓ A system push notification has also been dispatched to your device's notification bar and saved to your Alerts feed.`,
           [
-            { text: 'View Alerts Feed', onPress: () => router.push('/(tabs)/alerts') },
+            { text: 'View Alerts Feed', onPress: () => router.push('/alerts') },
             { text: 'Dismiss', style: 'cancel' },
           ]
         );

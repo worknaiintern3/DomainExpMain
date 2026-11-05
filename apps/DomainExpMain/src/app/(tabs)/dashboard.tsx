@@ -110,7 +110,8 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData(false);
-    }, [loadData])
+      refreshConfig();
+    }, [loadData, refreshConfig])
   );
 
   const onRefresh = async () => {
@@ -292,7 +293,7 @@ export default function DashboardScreen() {
               borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255, 255, 255, 0.8)',
             },
           ]}
-          onPress={() => router.push('/(tabs)/alerts')}
+          onPress={() => router.push('/alerts' as any)}
           activeOpacity={0.8}
         >
           <View style={[styles.greenPulseDot, { backgroundColor: systemStatus.color }]} />
@@ -440,7 +441,8 @@ export default function DashboardScreen() {
         {isFeatureEnabled('alerts') && (
           <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => router.push('/(tabs)/alerts')}
+            onPress={() => router.push('/alerts' as any)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             activeOpacity={0.85}
           >
             <View style={styles.statCardHeader}>
@@ -599,7 +601,7 @@ export default function DashboardScreen() {
                 } else if (item.id.includes('srv')) {
                   router.push('/(tabs)/servers');
                 } else {
-                  router.push('/(tabs)/alerts');
+                  router.push('/alerts' as any);
                 }
               };
 
@@ -702,7 +704,6 @@ export default function DashboardScreen() {
       case 'banner':
         return (
           <View key="sec_banner">
-            {renderAnnouncements()}
             {renderHeroCard()}
           </View>
         );
@@ -732,7 +733,8 @@ export default function DashboardScreen() {
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={[styles.bellButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            onPress={() => router.push('/(tabs)/alerts')}
+            onPress={() => router.push('/alerts' as any)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             activeOpacity={0.7}
             accessibilityLabel="Alerts"
           >
@@ -760,6 +762,7 @@ export default function DashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {renderAnnouncements()}
         {sortedSections.map((section) => renderSectionByKey(section))}
       </ScrollView>
     </View>

@@ -108,7 +108,7 @@ export default function RecentActivitiesScreen() {
     } else if (item.id.includes('srv') || item.title.toLowerCase().includes('server') || item.title.toLowerCase().includes('vps')) {
       router.push('/(tabs)/servers' as any);
     } else {
-      router.push('/(tabs)/alerts' as any);
+      router.push('/alerts' as any);
     }
   };
 

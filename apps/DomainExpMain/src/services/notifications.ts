@@ -37,7 +37,7 @@ export interface NotificationPreferences {
 export interface NotificationHistoryItem {
   id: string;
   assetId: string;
-  assetType: 'domain' | 'server' | 'hosting' | 'ssl';
+  assetType: 'domain' | 'server' | 'hosting' | 'ssl' | 'system' | string;
   assetName: string;
   expiryDate: string;
   reminderThreshold: number;
@@ -93,7 +93,17 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       }
     }
 
-    // 2. Request / check OS permissions
+    // 2. Check if running in Expo Go (remote push notifications require a custom development build / standalone APK)
+    const isExpoGo =
+      (Constants as any)?.appOwnership === 'expo' ||
+      (Constants as any)?.executionEnvironment === 'storeClient';
+
+    if (isExpoGo) {
+      console.log('Notice: Remote push notification registration skipped in Expo Go (requires development build / standalone APK)');
+      return null;
+    }
+
+    // 3. Request / check OS permissions
     const permissions: any = await Notifications.getPermissionsAsync();
     let isGranted = Boolean(permissions?.granted || permissions?.status === 'granted');
 
@@ -107,7 +117,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       return null;
     }
 
-    // 3. Resolve EAS project ID
+    // 4. Resolve EAS project ID
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ??
       (Constants as any)?.easConfig?.projectId ??
@@ -120,6 +130,11 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       });
       pushToken = tokenResult.data;
     } catch (tokenErr: any) {
+      const errMsg = String(tokenErr?.message || '');
+      if (errMsg.includes('ExpoApplication') || errMsg.includes('native module')) {
+        console.warn('Notice: Push notifications require native ExpoApplication module in development build.');
+        return null;
+      }
       try {
         const fallbackResult = await Notifications.getExpoPushTokenAsync();
         pushToken = fallbackResult.data;
@@ -176,6 +191,81 @@ export async function unregisterPushNotificationsAsync(): Promise<void> {
   }
 }
 
+export async function getLocalPushNotifications(): Promise<NotificationHistoryItem[]> {
+  try {
+    const raw = await getItem(STORAGE_KEYS.PUSH_NOTIFICATION_HISTORY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+export async function saveLocalPushNotification(item: NotificationHistoryItem): Promise<void> {
+  try {
+    const list = await getLocalPushNotifications();
+    const filtered = list.filter((p) => p.id !== item.id);
+    const updated = [item, ...filtered].slice(0, 100);
+    await setItem(STORAGE_KEYS.PUSH_NOTIFICATION_HISTORY, JSON.stringify(updated));
+  } catch {}
+}
+
+export async function clearAllLocalPushNotifications(): Promise<void> {
+  try {
+    await setItem(STORAGE_KEYS.PUSH_NOTIFICATION_HISTORY, JSON.stringify([]));
+  } catch {}
+}
+
+export async function markAllNotificationsAsReadLocal(): Promise<void> {
+  try {
+    const list = await getLocalPushNotifications();
+    const updated = list.map((item) => ({ ...item, isRead: true, readAt: new Date().toISOString() }));
+    await setItem(STORAGE_KEYS.PUSH_NOTIFICATION_HISTORY, JSON.stringify(updated));
+  } catch {}
+}
+
+function notificationToHistoryItem(
+  notif: Notifications.Notification,
+  isRead = false,
+): NotificationHistoryItem {
+  const content = notif.request?.content;
+  const data = (content?.data as Record<string, any>) || {};
+  const id = notif.request?.identifier || `push_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const title = content?.title || data.title || 'Push Notification';
+  const body = content?.body || data.body || data.message || '';
+  const date = notif.date ? new Date(notif.date).toISOString() : new Date().toISOString();
+
+  return {
+    id,
+    assetId: String(data.assetId || 'admin_broadcast'),
+    assetType: (data.assetType as any) || 'system',
+    assetName: String(data.assetName || data.category || 'DomainPulse Alert'),
+    expiryDate: date,
+    reminderThreshold: typeof data.days === 'number' ? data.days : 0,
+    title,
+    body,
+    status: 'delivered',
+    ticketId: null,
+    isRead,
+    readAt: isRead ? date : null,
+    createdAt: date,
+  };
+}
+
+export async function syncPresentedNotifications(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    if (Array.isArray(presented) && presented.length > 0) {
+      for (const notif of presented) {
+        const item = notificationToHistoryItem(notif, false);
+        await saveLocalPushNotification(item);
+      }
+    }
+  } catch {}
+}
+
 /**
  * Sets up foreground and tap listeners. Returns subscription cleanup function.
  */
@@ -184,12 +274,22 @@ export function setupNotificationListeners(
   onNotificationTapped?: (data: Record<string, any>) => void,
 ): () => void {
   const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+    try {
+      const item = notificationToHistoryItem(notification, false);
+      saveLocalPushNotification(item).catch(() => {});
+    } catch {}
     if (onNotificationReceived) {
       onNotificationReceived(notification);
     }
   });
 
   const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    try {
+      if (response?.notification) {
+        const item = notificationToHistoryItem(response.notification, true);
+        saveLocalPushNotification(item).catch(() => {});
+      }
+    } catch {}
     const data = response.notification.request.content.data;
     if (onNotificationTapped && data) {
       onNotificationTapped(data);
@@ -226,26 +326,64 @@ export async function updateNotificationPreferences(
 }
 
 /**
- * Retrieves notification history from the backend.
+ * Retrieves notification history from local cache and backend.
  */
 export async function getNotificationHistory(limit = 50): Promise<NotificationHistoryItem[]> {
-  const result = await apiRequest<NotificationHistoryItem[]>(
-    `/notifications/history?limit=${limit}`,
-    {
-      method: 'GET',
-    },
-  );
-  return result ?? [];
+  // Sync any active notifications currently sitting in the system tray
+  await syncPresentedNotifications().catch(() => {});
+
+  // Fetch local cached push notifications
+  const localList = await getLocalPushNotifications();
+
+  // Fetch from server if authenticated
+  let serverList: NotificationHistoryItem[] = [];
+  try {
+    const res = await apiRequest<NotificationHistoryItem[]>(
+      `/notifications/history?limit=${limit}`,
+      {
+        method: 'GET',
+      },
+    );
+    if (Array.isArray(res)) {
+      serverList = res;
+      for (const item of res) {
+        saveLocalPushNotification(item).catch(() => {});
+      }
+    }
+  } catch {}
+
+  // Deduplicate by id and title+body
+  const map = new Map<string, NotificationHistoryItem>();
+  [...localList, ...serverList].forEach((item) => {
+    if (!item) return;
+    const key = item.id || `${item.title}_${item.body}`;
+    if (!map.has(key)) {
+      map.set(key, item);
+    }
+  });
+
+  return Array.from(map.values())
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
 }
 
 /**
  * Marks a notification as read.
  */
 export async function markNotificationAsRead(id: string): Promise<boolean> {
+  try {
+    const list = await getLocalPushNotifications();
+    const updated = list.map((item) =>
+      item.id === id ? { ...item, isRead: true, readAt: new Date().toISOString() } : item,
+    );
+    await setItem(STORAGE_KEYS.PUSH_NOTIFICATION_HISTORY, JSON.stringify(updated));
+  } catch {}
+
   const result = await apiRequest<{ ok: boolean }>(`/notifications/history/${id}/read`, {
     method: 'PATCH',
-  });
-  return result?.ok ?? false;
+  }).catch(() => null);
+
+  return result?.ok ?? true;
 }
 
 /**
@@ -329,10 +467,27 @@ export async function sendLocalTestNotificationAsync(days: number): Promise<{
         sound: 'default',
         channelId: 'expiry-alerts',
         priority: Notifications.AndroidNotificationPriority.MAX,
-        data: { url: '/(tabs)/alerts', days },
+        data: { url: '/alerts', days },
       } as any,
       trigger: null,
     });
+
+    const testItem: NotificationHistoryItem = {
+      id: `local_test_${Date.now()}`,
+      assetId: 'test_notification',
+      assetType: 'domain',
+      assetName: 'Asset Expiry Monitor',
+      expiryDate: new Date().toISOString(),
+      reminderThreshold: days,
+      title,
+      body,
+      status: 'delivered',
+      ticketId: null,
+      isRead: false,
+      readAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    saveLocalPushNotification(testItem).catch(() => {});
 
     return {
       success: true,
@@ -352,7 +507,6 @@ export async function sendLocalTestNotificationAsync(days: number): Promise<{
   }
 }
 
-
 /**
  * Triggers a real remote test push notification from backend to this device
  */
@@ -364,5 +518,23 @@ export async function sendRemoteTestPushNotificationAsync(
     method: 'POST',
     body: { title, message },
   });
+  if (result?.ok) {
+    const testItem: NotificationHistoryItem = {
+      id: `remote_test_${Date.now()}`,
+      assetId: 'admin_broadcast',
+      assetType: 'system',
+      assetName: 'Live Cloud Notification Test',
+      expiryDate: new Date().toISOString(),
+      reminderThreshold: 0,
+      title: title || '🔔 DomainPulse Push Notification Test',
+      body: message || 'Push notifications are fully working on your mobile device!',
+      status: 'delivered',
+      ticketId: null,
+      isRead: false,
+      readAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    saveLocalPushNotification(testItem).catch(() => {});
+  }
   return result;
 }

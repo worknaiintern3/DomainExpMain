@@ -439,6 +439,7 @@ export class MobileAdminService {
       actionUrl: input.actionUrl ?? null,
       actionLabel: input.actionLabel ?? null,
       isActive: input.isActive ?? true,
+      broadcastType: (input as any).broadcastType ?? 'announcement',
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
       createdAt: new Date(),
@@ -447,6 +448,21 @@ export class MobileAdminService {
 
     await cols.mobileAnnouncements.insertOne(created as any);
     await this.logAudit('CREATE_ANNOUNCEMENT', `mobile_announcements:${created.id}`, input, userId, ipAddress);
+
+    // If sendPush is true or not explicitly false, also dispatch push notification to mobile devices!
+    if (input.sendPush !== false) {
+      await this.broadcastPushNotification(
+        {
+          title: input.title,
+          message: input.message,
+          platform: 'all',
+          skipAnnouncementRecord: true,
+        } as any,
+        userId ?? undefined,
+        ipAddress ?? undefined,
+      ).catch((err) => console.error('Error broadcasting push for announcement:', err));
+    }
+
     return created;
   }
 
@@ -468,6 +484,7 @@ export class MobileAdminService {
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       ...(input.startsAt !== undefined ? { startsAt: input.startsAt ? new Date(input.startsAt) : null } : {}),
       ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt ? new Date(input.expiresAt) : null } : {}),
+      ...((input as any).broadcastType !== undefined ? { broadcastType: (input as any).broadcastType } : {}),
       updatedAt: new Date(),
     };
 
@@ -475,6 +492,19 @@ export class MobileAdminService {
     const updated = await cols.mobileAnnouncements.findOne({ id });
     if (!updated) {
       throw new NotFoundException(`Announcement '${id}' not found`);
+    }
+
+    if (input.sendPush) {
+      await this.broadcastPushNotification(
+        {
+          title: updated.title,
+          message: updated.message,
+          platform: 'all',
+          skipAnnouncementRecord: true,
+        } as any,
+        userId ?? undefined,
+        ipAddress ?? undefined,
+      ).catch((err) => console.error('Error broadcasting push for updated announcement:', err));
     }
 
     await this.logAudit('UPDATE_ANNOUNCEMENT', `mobile_announcements:${id}`, input, userId, ipAddress);
@@ -970,7 +1000,7 @@ export class MobileAdminService {
           to: pushTargets,
           title: data.title,
           body: data.message,
-          data: { route: '/(tabs)/alerts', type: 'fleet_broadcast' },
+          data: { route: '/alerts', type: 'fleet_broadcast' },
           channelId: 'default',
           priority: 'high',
         },
@@ -978,18 +1008,50 @@ export class MobileAdminService {
     }
 
     const now = new Date();
-    const historyEntries = userIds.map((uId) => ({
+    // Gather all users so everyone's in-app notification center shows the announcement
+    const allUsers = (await cols.users.find({}, { projection: { id: 1 } }).toArray().catch(() => [])) || [];
+    const targetUserIds = [...new Set([...userIds, ...allUsers.map((u: any) => u.id)].filter(Boolean))];
+
+    const historyEntries = targetUserIds.map((uId) => ({
       id: randomUUID(),
       userId: uId,
+      assetId: 'admin_broadcast',
+      assetType: 'system',
+      assetName: 'Admin Announcement',
+      expiryDate: now,
+      reminderThreshold: 0,
       title: data.title,
+      body: data.message,
       message: data.message,
       channel: 'push',
       status: 'delivered',
+      isRead: false,
+      readAt: null,
       createdAt: now,
+      updatedAt: now,
     }));
 
     if (historyEntries.length > 0) {
       await cols.notificationHistory?.insertMany(historyEntries as any).catch(() => null);
+    }
+
+    // Persist as a mobile announcement so it shows in the Admin list and on Mobile Home Screen!
+    if (!(data as any).skipAnnouncementRecord) {
+      const announcementRecord = {
+        id: (data as any).announcementId || randomUUID(),
+        title: data.title,
+        message: data.message,
+        type: ((data as any).type as 'info' | 'warning' | 'critical' | 'promo') || 'info',
+        actionUrl: (data as any).actionUrl ?? null,
+        actionLabel: (data as any).actionLabel ?? null,
+        isActive: true,
+        broadcastType: (data as any).broadcastType || 'push',
+        startsAt: now,
+        expiresAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await cols.mobileAnnouncements?.insertOne(announcementRecord as any).catch(() => null);
     }
 
     await this.logAudit('BROADCAST_PUSH_NOTIFICATION', 'mobile_fleet', { ...data, recipientsCount: userIds.length }, adminUserId, ipAddress);
@@ -1027,21 +1089,31 @@ export class MobileAdminService {
           to: pushTargets,
           title: data.title,
           body: data.message,
-          data: { route: '/(tabs)/alerts', type: 'user_notification' },
+          data: { route: '/alerts', type: 'user_notification' },
           channelId: 'default',
           priority: 'high',
         },
       ]).catch((err) => console.error('Error dispatching user push notification:', err));
     }
 
+    const now = new Date();
     const historyItem = {
       id: randomUUID(),
       userId,
+      assetId: 'admin_notification',
+      assetType: 'system',
+      assetName: 'Admin Notification',
+      expiryDate: now,
+      reminderThreshold: 0,
       title: data.title,
+      body: data.message,
       message: data.message,
       channel: data.channel || 'all',
       status: 'delivered',
-      createdAt: new Date(),
+      isRead: false,
+      readAt: null,
+      createdAt: now,
+      updatedAt: now,
     };
 
     await cols.notificationHistory?.insertOne(historyItem as any).catch(() => null);

@@ -142,7 +142,7 @@ export class MobileClientService {
 
       const announcementRows =
         (await cols?.mobileAnnouncements
-          .find({ isActive: true } as any)
+          .find({ isActive: true, broadcastType: { $ne: 'push' } } as any)
           .toArray()) || [];
       const announcements = announcementRows.map((a: any) => ({
         id: a.id,
@@ -152,6 +152,7 @@ export class MobileClientService {
         actionUrl: a.actionUrl,
         actionLabel: a.actionLabel,
         isActive: a.isActive,
+        broadcastType: a.broadcastType || 'announcement',
         startsAt: a.startsAt?.toISOString() ?? null,
         expiresAt: a.expiresAt?.toISOString() ?? null,
       }));

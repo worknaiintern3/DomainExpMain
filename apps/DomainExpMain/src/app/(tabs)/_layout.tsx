@@ -495,12 +495,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="alerts"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
         name="more"
         options={{
           title: 'More',

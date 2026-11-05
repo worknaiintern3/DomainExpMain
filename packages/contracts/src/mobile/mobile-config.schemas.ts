@@ -66,6 +66,10 @@ export const MobileAnnouncementSchema = z
     isActive: z.boolean(),
     startsAt: z.string().nullable().optional(),
     expiresAt: z.string().nullable().optional(),
+    sendPush: z.boolean().optional(),
+    broadcastType: z.enum(['announcement', 'push']).optional(),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
   })
   .strict();
 export type MobileAnnouncement = z.infer<typeof MobileAnnouncementSchema>;
@@ -177,6 +181,10 @@ export const CreateMobileAnnouncementRequestSchema = z
     isActive: z.boolean().default(true),
     startsAt: z.string().nullable().optional(),
     expiresAt: z.string().nullable().optional(),
+    sendPush: z.boolean().optional(),
+    broadcastType: z.enum(['announcement', 'push']).optional(),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
   })
   .strict();
 export type CreateMobileAnnouncementRequest = z.infer<
@@ -193,6 +201,10 @@ export const UpdateMobileAnnouncementRequestSchema = z
     isActive: z.boolean().optional(),
     startsAt: z.string().nullable().optional(),
     expiresAt: z.string().nullable().optional(),
+    sendPush: z.boolean().optional(),
+    broadcastType: z.enum(['announcement', 'push']).optional(),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
   })
   .strict();
 export type UpdateMobileAnnouncementRequest = z.infer<

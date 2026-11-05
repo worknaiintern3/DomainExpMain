@@ -181,18 +181,20 @@ export class NotificationsController {
 
     return history.map((item) => ({
       id: item.id,
-      assetId: item.assetId,
-      assetType: item.assetType,
-      assetName: item.assetName,
-      expiryDate: item.expiryDate.toISOString(),
-      reminderThreshold: item.reminderThreshold,
+      assetId: item.assetId || 'admin_broadcast',
+      assetType: item.assetType || 'system',
+      assetName: item.assetName || 'Admin Announcement',
+      expiryDate: item.expiryDate
+        ? (item.expiryDate instanceof Date ? item.expiryDate.toISOString() : new Date(item.expiryDate).toISOString())
+        : new Date().toISOString(),
+      reminderThreshold: item.reminderThreshold ?? 0,
       title: item.title,
-      body: item.body,
-      status: item.status,
+      body: item.body || (item as any).message || '',
+      status: item.status || 'delivered',
       ticketId: item.ticketId ?? null,
       isRead: item.isRead ?? false,
-      readAt: item.readAt ? item.readAt.toISOString() : null,
-      createdAt: item.createdAt.toISOString(),
+      readAt: item.readAt ? (item.readAt instanceof Date ? item.readAt.toISOString() : new Date(item.readAt).toISOString()) : null,
+      createdAt: item.createdAt ? (item.createdAt instanceof Date ? item.createdAt.toISOString() : new Date(item.createdAt).toISOString()) : new Date().toISOString(),
     }));
   }
 

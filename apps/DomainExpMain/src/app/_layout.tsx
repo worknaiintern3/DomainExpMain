@@ -15,6 +15,8 @@ import { SettingsProvider } from '../store/settings-context';
 import {
   setupNotificationListeners,
   registerForPushNotificationsAsync,
+  saveLocalPushNotification,
+  syncPresentedNotifications,
 } from '../services/notifications';
 
 import { RemoteConfigProvider, useRemoteConfig } from '../store/remote-config-context';
@@ -113,24 +115,48 @@ function NavigationRoot() {
           const cleanId = String(data.assetId).replace(/^ssl_/, '');
           router.push({ pathname: '/domain/[id]', params: { id: cleanId } });
         } else {
-          router.push('/(tabs)/alerts' as any);
+          router.push('/alerts' as any);
         }
       } catch (err) {
         console.warn('Notification deep link navigation error:', err);
       }
     };
 
+    // Sync any notifications currently waiting in the Android/iOS status bar
+    syncPresentedNotifications().catch(() => {});
+
     // Check if app was opened via notification click from killed state
     Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response?.notification?.request?.content?.data) {
-        handleNotificationRoute(response.notification.request.content.data);
+      if (response?.notification) {
+        const notif = response.notification;
+        const content = notif.request?.content;
+        const data = (content?.data as Record<string, any>) || {};
+        saveLocalPushNotification({
+          id: notif.request?.identifier || `push_${Date.now()}`,
+          assetId: String(data.assetId || 'admin_broadcast'),
+          assetType: (data.assetType as any) || 'system',
+          assetName: String(data.assetName || 'Push Notification'),
+          expiryDate: new Date().toISOString(),
+          reminderThreshold: 0,
+          title: content?.title || data.title || 'Push Notification',
+          body: content?.body || data.body || '',
+          status: 'delivered',
+          ticketId: null,
+          isRead: true,
+          readAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        }).catch(() => {});
+
+        if (content?.data) {
+          handleNotificationRoute(content.data);
+        }
       }
     }).catch(() => {});
 
     // Listen for foreground taps or background response
     const cleanup = setupNotificationListeners(
       (_notif) => {
-        // Foreground alert received
+        // Foreground alert received - automatically persisted by setupNotificationListeners
       },
       (data) => {
         handleNotificationRoute(data);
@@ -156,6 +182,13 @@ function NavigationRoot() {
         <Stack.Screen name="google-play" options={{ headerShown: false }} />
         <Stack.Screen
           name="activities"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="alerts"
           options={{
             headerShown: false,
             animation: 'slide_from_right',

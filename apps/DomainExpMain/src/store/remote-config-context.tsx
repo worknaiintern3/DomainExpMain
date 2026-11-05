@@ -232,7 +232,7 @@ export function RemoteConfigProvider({ children }: { children: ReactNode }) {
       isFeatureEnabled,
       maintenanceMode: Boolean(config.app?.maintenanceMode),
       maintenanceMessage: config.app?.maintenanceMessage || null,
-      announcements: (config.announcements || []).filter((a) => a.isActive),
+      announcements: (config.announcements || []).filter((a) => a && a.isActive !== false && (a as any).broadcastType !== 'push' && a.actionUrl !== '#push_notification'),
       homeSections: (config.homeSections || DEFAULT_CONFIG.homeSections).sort(
         (a, b) => a.sortOrder - b.sortOrder,
       ),

@@ -88,6 +88,7 @@ export const mobileAnnouncements = pgTable(
     actionUrl: text('action_url'),
     actionLabel: text('action_label'),
     isActive: boolean('is_active').default(true).notNull(),
+    broadcastType: text('broadcast_type').default('announcement'),
     startsAt: timestamp('starts_at', { mode: 'date', withTimezone: true }),
     expiresAt: timestamp('expires_at', { mode: 'date', withTimezone: true }),
     ...lifecycleTimestamps(),
