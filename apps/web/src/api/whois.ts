@@ -403,7 +403,7 @@ export async function lookupWhois(
   }
 
   const promise = (async () => {
-    // 1. PRIMARY PATH: Direct live query to WhoisFreaks using the active API key
+    // 1. PRIMARY PATH: Direct live query to WhoisFreaks via configured base URL
     try {
       const baseUrl = getWhoisFreaksBaseUrl();
       const wfUrl = `${baseUrl}/v1.0/whois?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&whois=live&domainName=${encodeURIComponent(cleanDomain)}`;
@@ -416,24 +416,40 @@ export async function lookupWhois(
 
           // Also asynchronously sync to backend so the database and workspace cache are updated
           void apiRequest<NormalizedWhoisData>(`/whois/live?domain=${encodeURIComponent(cleanDomain)}${domainId ? `&domainId=${domainId}` : ''}`, {
-            authenticated: true,
+            authenticated: false,
           }).catch(() => {});
 
           return normalized;
         }
       }
     } catch (wfErr) {
-      console.warn('WhoisFreaks direct live query failed, trying backend / fallback:', wfErr);
+      console.warn('WhoisFreaks query via proxy failed, trying backend / direct:', wfErr);
     }
 
-    // 2. Secondary path: Query backend /whois/live
+    // 2. Direct public API query (WhoisFreaks supports wildcard CORS)
+    try {
+      const directWfUrl = `https://api.whoisfreaks.com/v1.0/whois?apiKey=${encodeURIComponent(FALLBACK_API_KEY)}&whois=live&domainName=${encodeURIComponent(cleanDomain)}`;
+      const directRes = await fetch(directWfUrl, { signal });
+      if (directRes.ok) {
+        const json = await directRes.json();
+        if (json && (json.status === true || json.domain_name)) {
+          const normalized = normalizeRawWhoisResponse(cleanDomain, json);
+          WHOIS_CACHE.set(cleanDomain, { data: normalized, timestamp: Date.now() });
+          return normalized;
+        }
+      }
+    } catch (directErr) {
+      console.warn('Direct WhoisFreaks query failed, trying backend:', directErr);
+    }
+
+    // 3. Secondary path: Query backend /whois/live
     try {
       const queryParams = new URLSearchParams({ domain: cleanDomain });
       if (domainId) queryParams.set('domainId', domainId);
       
       const res = await apiRequest<NormalizedWhoisData>(`/whois/live?${queryParams.toString()}`, {
         signal,
-        authenticated: true,
+        authenticated: false,
       });
       if (res) {
         WHOIS_CACHE.set(cleanDomain, { data: res, timestamp: Date.now() });

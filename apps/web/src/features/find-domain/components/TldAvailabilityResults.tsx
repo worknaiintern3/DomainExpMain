@@ -104,9 +104,7 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                   key={item.id}
                   onClick={() => {
                     onSelectDomain(item.domain, item.status);
-                    if (item.status === 'registered' || item.status === 'unknown') {
-                      onOpenWhois?.(item.domain);
-                    }
+                    onOpenWhois?.(item.domain);
                   }}
                   className={`h-11 cursor-pointer transition-colors group ${
                     isSelected
@@ -218,85 +216,72 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                       className="inline-flex items-center gap-1"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {isAvailable ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSelectDomain(item.domain, 'available');
-                              onCompareRegistrars(item.domain);
-                            }}
-                            className="h-7 px-2.5 rounded bg-primary text-on-primary font-caption-xs text-caption-xs font-semibold hover:bg-tertiary shadow-sm transition-colors cursor-pointer"
-                          >
-                            Compare
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onToggleWatchlist(item)}
-                            className={`w-7 h-7 flex items-center justify-center rounded transition-colors cursor-pointer ${
-                              item.isSaved
-                                ? 'bg-secondary-container text-primary hover:bg-surface-container'
-                                : 'bg-surface-container-low hover:bg-surface-container text-secondary hover:text-primary'
-                            }`}
-                            title={item.isSaved ? 'Remove from Saved' : 'Save Domain'}
-                          >
-                            <span
-                              className="material-symbols-outlined text-[16px]"
-                              style={{
-                                fontVariationSettings: item.isSaved ? "'FILL' 1" : "'FILL' 0",
-                              }}
-                            >
-                              {item.isSaved ? 'bookmark' : 'bookmark_border'}
-                            </span>
-                          </button>
-                        </>
-                      ) : isUnknown ? (
+                      {isAvailable && (
                         <button
                           type="button"
                           onClick={() => {
-                            onSelectDomain(item.domain, 'unknown');
-                            onOpenWhois?.(item.domain);
+                            onSelectDomain(item.domain, 'available');
+                            onCompareRegistrars(item.domain);
                           }}
-                          className="h-7 px-2.5 rounded bg-surface-container hover:bg-surface-variant text-on-surface font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                          className="h-7 px-2.5 rounded bg-primary text-on-primary font-caption-xs text-caption-xs font-semibold hover:bg-tertiary shadow-sm transition-colors cursor-pointer"
                         >
-                          <span className="material-symbols-outlined text-[14px]">info</span>
-                          Details
+                          Compare
                         </button>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSelectDomain(item.domain, 'registered');
-                              onOpenWhois?.(item.domain);
-                            }}
-                            className="h-7 px-2.5 rounded bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
-                            title="Inspect Live WHOIS Data"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">fingerprint</span>
-                            Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onToggleWatchlist(item)}
-                            className={`w-7 h-7 flex items-center justify-center rounded transition-colors cursor-pointer ${
-                              item.isSaved
-                                ? 'bg-secondary-container text-primary hover:bg-surface-container'
-                                : 'bg-surface-container-low hover:bg-surface-container text-secondary hover:text-primary'
-                            }`}
-                            title={item.isSaved ? 'Remove from Tracked Watchlist' : 'Track Domain in Watchlist'}
-                          >
-                            <span
-                              className="material-symbols-outlined text-[16px]"
-                              style={{
-                                fontVariationSettings: item.isSaved ? "'FILL' 1" : "'FILL' 0",
-                              }}
-                            >
-                              {item.isSaved ? 'visibility' : 'visibility_off'}
-                            </span>
-                          </button>
-                        </>
                       )}
+
+                      {/* Details Button (Always opens WHOIS & domain details modal) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectDomain(item.domain, item.status);
+                          onOpenWhois?.(item.domain);
+                        }}
+                        className={`h-7 px-2.5 rounded font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-xs ${
+                          item.status === 'registered'
+                            ? 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25'
+                            : 'bg-surface-container hover:bg-surface-variant text-on-surface border border-outline-variant/30'
+                        }`}
+                        title="View Full WHOIS & Domain Details"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {item.status === 'registered' ? 'fingerprint' : 'info'}
+                        </span>
+                        Details
+                      </button>
+
+                      {/* Eye Icon Button (👁️) specifically for inspecting/viewing details */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectDomain(item.domain, item.status);
+                          onOpenWhois?.(item.domain);
+                        }}
+                        className="w-7 h-7 flex items-center justify-center rounded bg-surface-container-low hover:bg-primary/15 text-secondary hover:text-primary transition-colors cursor-pointer border border-transparent hover:border-primary/20"
+                        title="View Details & WHOIS (Eye)"
+                      >
+                        <span className="material-symbols-outlined text-[17px]">visibility</span>
+                      </button>
+
+                      {/* Bookmark Button for saving/watching domain */}
+                      <button
+                        type="button"
+                        onClick={() => onToggleWatchlist(item)}
+                        className={`w-7 h-7 flex items-center justify-center rounded transition-colors cursor-pointer ${
+                          item.isSaved
+                            ? 'bg-secondary-container text-primary hover:bg-surface-container'
+                            : 'bg-surface-container-low hover:bg-surface-container text-secondary hover:text-primary'
+                        }`}
+                        title={item.isSaved ? 'Remove from Saved Watchlist' : 'Save Domain to Watchlist'}
+                      >
+                        <span
+                          className="material-symbols-outlined text-[16px]"
+                          style={{
+                            fontVariationSettings: item.isSaved ? "'FILL' 1" : "'FILL' 0",
+                          }}
+                        >
+                          {item.isSaved ? 'bookmark' : 'bookmark_border'}
+                        </span>
+                      </button>
                     </div>
                   </td>
                 </tr>

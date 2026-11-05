@@ -218,6 +218,7 @@ export const FindDomainPage: React.FC = () => {
 
   const handleOpenWhois = async (domainName: string) => {
     setWhoisModalDomain(domainName);
+    setWhoisData(null);
     setWhoisLoading(true);
     setWhoisError(null);
     try {
@@ -619,10 +620,15 @@ export const FindDomainPage: React.FC = () => {
           data={whoisData}
           domainName={whoisModalDomain}
           isOpen={Boolean(whoisModalDomain)}
-          onClose={() => setWhoisModalDomain(null)}
+          onClose={() => {
+            setWhoisModalDomain(null);
+            setWhoisData(null);
+            setWhoisError(null);
+          }}
           loading={whoisLoading}
           error={whoisError}
           onRefresh={() => whoisModalDomain && void handleOpenWhois(whoisModalDomain)}
+          onAddToPortfolio={(domain) => handleToggleWatchlistFromInspector(domain)}
         />
       )}
 

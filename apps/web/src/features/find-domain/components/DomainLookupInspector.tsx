@@ -163,14 +163,15 @@ export const DomainLookupInspector: React.FC<DomainLiveInspectorProps> = ({
 
           {/* Action Buttons */}
           <div className="grid grid-cols-1 gap-unit-xs pt-1">
-            {status === 'registered' && onOpenWhois && (
+            {onOpenWhois && (
               <button
                 type="button"
                 onClick={() => onOpenWhois(domain)}
-                className="h-8 px-2 rounded-lg font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 cursor-pointer"
+                className="h-8 px-2 rounded-lg font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 cursor-pointer font-semibold shadow-xs"
+                title="View Full WHOIS & Domain Details"
               >
-                <span className="material-symbols-outlined text-[16px]">fingerprint</span>
-                <span>View Full WHOIS &amp; DNS Details</span>
+                <span className="material-symbols-outlined text-[16px]">visibility</span>
+                <span>View Full Details &amp; WHOIS</span>
               </button>
             )}
             <button
