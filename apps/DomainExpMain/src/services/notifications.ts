@@ -60,9 +60,21 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   }
 
   try {
-    // 1. Configure Android Notification Channel (supported in standalone APK/AAB builds)
+    // 1. Configure Android Notification Channels (default & expiry-alerts)
     if (Platform.OS === 'android') {
       try {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'General Notifications',
+          importance: Notifications.AndroidImportance.MAX,
+          sound: 'default',
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#38bdf8',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
+        });
         await Notifications.setNotificationChannelAsync('expiry-alerts', {
           name: 'Asset Expiry Reminders',
           description: 'Notifications for domain, server, hosting, and SSL certificate expiry',
@@ -70,10 +82,13 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#2563EB',
           sound: 'default',
+          enableLights: true,
+          enableVibrate: true,
           showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
         });
       } catch (channelErr: any) {
-        // In Expo Go client, custom channels are unavailable; handled automatically in standalone builds.
         console.log('Notice: Custom notification channel skipped in Expo Go');
       }
     }
@@ -105,7 +120,13 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       });
       pushToken = tokenResult.data;
     } catch (tokenErr: any) {
-      console.log('Notice: Remote push token registration requires standalone APK or production build (Expo Go on Android disables remote push).');
+      try {
+        const fallbackResult = await Notifications.getExpoPushTokenAsync();
+        pushToken = fallbackResult.data;
+      } catch (fallbackErr: any) {
+        console.log('Notice: Remote push token retrieval via Expo service failed, checking local cache...');
+        pushToken = await getItem(STORAGE_KEYS.EXPO_PUSH_TOKEN);
+      }
     }
 
     if (!pushToken) {
@@ -331,3 +352,17 @@ export async function sendLocalTestNotificationAsync(days: number): Promise<{
   }
 }
 
+
+/**
+ * Triggers a real remote test push notification from backend to this device
+ */
+export async function sendRemoteTestPushNotificationAsync(
+  title?: string,
+  message?: string,
+): Promise<{ ok: boolean; sentCount: number; message?: string }> {
+  const result = await apiRequest<{ ok: boolean; sentCount: number; message?: string }>('/notifications/test', {
+    method: 'POST',
+    body: { title, message },
+  });
+  return result;
+}

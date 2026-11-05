@@ -99,6 +99,117 @@ export class ExpiryMonitorService {
     let remindersSkippedAlreadySent = 0;
     let remindersSkippedDisabled = 0;
 
+    // Simulation / test mode: trigger on-demand test alert directly to user's device
+    if (options.simulatedThresholds && options.simulatedThresholds.length > 0) {
+      const simulatedThreshold = options.simulatedThresholds[0] ?? 7;
+      const targetUserId = options.targetUserId;
+
+      const assets = await this.gatherMonitoredAssets(options.workspaceId);
+      let assetToSimulate: AssetToMonitor | undefined;
+
+      if (targetUserId) {
+        for (const a of assets) {
+          const userIds = await this.resolveTargetUserIds(a, targetUserId);
+          if (userIds.includes(targetUserId)) {
+            assetToSimulate = a;
+            break;
+          }
+        }
+      }
+      if (!assetToSimulate) {
+        assetToSimulate = assets[0];
+      }
+      if (!assetToSimulate) {
+        assetToSimulate = {
+          assetId: 'simulated-domain-1',
+          assetType: 'domain',
+          assetName: 'domainpulse.org',
+          hostname: 'domainpulse.org',
+          expiresAt: new Date(Date.now() + simulatedThreshold * 24 * 60 * 60 * 1000),
+          workspaceId: options.workspaceId || '',
+          status: 'active',
+        };
+      }
+
+      const targetUserIds = targetUserId
+        ? [targetUserId]
+        : await this.resolveTargetUserIds(assetToSimulate);
+
+      for (const userId of targetUserIds) {
+        remindersIdentified++;
+        const { title, body, route } = this.formatExpiryMessage(
+          assetToSimulate.assetType,
+          assetToSimulate.assetName,
+          simulatedThreshold,
+          assetToSimulate.assetId,
+        );
+
+        if (options.dryRun) {
+          remindersSent++;
+          continue;
+        }
+
+        const deviceTokens = await this.repository.getActiveDeviceTokensForUser(userId);
+        let status: 'sent' | 'pending' | 'failed' = 'pending';
+        let ticketId: string | null = null;
+        let failureReason: string | null = null;
+
+        if (deviceTokens.length > 0) {
+          const tokens = deviceTokens.map((d) => d.token);
+          const pushResult = await this.pushSender.sendPushNotifications([
+            {
+              to: tokens,
+              title,
+              body,
+              data: {
+                assetId: assetToSimulate.assetId,
+                assetType: assetToSimulate.assetType,
+                assetName: assetToSimulate.assetName,
+                route,
+              },
+              channelId: 'expiry-alerts',
+              priority: 'high',
+            },
+          ]);
+          const firstTicket = pushResult.tickets[0];
+          ticketId = firstTicket?.ticketId ?? null;
+          status = pushResult.successfulCount > 0 ? 'sent' : 'failed';
+          failureReason = firstTicket?.error ?? null;
+        } else {
+          failureReason = 'No registered active mobile device tokens';
+        }
+
+        await this.repository.recordNotificationHistory({
+          userId,
+          assetId: assetToSimulate.assetId,
+          assetType: assetToSimulate.assetType,
+          assetName: assetToSimulate.assetName,
+          expiryDate: assetToSimulate.expiresAt,
+          reminderThreshold: simulatedThreshold,
+          title,
+          body,
+          status,
+          ticketId,
+          failureReason,
+        });
+
+        remindersSent++;
+      }
+
+      return {
+        jobId,
+        startedAt: startedAt.toISOString(),
+        completedAt: new Date().toISOString(),
+        assetsChecked: 1,
+        remindersIdentified,
+        remindersSent,
+        remindersSkippedAlreadySent: 0,
+        remindersSkippedDisabled: 0,
+        dryRun: !!options.dryRun,
+        errors,
+      };
+    }
+
     const assets = await this.gatherMonitoredAssets(options.workspaceId);
 
     for (const asset of assets) {

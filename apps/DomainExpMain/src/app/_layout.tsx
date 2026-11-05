@@ -20,6 +20,21 @@ import {
 import { RemoteConfigProvider, useRemoteConfig } from '../store/remote-config-context';
 import { MaintenanceBarrier, UpdateRequiredBarrier } from '../components/AdminBarriers';
 
+// Configure foreground notification behavior at root level
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldPresentAlert: true,
+    shouldPresentBadge: true,
+    shouldPresentSound: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    priority: Notifications.AndroidNotificationPriority.MAX,
+  } as any),
+});
+
 // Configure initial route anchoring for Expo Router
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -48,6 +63,40 @@ function NavigationRoot() {
 
   // Push notification setup and deep linking navigation
   useEffect(() => {
+    // Ensure standard Android notification channels exist on app launch
+    if (Platform.OS === 'android') {
+      const setupChannels = async () => {
+        try {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'General Notifications',
+            importance: Notifications.AndroidImportance.MAX,
+            sound: 'default',
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#38bdf8',
+            enableLights: true,
+            enableVibrate: true,
+            showBadge: true,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            bypassDnd: true,
+          });
+          await Notifications.setNotificationChannelAsync('expiry-alerts', {
+            name: 'Asset Expiry Reminders',
+            description: 'Notifications for domain, server, hosting, and SSL certificate expiry',
+            importance: Notifications.AndroidImportance.MAX,
+            sound: 'default',
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#2563EB',
+            enableLights: true,
+            enableVibrate: true,
+            showBadge: true,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            bypassDnd: true,
+          });
+        } catch {}
+      };
+      setupChannels();
+    }
+
     if (isAuthenticated) {
       registerForPushNotificationsAsync().catch(() => {});
     }

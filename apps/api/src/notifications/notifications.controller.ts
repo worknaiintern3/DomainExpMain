@@ -27,12 +27,14 @@ import {
 } from '../workspace-context';
 import { NotificationsRepository } from './notifications.repository';
 import { ExpiryMonitorService } from './expiry-monitor.service';
+import { PushSenderService } from './push-sender.service';
 
 @Controller('notifications')
 export class NotificationsController {
   constructor(
     private readonly repository: NotificationsRepository,
     private readonly expiryMonitor: ExpiryMonitorService,
+    private readonly pushSender: PushSenderService,
   ) {}
 
   @Post('devices')
@@ -293,5 +295,62 @@ export class NotificationsController {
     });
 
     return result;
+  }
+
+  @Post('test')
+  @UseGuards(AccessTokenGuard)
+  async sendTestPushNotification(
+    @Req() request: WorkspaceContextRequest,
+    @Body() body: any,
+  ) {
+    const userId = request.authPrincipal?.userId;
+    if (!userId) {
+      throw new BadRequestException('User identification missing');
+    }
+
+    const deviceTokens = await this.repository.getActiveDeviceTokensForUser(userId);
+    const tokens = deviceTokens.map((d) => d.token);
+    const title = body?.title || '🔔 DomainPulse Push Notification Test';
+    const message = body?.message || 'Push notifications are fully working on your mobile device!';
+
+    if (tokens.length === 0) {
+      return {
+        ok: false,
+        message: 'No active mobile device tokens registered for your account. Please open the mobile app to register.',
+        sentCount: 0,
+      };
+    }
+
+    const pushResult = await this.pushSender.sendPushNotifications([
+      {
+        to: tokens,
+        title,
+        body: message,
+        data: { route: '/(tabs)/alerts', test: true },
+        channelId: 'default',
+        priority: 'high',
+      },
+    ]);
+
+    await this.repository.recordNotificationHistory({
+      userId,
+      assetId: 'test_notification',
+      assetType: 'domain',
+      assetName: 'DomainPulse Notification Service',
+      expiryDate: new Date(),
+      reminderThreshold: 0,
+      title,
+      body: message,
+      status: pushResult.successfulCount > 0 ? 'sent' : 'failed',
+      ticketId: pushResult.tickets[0]?.ticketId ?? null,
+      failureReason: pushResult.tickets[0]?.error ?? null,
+    });
+
+    return {
+      ok: pushResult.successfulCount > 0,
+      sentCount: pushResult.successfulCount,
+      failureCount: pushResult.failureCount,
+      tickets: pushResult.tickets,
+    };
   }
 }

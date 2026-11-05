@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type {
   MobileAnnouncementTable,
@@ -23,6 +24,7 @@ import type {
 } from '@domainpulse/contracts';
 
 import { DatabaseService } from '../database/database.service';
+import { PushSenderService } from '../notifications/push-sender.service';
 
 function formatRegistrarName(raw?: string | null): string {
   if (!raw) return 'Hostinger';
@@ -103,6 +105,9 @@ export class MobileAdminService {
   constructor(
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
+    @Optional()
+    @Inject(PushSenderService)
+    private readonly pushSender?: PushSenderService,
   ) {}
 
   private async logAudit(
@@ -950,12 +955,27 @@ export class MobileAdminService {
     const cols = this.databaseService.collections;
     if (!cols) throw new Error('MongoDB collections not available');
 
-    const filter: any = {};
+    const filter: any = { isActive: true };
     if (data.platform && data.platform !== 'all') {
       filter.platform = data.platform;
     }
-    const tokens = await cols.notificationDeviceTokens?.find(filter).toArray().catch(() => []) || [];
-    const userIds = [...new Set(tokens.map((t: any) => t.userId))];
+    const tokens = (await cols.notificationDeviceTokens?.find(filter).toArray().catch(() => [])) || [];
+    const userIds = [...new Set(tokens.map((t: any) => t.userId).filter(Boolean))];
+
+    // Dispatch real Expo Push Notification to all active fleet devices
+    const pushTargets = tokens.map((t: any) => t.token).filter(Boolean);
+    if (pushTargets.length > 0 && this.pushSender) {
+      await this.pushSender.sendPushNotifications([
+        {
+          to: pushTargets,
+          title: data.title,
+          body: data.message,
+          data: { route: '/(tabs)/alerts', type: 'fleet_broadcast' },
+          channelId: 'default',
+          priority: 'high',
+        },
+      ]).catch((err) => console.error('Error dispatching fleet push broadcast:', err));
+    }
 
     const now = new Date();
     const historyEntries = userIds.map((uId) => ({
@@ -997,6 +1017,22 @@ export class MobileAdminService {
   ) {
     const cols = this.databaseService.collections;
     if (!cols) throw new Error('MongoDB collections not available');
+
+    // Dispatch real Expo Push Notification to this user's active devices
+    const userTokens = (await cols.notificationDeviceTokens?.find({ userId, isActive: true }).toArray().catch(() => [])) || [];
+    const pushTargets = userTokens.map((t: any) => t.token).filter(Boolean);
+    if (pushTargets.length > 0 && this.pushSender) {
+      await this.pushSender.sendPushNotifications([
+        {
+          to: pushTargets,
+          title: data.title,
+          body: data.message,
+          data: { route: '/(tabs)/alerts', type: 'user_notification' },
+          channelId: 'default',
+          priority: 'high',
+        },
+      ]).catch((err) => console.error('Error dispatching user push notification:', err));
+    }
 
     const historyItem = {
       id: randomUUID(),

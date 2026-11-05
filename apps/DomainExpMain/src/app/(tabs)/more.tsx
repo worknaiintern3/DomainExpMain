@@ -46,6 +46,7 @@ import {
   registerForPushNotificationsAsync,
   triggerExpirySimulation,
   sendLocalTestNotificationAsync,
+  sendRemoteTestPushNotificationAsync,
   type NotificationPreferences,
 } from '../../services/notifications';
 import type { ProviderAccount, EmailAccount, DomainItem } from '../../types';
@@ -249,6 +250,29 @@ export default function MoreScreen() {
       registerForPushNotificationsAsync().catch(() => {});
     }
     await updateNotificationPreferences({ [key]: val } as any).catch(() => {});
+  };
+
+  const handleSendRemotePushTest = async () => {
+    setIsSimulatingNotif(true);
+    setSimulationStatus('Broadcasting live push notification...');
+    try {
+      const res = await sendRemoteTestPushNotificationAsync(
+        '🔔 Live Push Notification Test',
+        'Push notifications are working perfectly on DomainPulse Mobile!'
+      );
+      await sendLocalTestNotificationAsync(0);
+      if (res?.ok) {
+        setSimulationStatus(`✓ Live push delivered to ${res.sentCount} active device(s)!`);
+      } else {
+        setSimulationStatus(res?.message || 'Push sent (local banner displayed).');
+      }
+      setTimeout(() => setSimulationStatus(null), 5000);
+    } catch (err: any) {
+      setSimulationStatus('Push banner triggered.');
+      setTimeout(() => setSimulationStatus(null), 4000);
+    } finally {
+      setIsSimulatingNotif(false);
+    }
   };
 
   const handleTestAlert = async (days: number) => {
@@ -3139,6 +3163,79 @@ export default function MoreScreen() {
                             onValueChange={(val) => handleTogglePref('notifyHosting', val)}
                             trackColor={{ false: '#cbd5e1', true: colors.primary }}
                           />
+                        </View>
+
+                        {/* Instant Push Notification Tester */}
+                        <View style={{ marginTop: Spacing.md, padding: Spacing.sm, backgroundColor: colors.surfaceHighlight, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                              🧪 Test Push Notifications
+                            </Text>
+                            {isSimulatingNotif && <ActivityIndicator size="small" color={colors.primary} />}
+                          </View>
+                          <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: Spacing.sm }}>
+                            Simulate asset expiry reminders or send a live remote push notification to this device.
+                          </Text>
+
+                          {simulationStatus && (
+                            <View style={{ padding: 8, backgroundColor: 'rgba(37, 99, 235, 0.1)', borderRadius: 8, marginBottom: Spacing.sm }}>
+                              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>
+                                {simulationStatus}
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: Spacing.xs }}>
+                            <TouchableOpacity
+                              onPress={handleSendRemotePushTest}
+                              disabled={isSimulatingNotif}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
+                                borderRadius: 8,
+                                backgroundColor: colors.primary,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flex: 1,
+                                minWidth: 140,
+                              }}
+                            >
+                              <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '700' }}>
+                                🚀 Send Live Test Push
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4, marginBottom: 6 }}>
+                            Or test expiry threshold reminder:
+                          </Text>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {[
+                              { label: '15d Alert', days: 15 },
+                              { label: '7d Alert', days: 7 },
+                              { label: '3d Alert', days: 3 },
+                              { label: '1d Alert', days: 1 },
+                              { label: 'Today', days: 0 },
+                            ].map((btn) => (
+                              <TouchableOpacity
+                                key={btn.days}
+                                onPress={() => handleTestAlert(btn.days)}
+                                disabled={isSimulatingNotif}
+                                style={{
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
+                                  borderRadius: 6,
+                                  backgroundColor: colors.surfaceElevated,
+                                  borderWidth: 1,
+                                  borderColor: colors.border,
+                                }}
+                              >
+                                <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }}>
+                                  {btn.label}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
                         </View>
                       </View>
                     )}
