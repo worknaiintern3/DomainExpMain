@@ -3339,8 +3339,8 @@ export default function MoreScreen() {
                             url: 'http://localhost:4000/api/v1',
                           },
                           {
-                            label: '📱 LAN / WiFi (192.168.1.39)',
-                            url: 'http://192.168.1.39:4000/api/v1',
+                            label: '📱 LAN / WiFi (192.168.1.35)',
+                            url: 'http://192.168.1.35:4000/api/v1',
                           },
                           {
                             label: '🤖 Android Emulator',

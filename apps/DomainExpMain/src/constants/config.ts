@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 const PRODUCTION_API_URL = 'https://app.domainexprt.com/api/v1';
-const LOCAL_BACKEND_URL = 'http://192.168.1.39:4000/api/v1';
+const LOCAL_BACKEND_URL = 'http://192.168.1.35:4000/api/v1';
 
 const getInitialApiUrl = (): string => {
   if (process.env.EXPO_PUBLIC_API_URL) {
@@ -17,7 +17,7 @@ export const API_CONFIG = {
   DEFAULT_API_URL: getInitialApiUrl(),
   PRODUCTION_API_URL: PRODUCTION_API_URL,
   FALLBACK_LOCALHOST: 'http://localhost:4000/api/v1',
-  WIFI_IP_URL: 'http://192.168.1.39:4000/api/v1',
+  WIFI_IP_URL: 'http://192.168.1.35:4000/api/v1',
   ANDROID_EMULATOR_URL: 'http://10.0.2.2:4000/api/v1',
   TIMEOUT_MS: 15000,
   APP_NAME: 'DomainExpert',
