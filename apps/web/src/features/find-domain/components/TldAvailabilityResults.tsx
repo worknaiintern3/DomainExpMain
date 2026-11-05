@@ -102,7 +102,12 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
               return (
                 <tr
                   key={item.id}
-                  onClick={() => onSelectDomain(item.domain, item.status)}
+                  onClick={() => {
+                    onSelectDomain(item.domain, item.status);
+                    if (item.status === 'registered' || item.status === 'unknown') {
+                      onOpenWhois?.(item.domain);
+                    }
+                  }}
                   className={`h-11 cursor-pointer transition-colors group ${
                     isSelected
                       ? 'bg-primary/5 hover:bg-primary/10'
@@ -248,38 +253,46 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                       ) : isUnknown ? (
                         <button
                           type="button"
-                          onClick={() => onSelectDomain(item.domain, 'unknown')}
-                          className="h-7 px-2.5 rounded bg-surface-container hover:bg-surface-variant text-on-surface font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer"
+                          onClick={() => {
+                            onSelectDomain(item.domain, 'unknown');
+                            onOpenWhois?.(item.domain);
+                          }}
+                          className="h-7 px-2.5 rounded bg-surface-container hover:bg-surface-variant text-on-surface font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                         >
+                          <span className="material-symbols-outlined text-[14px]">info</span>
                           Details
                         </button>
                       ) : (
                         <>
-                          {onOpenWhois && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenWhois(item.domain)}
-                              className="h-7 px-2.5 rounded bg-primary/10 hover:bg-primary/20 text-primary font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer"
-                              title="Inspect Live WHOIS Data"
-                            >
-                              WHOIS
-                            </button>
-                          )}
                           <button
                             type="button"
-                            onClick={() => onSelectDomain(item.domain, 'registered')}
-                            className="h-7 px-2.5 rounded bg-surface-container hover:bg-surface-variant text-on-surface font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer"
+                            onClick={() => {
+                              onSelectDomain(item.domain, 'registered');
+                              onOpenWhois?.(item.domain);
+                            }}
+                            className="h-7 px-2.5 rounded bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 font-caption-xs text-caption-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                            title="Inspect Live WHOIS Data"
                           >
+                            <span className="material-symbols-outlined text-[14px]">fingerprint</span>
                             Details
                           </button>
                           <button
                             type="button"
                             onClick={() => onToggleWatchlist(item)}
-                            className="w-7 h-7 flex items-center justify-center rounded hover:bg-surface-container text-secondary hover:text-primary transition-colors cursor-pointer"
-                            title="Track Domain"
+                            className={`w-7 h-7 flex items-center justify-center rounded transition-colors cursor-pointer ${
+                              item.isSaved
+                                ? 'bg-secondary-container text-primary hover:bg-surface-container'
+                                : 'bg-surface-container-low hover:bg-surface-container text-secondary hover:text-primary'
+                            }`}
+                            title={item.isSaved ? 'Remove from Tracked Watchlist' : 'Track Domain in Watchlist'}
                           >
-                            <span className="material-symbols-outlined text-[16px]">
-                              visibility
+                            <span
+                              className="material-symbols-outlined text-[16px]"
+                              style={{
+                                fontVariationSettings: item.isSaved ? "'FILL' 1" : "'FILL' 0",
+                              }}
+                            >
+                              {item.isSaved ? 'visibility' : 'visibility_off'}
                             </span>
                           </button>
                         </>

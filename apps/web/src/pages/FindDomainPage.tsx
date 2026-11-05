@@ -188,7 +188,29 @@ export const FindDomainPage: React.FC = () => {
   const [rows, setRows] = useState<LiveRow[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('domainpulse_find_domain_watchlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('domainpulse_find_domain_watchlist', JSON.stringify(watchlist));
+    } catch {}
+  }, [watchlist]);
+
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showFeedback = (msg: string) => {
+    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+    setActionFeedback(msg);
+    feedbackTimeoutRef.current = setTimeout(() => setActionFeedback(null), 3000);
+  };
   const [whoisModalDomain, setWhoisModalDomain] = useState<string | null>(null);
   const [whoisData, setWhoisData] = useState<NormalizedWhoisData | null>(null);
   const [whoisLoading, setWhoisLoading] = useState(false);
@@ -362,6 +384,14 @@ export const FindDomainPage: React.FC = () => {
     setSelectedDomain(domain);
   };
 
+  const handleCompareRegistrars = (domain: string) => {
+    setSelectedDomain(domain);
+    const el = document.getElementById('registrar-price-cards');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+
   const watchlistPriceFor = (domain: string): { price: string; registrar: string; status: DomainAvailabilityStatus } => {
     const row = rows.find((candidate) => candidate.item.domain === domain);
     const priced = row ? pricedResult(row.results) : undefined;
@@ -380,6 +410,7 @@ export const FindDomainPage: React.FC = () => {
   ) => {
     if (savedSet.has(item.domain)) {
       setWatchlist((prev) => prev.filter((w) => w.domain !== item.domain));
+      showFeedback(`Removed ${item.domain} from Watchlist`);
       return;
     }
     const live = watchlistPriceFor(item.domain);
@@ -391,11 +422,13 @@ export const FindDomainPage: React.FC = () => {
       status: live.status,
     };
     setWatchlist((prev) => [newItem, ...prev]);
+    showFeedback(`Saved ${item.domain} to Watchlist`);
   };
 
   const handleToggleWatchlistFromInspector = (domain: string) => {
     if (savedSet.has(domain)) {
       setWatchlist((prev) => prev.filter((w) => w.domain !== domain));
+      showFeedback(`Removed ${domain} from Watchlist`);
     } else {
       const live = watchlistPriceFor(domain);
       const newItem: WatchlistItem = {
@@ -406,6 +439,7 @@ export const FindDomainPage: React.FC = () => {
         status: live.status,
       };
       setWatchlist((prev) => [newItem, ...prev]);
+      showFeedback(`Saved ${domain} to Watchlist`);
     }
   };
 
@@ -503,7 +537,7 @@ export const FindDomainPage: React.FC = () => {
               selectedDomain={inspectorDomain}
               onSelectDomain={handleSelectDomain}
               onToggleWatchlist={handleToggleWatchlist}
-              onCompareRegistrars={handleSelectDomain}
+              onCompareRegistrars={handleCompareRegistrars}
               onOpenWhois={handleOpenWhois}
             />
           </div>
@@ -511,23 +545,27 @@ export const FindDomainPage: React.FC = () => {
           {/* Right Column (4 cols): Provider Breakdown, Registrar Pricing & Watchlist */}
           <div className="xl:col-span-4 flex flex-col gap-unit-base">
             {inspectorDomain && (
-              <DomainLookupInspector
-                domain={inspectorDomain}
-                status={inspectorStatus}
-                results={inspectorResults}
-                requestError={inspectorError}
-                onToggleWatchlist={handleToggleWatchlistFromInspector}
-                isSaved={savedSet.has(inspectorDomain)}
-                onOpenWhois={handleOpenWhois}
-              />
+              <div id="domain-lookup-inspector">
+                <DomainLookupInspector
+                  domain={inspectorDomain}
+                  status={inspectorStatus}
+                  results={inspectorResults}
+                  requestError={inspectorError}
+                  onToggleWatchlist={handleToggleWatchlistFromInspector}
+                  isSaved={savedSet.has(inspectorDomain)}
+                  onOpenWhois={handleOpenWhois}
+                />
+              </div>
             )}
 
             {inspectorDomain && (
-              <RegistrarPriceCards
-                domain={inspectorDomain}
-                isAvailable={inspectorAvailable}
-                results={inspectorResults}
-              />
+              <div id="registrar-price-cards">
+                <RegistrarPriceCards
+                  domain={inspectorDomain}
+                  isAvailable={inspectorAvailable}
+                  results={inspectorResults}
+                />
+              </div>
             )}
 
             <WatchlistSection
@@ -579,12 +617,23 @@ export const FindDomainPage: React.FC = () => {
       {whoisModalDomain && (
         <WhoisDetailsModal
           data={whoisData}
+          domainName={whoisModalDomain}
           isOpen={Boolean(whoisModalDomain)}
           onClose={() => setWhoisModalDomain(null)}
           loading={whoisLoading}
           error={whoisError}
           onRefresh={() => whoisModalDomain && void handleOpenWhois(whoisModalDomain)}
         />
+      )}
+
+      {actionFeedback && (
+        <div
+          role="status"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900/95 text-white shadow-2xl border border-slate-700/60 text-body-sm font-medium backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-150"
+        >
+          <span className="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span>
+          <span>{actionFeedback}</span>
+        </div>
       )}
 
       {/* State 4: Error State */}

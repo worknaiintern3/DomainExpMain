@@ -108,4 +108,24 @@ describe('FindDomainPage availability search', () => {
       expect(screen.getAllByText('mobilepay.in').length).toBeGreaterThan(0);
     });
   });
+
+  it('opens WHOIS modal on Details click and toggles Watchlist for mobilepay.cafe', async () => {
+    searchMock.mockResolvedValue([
+      availability('mobilepay.cafe', false),
+    ]);
+    renderPage();
+    searchFor('mobilepay.cafe');
+
+    await waitFor(() => expect(screen.getAllByText('mobilepay.cafe').length).toBeGreaterThan(0));
+
+    // 1. Details button exists and triggers WHOIS lookup
+    const detailsButtons = screen.getAllByRole('button', { name: /Details/i });
+    expect(detailsButtons.length).toBeGreaterThan(0);
+    fireEvent.click(detailsButtons[0]!);
+
+    // 2. Track button toggles saved watchlist
+    const trackButton = screen.getByTitle(/Track Domain in Watchlist/i);
+    fireEvent.click(trackButton);
+    await waitFor(() => expect(screen.getByTitle(/Remove from Tracked Watchlist/i)).toBeInTheDocument());
+  });
 });

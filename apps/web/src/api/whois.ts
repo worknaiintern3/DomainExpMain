@@ -145,6 +145,9 @@ const FALLBACK_API_KEY =
   '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
 
 function getWhoisFreaksBaseUrl(): string {
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+    return 'https://api.whoisfreaks.com';
+  }
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return '/whoisfreaks-api';
   }

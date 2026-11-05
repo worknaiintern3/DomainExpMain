@@ -4,6 +4,7 @@ import { Button } from '@/components/common/Button';
 
 interface WhoisDetailsModalProps {
   data: NormalizedWhoisData | null;
+  domainName?: string;
   loading?: boolean;
   error?: string | null;
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface WhoisDetailsModalProps {
 
 export const WhoisDetailsModal: React.FC<WhoisDetailsModalProps> = ({
   data,
+  domainName,
   loading = false,
   error = null,
   isOpen,
@@ -59,7 +61,7 @@ export const WhoisDetailsModal: React.FC<WhoisDetailsModalProps> = ({
             <div className="flex items-center gap-unit-sm flex-wrap">
               <span className="material-symbols-outlined text-[24px] text-primary">verified_user</span>
               <h2 className="font-label-mono text-headline-md font-bold text-on-surface truncate">
-                {data?.domainName || 'WHOIS Record'}
+                {data?.domainName || domainName || 'WHOIS Record'}
               </h2>
               {data && (
                 <span
