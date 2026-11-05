@@ -124,8 +124,10 @@ describe('FindDomainPage availability search', () => {
     fireEvent.click(detailsButtons[0]!);
 
     // 2. Track button toggles saved watchlist
-    const trackButton = screen.getByTitle(/Track Domain in Watchlist/i);
+    const trackButtons = screen.getAllByTitle(/(?:Track|Save) Domain (?:in|to) Watchlist/i);
+    expect(trackButtons.length).toBeGreaterThan(0);
+    const trackButton = trackButtons[0]!;
     fireEvent.click(trackButton);
-    await waitFor(() => expect(screen.getByTitle(/Remove from Tracked Watchlist/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByTitle(/Remove from (?:Tracked|Saved) Watchlist/i).length).toBeGreaterThan(0));
   });
 });

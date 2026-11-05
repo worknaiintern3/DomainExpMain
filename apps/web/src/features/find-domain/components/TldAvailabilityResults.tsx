@@ -271,7 +271,7 @@ export const TldAvailabilityResults: React.FC<TldAvailabilityResultsProps> = ({
                             ? 'bg-secondary-container text-primary hover:bg-surface-container'
                             : 'bg-surface-container-low hover:bg-surface-container text-secondary hover:text-primary'
                         }`}
-                        title={item.isSaved ? 'Remove from Saved Watchlist' : 'Save Domain to Watchlist'}
+                        title={item.isSaved ? 'Remove from Tracked Watchlist' : 'Track Domain in Watchlist'}
                       >
                         <span
                           className="material-symbols-outlined text-[16px]"
