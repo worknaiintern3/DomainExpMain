@@ -154,6 +154,8 @@ export const STORAGE_KEYS = {
   PROVIDER_TOKENS_MAP: 'dp_provider_tokens_map',
   EXPO_PUSH_TOKEN: 'dp_expo_push_token',
   PUSH_NOTIFICATION_HISTORY: 'dp_push_notification_history_v2',
+  APP_REVIEW_STATE: 'dp_app_review_state_v1',
+  APP_TOUR_COMPLETED: 'dp_app_tour_completed_v1',
 };
 
 let currentActiveUserId: string | null = null;

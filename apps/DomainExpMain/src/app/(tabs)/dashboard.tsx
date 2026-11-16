@@ -179,11 +179,33 @@ export default function DashboardScreen() {
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [homeSections]);
 
-  const renderAnnouncements = () => {
-    if (!announcements || announcements.length === 0) return null;
+  const heroSection = useMemo(() => {
+    return homeSections.find((s) => s.sectionKey === 'hero');
+  }, [homeSections]);
+
+  const bannerSection = useMemo(() => {
+    return homeSections.find((s) => s.sectionKey === 'banner' || s.sectionKey === 'announcements');
+  }, [homeSections]);
+
+  const isHeroEnabled = useMemo(() => {
+    if (!heroSection) return true;
+    return heroSection.enabled !== false && (heroSection as any).isVisible !== false;
+  }, [heroSection]);
+
+  const isBannerEnabled = useMemo(() => {
+    if (!bannerSection) return true;
+    return bannerSection.enabled !== false && (bannerSection as any).isVisible !== false;
+  }, [bannerSection]);
+
+  const renderAnnouncements = (sectionTitle?: string) => {
+    const list = Array.isArray(announcements)
+      ? announcements.filter((a) => a && typeof a === 'object')
+      : [];
+    if (list.length === 0) return null;
+
     return (
-      <View style={{ marginBottom: Spacing.md, gap: 10 }}>
-        {announcements.map((ann) => {
+      <View key="sec_announcements" style={{ marginBottom: Spacing.md, gap: 10 }}>
+        {list.map((ann, idx) => {
           const isCrit = ann.type === 'critical';
           const isWarn = ann.type === 'warning';
           const isPromo = ann.type === 'promo';
@@ -220,11 +242,20 @@ export default function DashboardScreen() {
             ? 'sparkles'
             : 'information-circle';
 
-          const actionLabel = ann.actionLabel || (ann as any).actionText;
+          const actionLabel = typeof ann.actionLabel === 'string'
+            ? ann.actionLabel
+            : typeof (ann as any).actionText === 'string'
+            ? (ann as any).actionText
+            : null;
+
+          const actionUrl = typeof ann.actionUrl === 'string' ? ann.actionUrl : null;
+          const id = ann.id || `announcement_${idx}`;
+          const title = typeof ann.title === 'string' ? ann.title : String(ann.title ?? '');
+          const message = typeof ann.message === 'string' ? ann.message : String(ann.message ?? '');
 
           return (
             <View
-              key={ann.id}
+              key={id}
               style={[
                 styles.announcementCard,
                 { backgroundColor: bannerBg, borderColor: bannerBorder },
@@ -233,20 +264,22 @@ export default function DashboardScreen() {
               <View style={styles.announcementHeader}>
                 <Ionicons name={iconName as any} size={20} color={bannerTextColor} />
                 <Text style={[styles.announcementTitle, { color: bannerTextColor }]}>
-                  {ann.title}
+                  {title}
                 </Text>
               </View>
-              <Text style={[styles.announcementMessage, { color: colors.textSecondary }]}>
-                {ann.message}
-              </Text>
-              {Boolean(ann.actionUrl && actionLabel) && (
+              {message ? (
+                <Text style={[styles.announcementMessage, { color: colors.textSecondary }]}>
+                  {message}
+                </Text>
+              ) : null}
+              {Boolean(actionUrl && actionLabel) && (
                 <TouchableOpacity
                   style={[styles.announcementBtn, { backgroundColor: bannerTextColor }]}
                   onPress={() => {
-                    if (ann.actionUrl?.startsWith('http')) {
-                      Linking.openURL(ann.actionUrl).catch(() => {});
-                    } else if (ann.actionUrl?.startsWith('/')) {
-                      router.push(ann.actionUrl as any);
+                    if (actionUrl?.startsWith('http')) {
+                      Linking.openURL(actionUrl).catch(() => {});
+                    } else if (actionUrl?.startsWith('/')) {
+                      router.push(actionUrl as any);
                     }
                   }}
                   activeOpacity={0.8}
@@ -261,7 +294,7 @@ export default function DashboardScreen() {
     );
   };
 
-  const renderHeroCard = () => (
+  const renderHeroCard = (customTitle?: string) => (
     <ImageBackground
       key="hero_card"
       source={require('../../../assets/images/hero-card-bg.png')}
@@ -277,7 +310,14 @@ export default function DashboardScreen() {
     >
       <View style={styles.heroLeft}>
         <Text style={[styles.greetingTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
-          {greeting.text} {greeting.icon}
+          {customTitle &&
+          customTitle !== 'Announcements' &&
+          customTitle !== 'Banner' &&
+          customTitle !== 'Greeting & Status' &&
+          customTitle !== 'Welcome Hero Card' &&
+          customTitle !== 'Greeting'
+            ? customTitle
+            : `${greeting.text} ${greeting.icon}`}
         </Text>
         <Text style={[styles.heroSubtitle, { color: isDark ? '#94a3b8' : '#334155' }]}>
           {totalDomains > 0 || totalServers > 0 || totalWebsites > 0
@@ -308,6 +348,15 @@ export default function DashboardScreen() {
 
   const renderStatsSection = (title?: string) => (
     <View key="sec_stats" style={{ marginBottom: Spacing.xl }}>
+      <View style={[styles.sectionHeader, { marginBottom: 10 }]}>
+        <View style={styles.sectionHeaderLeft}>
+          <Text style={styles.sectionIcon}>📊</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title || 'Overview Metrics'}</Text>
+        </View>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/domains')} activeOpacity={0.7}>
+          <Text style={[styles.viewAllLink, { color: colors.primary }]}>View All →</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.statsGrid}>
         {/* Card 1: Domains */}
         {isFeatureEnabled('domains') && (
@@ -699,20 +748,189 @@ export default function DashboardScreen() {
     );
   };
 
+  const renderDomainsSection = (title?: string) => {
+    if (!isFeatureEnabled('domains')) return null;
+
+    const expiringSoon = domains
+      .filter((d) => {
+        const expTime = d.expiresAt ? new Date(d.expiresAt).getTime() : NaN;
+        const days = !isNaN(expTime)
+          ? Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)))
+          : d.daysRemaining ?? 365;
+        return days <= 30;
+      })
+      .sort((a, b) => (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999));
+
+    const displayList = expiringSoon.length > 0 ? expiringSoon.slice(0, 4) : domains.slice(0, 4);
+
+    return (
+      <View key="sec_domains" style={{ marginBottom: Spacing.xl }}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderLeft}>
+            <Text style={styles.sectionIcon}>🌐</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{title || 'Expiring Domains'}</Text>
+            {domains.length > 0 && (
+              <View style={[styles.activityBadge, { backgroundColor: colors.primaryMuted }]}>
+                <Text style={[styles.activityBadgeText, { color: colors.primary }]}>{domains.length}</Text>
+              </View>
+            )}
+          </View>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/domains')} activeOpacity={0.7}>
+            <Text style={[styles.viewAllLink, { color: colors.primary }]}>View All →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {displayList.length === 0 ? (
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.emptyIconBox, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : '#e0f2fe' }]}>
+              <Ionicons name="globe-outline" size={24} color={colors.primary} />
+            </View>
+            <View style={styles.emptyTextBox}>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No domains registered yet</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Add your domains in Domains tab to monitor expiry & DNS.</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {displayList.map((domain, idx) => {
+              const expTime = domain.expiresAt ? new Date(domain.expiresAt).getTime() : NaN;
+              const days = !isNaN(expTime)
+                ? Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)))
+                : domain.daysRemaining ?? 0;
+              const isUrgent = days <= 10;
+
+              return (
+                <React.Fragment key={domain.id}>
+                  {idx > 0 && <View style={[styles.activityDivider, { backgroundColor: colors.borderSubtle }]} />}
+                  <TouchableOpacity
+                    style={styles.activityItem}
+                    onPress={() => router.push(`/domain/${domain.id}` as any)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.activityIconBox, { backgroundColor: isUrgent ? 'rgba(239, 68, 68, 0.12)' : isDark ? 'rgba(56, 189, 248, 0.12)' : '#e0f2fe' }]}>
+                      <Ionicons
+                        name="globe-outline"
+                        size={18}
+                        color={isUrgent ? '#ef4444' : colors.primary}
+                      />
+                    </View>
+                    <View style={styles.activityCenter}>
+                      <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
+                        {domain.name}
+                      </Text>
+                      <Text style={[styles.activitySubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {domain.registrar || 'Authoritative Registry'} • {days <= 0 ? 'Expired' : `${days}d remaining`}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: isUrgent ? '#ef4444' : '#10b981' }}>
+                        {isUrgent ? 'EXPIRING' : 'ACTIVE'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </React.Fragment>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderServersSection = (title?: string) => {
+    if (!isFeatureEnabled('servers')) return null;
+
+    const displayList = servers.slice(0, 4);
+
+    return (
+      <View key="sec_servers" style={{ marginBottom: Spacing.xl }}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderLeft}>
+            <Text style={styles.sectionIcon}>🖥️</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{title || 'Monitored Infrastructure'}</Text>
+            {servers.length > 0 && (
+              <View style={[styles.activityBadge, { backgroundColor: colors.primaryMuted }]}>
+                <Text style={[styles.activityBadgeText, { color: colors.primary }]}>{servers.length}</Text>
+              </View>
+            )}
+          </View>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/servers')} activeOpacity={0.7}>
+            <Text style={[styles.viewAllLink, { color: colors.primary }]}>View All →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {displayList.length === 0 ? (
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.emptyIconBox, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : '#e0f2fe' }]}>
+              <Ionicons name="server-outline" size={24} color={colors.primary} />
+            </View>
+            <View style={styles.emptyTextBox}>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No servers monitored</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Add cloud instances or VPS nodes in Servers tab.</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {displayList.map((server, idx) => {
+              const isHealthy = server.status === 'healthy';
+
+              return (
+                <React.Fragment key={server.id}>
+                  {idx > 0 && <View style={[styles.activityDivider, { backgroundColor: colors.borderSubtle }]} />}
+                  <TouchableOpacity
+                    style={styles.activityItem}
+                    onPress={() => router.push(`/server/${server.id}` as any)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.activityIconBox, { backgroundColor: isHealthy ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)' }]}>
+                      <Ionicons
+                        name="server-outline"
+                        size={18}
+                        color={isHealthy ? '#10b981' : '#ef4444'}
+                      />
+                    </View>
+                    <View style={styles.activityCenter}>
+                      <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
+                        {server.name}
+                      </Text>
+                      <Text style={[styles.activitySubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {server.provider || 'Cloud VPS'} • {server.ipAddress || '127.0.0.1'}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: isHealthy ? '#10b981' : '#ef4444' }}>
+                        {isHealthy ? 'ONLINE' : 'DEGRADED'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </React.Fragment>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderSectionByKey = (section: (typeof homeSections)[0]) => {
     switch (section.sectionKey) {
+      case 'hero':
+        if (!isHeroEnabled) return null;
+        return renderHeroCard(section.title);
       case 'banner':
-        return (
-          <View key="sec_banner">
-            {renderHeroCard()}
-          </View>
-        );
+      case 'announcements':
+        if (!isBannerEnabled) return null;
+        return renderAnnouncements(section.title);
       case 'stats':
         return renderStatsSection(section.title);
       case 'quickActions':
         return renderQuickConnectSection(section.title);
       case 'alerts':
         return renderActivitySection(section.title);
+      case 'domains':
+        return renderDomainsSection(section.title);
+      case 'servers':
+        return renderServersSection(section.title);
       default:
         return null;
     }
@@ -762,8 +980,12 @@ export default function DashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {renderAnnouncements()}
-        {sortedSections.map((section) => renderSectionByKey(section))}
+        {!heroSection && isHeroEnabled && renderHeroCard()}
+        {sortedSections.map((section) => (
+          <React.Fragment key={section.sectionKey}>
+            {renderSectionByKey(section)}
+          </React.Fragment>
+        ))}
       </ScrollView>
     </View>
   );

@@ -29,6 +29,9 @@ export const PlatformOverviewPage: React.FC = () => {
       setStats(data);
     } catch (err) {
       setStats(null);
+      if (err instanceof Error && err.message.includes('Authentication required')) {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setLoading(false);

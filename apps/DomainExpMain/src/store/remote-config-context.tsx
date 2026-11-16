@@ -116,10 +116,13 @@ const DEFAULT_CONFIG: RemoteBootstrapConfig = {
     { key: 'more', label: 'More', icon: 'settings', route: '/settings', sortOrder: 5, enabled: true },
   ],
   homeSections: [
-    { sectionKey: 'banner', title: 'Announcements', sortOrder: 1, enabled: true },
-    { sectionKey: 'stats', title: 'Portfolio Overview', sortOrder: 2, enabled: true },
-    { sectionKey: 'quickActions', title: 'Quick Connect', sortOrder: 3, enabled: true },
-    { sectionKey: 'alerts', title: 'Recent Activity', sortOrder: 4, enabled: true },
+    { sectionKey: 'hero', title: 'Greeting & Status', sortOrder: 1, enabled: true },
+    { sectionKey: 'banner', title: 'Announcements', sortOrder: 2, enabled: true },
+    { sectionKey: 'stats', title: 'Overview Metrics', sortOrder: 3, enabled: true },
+    { sectionKey: 'quickActions', title: 'Quick Actions', sortOrder: 4, enabled: true },
+    { sectionKey: 'alerts', title: 'Urgent Alerts', sortOrder: 5, enabled: true },
+    { sectionKey: 'domains', title: 'Expiring Domains', sortOrder: 6, enabled: true },
+    { sectionKey: 'servers', title: 'Monitored Infrastructure', sortOrder: 7, enabled: true },
   ],
   version: {
     platform: 'all',
@@ -233,9 +236,14 @@ export function RemoteConfigProvider({ children }: { children: ReactNode }) {
       maintenanceMode: Boolean(config.app?.maintenanceMode),
       maintenanceMessage: config.app?.maintenanceMessage || null,
       announcements: (config.announcements || []).filter((a) => a && a.isActive !== false && (a as any).broadcastType !== 'push' && a.actionUrl !== '#push_notification'),
-      homeSections: (config.homeSections || DEFAULT_CONFIG.homeSections).sort(
-        (a, b) => a.sortOrder - b.sortOrder,
-      ),
+      homeSections: (() => {
+        const raw = Array.isArray(config.homeSections) && config.homeSections.length > 0
+          ? config.homeSections
+          : DEFAULT_CONFIG.homeSections;
+        const remoteKeys = new Set(raw.map((s) => s.sectionKey));
+        const missing = DEFAULT_CONFIG.homeSections.filter((def) => !remoteKeys.has(def.sectionKey));
+        return [...raw, ...missing].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      })(),
       navigationItems: (config.navigation || DEFAULT_CONFIG.navigation).sort(
         (a, b) => a.sortOrder - b.sortOrder,
       ),

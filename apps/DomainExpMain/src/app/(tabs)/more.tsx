@@ -16,6 +16,7 @@ import {
   Share,
   Alert,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -26,6 +27,8 @@ import { useTheme } from '../../store/theme-context';
 import { useAuth } from '../../store/auth-context';
 import { useSettings } from '../../store/settings-context';
 import { useRemoteConfig } from '../../store/remote-config-context';
+import { triggerOfficialStoreReview } from '../../services/appReview';
+import { AppTourModal } from '../../components/AppTourModal';
 import { fetchDomainsList, importDomainsBatch, deleteDomain } from '../../services/domains';
 import {
   fetchProviderAccountsList,
@@ -76,6 +79,7 @@ type ModalType =
   | 'billing'
   | 'help'
   | 'about'
+  | 'tour'
   | null;
 
 const MODAL_CONFIG: Record<
@@ -153,6 +157,14 @@ const MODAL_CONFIG: Record<
     iconBg: 'rgba(99, 102, 241, 0.15)',
     heightPercentage: '85%',
   },
+  tour: {
+    title: 'App Feature Tour',
+    subtitle: 'Interactive guide and walkthrough of key features',
+    icon: 'compass-outline',
+    iconColor: '#38bdf8',
+    iconBg: 'rgba(56, 189, 248, 0.15)',
+    heightPercentage: '85%',
+  },
 };
 
 export default function MoreScreen() {
@@ -175,6 +187,7 @@ export default function MoreScreen() {
   } = useSettings();
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [isTourModalOpen, setIsTourModalOpen] = useState(false);
   const [isOpeningBillingPortal, setIsOpeningBillingPortal] = useState(false);
 
   useEffect(() => {
@@ -441,10 +454,20 @@ export default function MoreScreen() {
   const [editAzureSubscriptionId, setEditAzureSubscriptionId] = useState('');
 
   // Keyboard avoidance and token visibility state
+  const { height: windowHeight } = useWindowDimensions();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showAddTokenText, setShowAddTokenText] = useState(false);
   const [showEditTokenText, setShowEditTokenText] = useState(false);
   const [showAwsSecretText, setShowAwsSecretText] = useState(false);
+  const addAccountScrollRef = useRef<any>(null);
+  const editTokenScrollRef = useRef<any>(null);
+
+  const availableSheetHeight = useMemo(() => {
+    if (keyboardHeight > 0) {
+      return Math.max(windowHeight - keyboardHeight - insets.top - 24, 260);
+    }
+    return '88%';
+  }, [keyboardHeight, windowHeight, insets.top]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -1318,6 +1341,15 @@ export default function MoreScreen() {
         visible: true,
       },
       {
+        id: 'tour' as ModalType,
+        icon: '🧭',
+        iconBg: isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe',
+        iconColor: '#0284c7',
+        label: 'App Feature Tour',
+        subtitle: 'Interactive guide on how DomainExpert works',
+        visible: true,
+      },
+      {
         id: 'help' as ModalType,
         icon: '❓',
         iconBg: isDark ? 'rgba(244, 63, 94, 0.15)' : '#ffe4e6',
@@ -1448,6 +1480,8 @@ export default function MoreScreen() {
   const handleMenuPress = (id: ModalType) => {
     if (id === 'profile') {
       openProfileModal();
+    } else if (id === 'tour') {
+      setIsTourModalOpen(true);
     } else {
       setActiveModal(id);
     }
@@ -1617,10 +1651,14 @@ export default function MoreScreen() {
             style={[
               styles.modalSheet,
               activeModal && MODAL_CONFIG[activeModal]
-                ? { height: keyboardHeight > 0 ? '94%' : MODAL_CONFIG[activeModal].heightPercentage, maxHeight: '96%' }
-                : { height: keyboardHeight > 0 ? '94%' : '88%', maxHeight: '96%' },
+                ? {
+                    height: keyboardHeight > 0 ? availableSheetHeight : MODAL_CONFIG[activeModal].heightPercentage,
+                    maxHeight: availableSheetHeight,
+                  }
+                : { maxHeight: availableSheetHeight },
               {
                 backgroundColor: colors.surface,
+                marginBottom: Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight : 0,
                 paddingBottom: Math.max(insets.bottom, 24),
               },
             ]}
@@ -1705,9 +1743,7 @@ export default function MoreScreen() {
                 contentContainerStyle={[
                   styles.sheetBody,
                   {
-                    paddingBottom: keyboardHeight > 0
-                      ? keyboardHeight + 80
-                      : (activeModal === 'providers' ? Math.max(insets.bottom + 48, 64) : Spacing.xxl),
+                    paddingBottom: (activeModal === 'providers' ? Math.max(insets.bottom + 48, 64) : Spacing.xxl),
                   },
                 ]}
                 showsVerticalScrollIndicator={true}
@@ -3601,6 +3637,57 @@ export default function MoreScreen() {
                     <Text style={[styles.aboutDesc, { color: colors.textSecondary }]}>
                       {appBranding.appName || 'DomainExpert'} is an enterprise infrastructure and domain portfolio monitoring suite designed for modern DevOps and site reliability engineers.
                     </Text>
+
+                    <TouchableOpacity
+                      style={{
+                        marginTop: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe',
+                        borderColor: isDark ? '#38bdf8' : '#0284c7',
+                        borderWidth: 1,
+                        paddingVertical: 12,
+                        paddingHorizontal: 20,
+                        borderRadius: 14,
+                        width: '100%',
+                        gap: 8,
+                      }}
+                      onPress={() => {
+                        setActiveModal(null);
+                        setIsTourModalOpen(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="compass-outline" size={18} color={isDark ? '#38bdf8' : '#0284c7'} />
+                      <Text style={{ color: isDark ? '#38bdf8' : '#0284c7', fontSize: 14, fontWeight: '700' }}>
+                        Take Feature Tour & Guide
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{
+                        marginTop: 10,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
+                        borderColor: isDark ? '#f59e0b' : '#d97706',
+                        borderWidth: 1,
+                        paddingVertical: 12,
+                        paddingHorizontal: 20,
+                        borderRadius: 14,
+                        width: '100%',
+                        gap: 8,
+                      }}
+                      onPress={() => triggerOfficialStoreReview()}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="star" size={18} color="#f59e0b" />
+                      <Text style={{ color: isDark ? '#38bdf8' : '#0284c7', fontSize: 14, fontWeight: '700' }}>
+                        Rate on Google Play Store
+                      </Text>
+                    </TouchableOpacity>
                     <View style={[styles.divider, { backgroundColor: colors.borderSubtle, marginVertical: Spacing.lg }]} />
                     <Text style={[styles.copyrightText, { color: colors.textMuted }]}>
                       © {new Date().getFullYear()} {appBranding.appName || 'DomainExpert'} Inc. All rights reserved.
@@ -3634,8 +3721,8 @@ export default function MoreScreen() {
               styles.modalSheet,
               {
                 backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                height: keyboardHeight > 0 ? '94%' : '88%',
-                maxHeight: '96%',
+                maxHeight: availableSheetHeight,
+                marginBottom: Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight : 0,
                 paddingBottom: Math.max(insets.bottom, 16),
               },
             ]}
@@ -3657,9 +3744,10 @@ export default function MoreScreen() {
             </View>
 
             <ScrollView
+              ref={addAccountScrollRef}
               contentContainerStyle={[
                 styles.sheetBody,
-                { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 36 },
+                { paddingBottom: keyboardHeight > 0 ? 48 : Math.max(insets.bottom, 24) },
               ]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={true}
@@ -3768,6 +3856,8 @@ export default function MoreScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={newAccLabel}
                     onChangeText={setNewAccLabel}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 80, animated: true }), 120)}
                   />
 
                   {newAccProviderKey === 'aws' ? (
@@ -3790,6 +3880,8 @@ export default function MoreScreen() {
                         onChangeText={setNewAwsAccessKeyId}
                         autoCapitalize="characters"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 160, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Secret Access Key *</Text>
@@ -3804,6 +3896,8 @@ export default function MoreScreen() {
                           autoCapitalize="none"
                           autoCorrect={false}
                           spellCheck={false}
+                          disableFullscreenUI={true}
+                          onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 240, animated: true }), 120)}
                         />
                         <TouchableOpacity
                           style={{ position: 'absolute', right: 12, top: 14, padding: 4 }}
@@ -3828,6 +3922,8 @@ export default function MoreScreen() {
                         secureTextEntry
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 320, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Regions to inventory (comma-separated)</Text>
@@ -3839,6 +3935,8 @@ export default function MoreScreen() {
                         onChangeText={setNewAwsRegions}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                       />
                     </>
                   ) : newAccProviderKey === 'namecheap' ? (
@@ -3862,6 +3960,8 @@ export default function MoreScreen() {
                         secureTextEntry
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 160, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>API Username *</Text>
@@ -3873,6 +3973,8 @@ export default function MoreScreen() {
                         onChangeText={setNewNamecheapApiUser}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 240, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Client IP (Whitelisted IP)</Text>
@@ -3884,6 +3986,8 @@ export default function MoreScreen() {
                         onChangeText={setNewNamecheapClientIp}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Account Username (Optional)</Text>
@@ -3895,6 +3999,8 @@ export default function MoreScreen() {
                         onChangeText={setNewNamecheapUserName}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                       />
                     </>
                   ) : newAccProviderKey === 'gcp' ? (
@@ -3908,6 +4014,8 @@ export default function MoreScreen() {
                         onChangeText={setNewGcpProjectId}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 140, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Service Account Email *</Text>
@@ -3919,6 +4027,8 @@ export default function MoreScreen() {
                         onChangeText={setNewGcpClientEmail}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 220, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Service Account Private Key *</Text>
@@ -3932,6 +4042,8 @@ export default function MoreScreen() {
                         multiline
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                       />
                     </>
                   ) : newAccProviderKey === 'azure' ? (
@@ -3945,6 +4057,8 @@ export default function MoreScreen() {
                         onChangeText={setNewAzureTenantId}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 140, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Client (Application) ID *</Text>
@@ -3956,6 +4070,8 @@ export default function MoreScreen() {
                         onChangeText={setNewAzureClientId}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 220, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Client Secret *</Text>
@@ -3968,6 +4084,8 @@ export default function MoreScreen() {
                         secureTextEntry
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 300, animated: true }), 120)}
                       />
 
                       <Text style={[styles.label, { color: colors.textSecondary }]}>Subscription ID *</Text>
@@ -3979,6 +4097,8 @@ export default function MoreScreen() {
                         onChangeText={setNewAzureSubscriptionId}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        disableFullscreenUI={true}
+                        onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                       />
                     </>
                   ) : (
@@ -4005,6 +4125,8 @@ export default function MoreScreen() {
                           autoCapitalize="none"
                           autoCorrect={false}
                           spellCheck={false}
+                          disableFullscreenUI={true}
+                          onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                         />
                         {newAccProviderKey !== 'google-play' && (
                           <TouchableOpacity
@@ -4047,6 +4169,8 @@ export default function MoreScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={newAccNotes}
                     onChangeText={setNewAccNotes}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                   />
                 </>
               ) : (
@@ -4060,6 +4184,8 @@ export default function MoreScreen() {
                     autoCapitalize="none"
                     value={newAccEmail}
                     onChangeText={setNewAccEmail}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 60, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Label (Optional)</Text>
@@ -4069,6 +4195,8 @@ export default function MoreScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={newAccLabel}
                     onChangeText={setNewAccLabel}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollTo({ y: 120, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Notes (Optional)</Text>
@@ -4078,6 +4206,8 @@ export default function MoreScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={newAccNotes}
                     onChangeText={setNewAccNotes}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => addAccountScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                   />
                 </>
               )}
@@ -4150,8 +4280,8 @@ export default function MoreScreen() {
               styles.modalSheet,
               {
                 backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
-                height: keyboardHeight > 0 ? '92%' : '68%',
-                maxHeight: '95%',
+                maxHeight: availableSheetHeight,
+                marginBottom: Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight : 0,
                 paddingBottom: Math.max(insets.bottom, 16),
               },
             ]}
@@ -4173,9 +4303,10 @@ export default function MoreScreen() {
             </View>
 
             <ScrollView
+              ref={editTokenScrollRef}
               contentContainerStyle={[
                 styles.sheetBody,
-                { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 36 },
+                { paddingBottom: keyboardHeight > 0 ? 48 : Math.max(insets.bottom, 24) },
               ]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={true}
@@ -4200,6 +4331,8 @@ export default function MoreScreen() {
                     onChangeText={setEditAwsAccessKeyId}
                     autoCapitalize="characters"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 140, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Secret Access Key *</Text>
@@ -4214,6 +4347,8 @@ export default function MoreScreen() {
                       autoCapitalize="none"
                       autoCorrect={false}
                       spellCheck={false}
+                      disableFullscreenUI={true}
+                      onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 220, animated: true }), 120)}
                     />
                     <TouchableOpacity
                       style={{ position: 'absolute', right: 12, top: 14, padding: 4 }}
@@ -4238,6 +4373,8 @@ export default function MoreScreen() {
                     secureTextEntry
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 300, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Regions to inventory (comma-separated)</Text>
@@ -4249,6 +4386,8 @@ export default function MoreScreen() {
                     onChangeText={setEditAwsRegions}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                   />
                 </>
               ) : editingTokenAccount?.providerKey === 'namecheap' ? (
@@ -4272,6 +4411,8 @@ export default function MoreScreen() {
                     secureTextEntry
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 140, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>API Username *</Text>
@@ -4283,6 +4424,8 @@ export default function MoreScreen() {
                     onChangeText={setEditNamecheapApiUser}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 220, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Client IP (Whitelisted IP)</Text>
@@ -4294,6 +4437,8 @@ export default function MoreScreen() {
                     onChangeText={setEditNamecheapClientIp}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Account Username (Optional)</Text>
@@ -4305,6 +4450,8 @@ export default function MoreScreen() {
                     onChangeText={setEditNamecheapUserName}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                   />
                 </>
               ) : editingTokenAccount?.providerKey === 'gcp' ? (
@@ -4318,6 +4465,8 @@ export default function MoreScreen() {
                     onChangeText={setEditGcpProjectId}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 140, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Service Account Email *</Text>
@@ -4329,6 +4478,8 @@ export default function MoreScreen() {
                     onChangeText={setEditGcpClientEmail}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 220, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Service Account Private Key *</Text>
@@ -4342,6 +4493,8 @@ export default function MoreScreen() {
                     multiline
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                   />
                 </>
               ) : editingTokenAccount?.providerKey === 'azure' ? (
@@ -4355,6 +4508,8 @@ export default function MoreScreen() {
                     onChangeText={setEditAzureTenantId}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 140, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Client (Application) ID *</Text>
@@ -4366,6 +4521,8 @@ export default function MoreScreen() {
                     onChangeText={setEditAzureClientId}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 220, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Client Secret *</Text>
@@ -4378,6 +4535,8 @@ export default function MoreScreen() {
                     secureTextEntry
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollTo({ y: 300, animated: true }), 120)}
                   />
 
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Subscription ID *</Text>
@@ -4389,6 +4548,8 @@ export default function MoreScreen() {
                     onChangeText={setEditAzureSubscriptionId}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
+                    onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                   />
                 </>
               ) : (
@@ -4417,6 +4578,8 @@ export default function MoreScreen() {
                       autoCapitalize="none"
                       autoCorrect={false}
                       spellCheck={false}
+                      disableFullscreenUI={true}
+                      onFocus={() => setTimeout(() => editTokenScrollRef.current?.scrollToEnd({ animated: true }), 120)}
                     />
                     <TouchableOpacity
                       style={{
@@ -5317,6 +5480,12 @@ export default function MoreScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Interactive App Feature Tour / Walkthrough Modal */}
+      <AppTourModal
+        visible={isTourModalOpen}
+        onClose={() => setIsTourModalOpen(false)}
+      />
     </ImageBackground>
   );
 }
@@ -5793,7 +5962,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    height: 48,
     fontSize: 15,
   },
   passwordFieldRow: {

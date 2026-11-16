@@ -1,11 +1,14 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { fireEvent, getByRole, queryByRole } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminLayout } from '../src/components/AdminLayout';
+import { AdminProtectedRoute } from '../src/components/AdminProtectedRoute';
 import { ThemeProvider } from '../src/context/ThemeContext';
+import { LoginPage } from '../src/pages/LoginPage';
 import { PlatformOverviewPage } from '../src/pages/PlatformOverviewPage';
+import { UsersManagementPage } from '../src/pages/UsersManagementPage';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -94,5 +97,114 @@ describe('admin session and overview recovery', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(15_001); });
     expect(getByRole(container, 'alert').textContent).toContain('request timed out');
     expect(getByRole(container, 'button', { name: 'Try again' })).toBeTruthy();
+  });
+
+  it('redirects to sign-in page when logged out and navigating to All Users Hub or Website Users', async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/users?tab=all']}>
+          <ThemeProvider>
+            <AdminLayout>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<AdminProtectedRoute />}>
+                  <Route path="/" element={<PlatformOverviewPage />} />
+                  <Route path="/users" element={<UsersManagementPage />} />
+                </Route>
+              </Routes>
+            </AdminLayout>
+          </ThemeProvider>
+        </MemoryRouter>
+      );
+    });
+
+    expect(getByRole(container, 'heading', { name: /Sign in to Admin Center/i })).toBeTruthy();
+    expect(container.textContent).not.toContain('Authentication required');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('redirects to sign-in page when clicking All Users Hub or Website Users in sidebar while logged out', async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/']}>
+          <ThemeProvider>
+            <AdminLayout>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<AdminProtectedRoute />}>
+                  <Route path="/" element={<PlatformOverviewPage />} />
+                  <Route path="/users" element={<UsersManagementPage />} />
+                </Route>
+              </Routes>
+            </AdminLayout>
+          </ThemeProvider>
+        </MemoryRouter>
+      );
+    });
+
+    // Click All Users Hub in sidebar
+    const allUsersLink = getByRole(container, 'link', { name: /All Users Hub/i });
+    await act(async () => fireEvent.click(allUsersLink));
+
+    expect(getByRole(container, 'heading', { name: /Sign in to Admin Center/i })).toBeTruthy();
+    expect(container.textContent).not.toContain('Authentication required');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // Click Website Users in sidebar
+    const webUsersLink = getByRole(container, 'link', { name: /Website Users/i });
+    await act(async () => fireEvent.click(webUsersLink));
+
+    expect(getByRole(container, 'heading', { name: /Sign in to Admin Center/i })).toBeTruthy();
+    expect(container.textContent).not.toContain('Authentication required');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('maintains authenticated session and does not redirect to sign-in when clicking Super Admin (Connected)', async () => {
+    localStorage.setItem('domainpulse_admin_token', 'super-admin-token');
+    fetchMock.mockResolvedValue(json(stats));
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/']}>
+          <ThemeProvider>
+            <AdminLayout>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<AdminProtectedRoute />}>
+                  <Route path="/" element={<PlatformOverviewPage />} />
+                  <Route path="/users" element={<UsersManagementPage />} />
+                </Route>
+              </Routes>
+            </AdminLayout>
+          </ThemeProvider>
+        </MemoryRouter>
+      );
+    });
+
+    // Check that Super Admin (Connected) button is present
+    const superAdminBtn = getByRole(container, 'button', { name: /Super Admin \(Connected\)/i });
+    expect(superAdminBtn).toBeTruthy();
+
+    // Click Super Admin (Connected)
+    await act(async () => fireEvent.click(superAdminBtn));
+
+    // Must NOT redirect to Sign In page
+    expect(queryByRole(container, 'heading', { name: 'Sign in to Admin Center' })).toBeNull();
+
+    // Must maintain the session and token
+    expect(localStorage.getItem('domainpulse_admin_token')).toBe('super-admin-token');
+
+    // Must show active session status modal
+    expect(getByRole(container, 'heading', { name: 'Super Admin Session' })).toBeTruthy();
+    expect(container.textContent).toContain('Connected & Active');
+
+    // Click Maintain Current Session
+    const maintainBtn = getByRole(container, 'button', { name: 'Maintain Current Session' });
+    await act(async () => fireEvent.click(maintainBtn));
+
+    // Modal closes, still on platform command center, session maintained
+    expect(queryByRole(container, 'heading', { name: 'Super Admin Session' })).toBeNull();
+    expect(getByRole(container, 'heading', { name: 'Platform Command Center' })).toBeTruthy();
+    expect(localStorage.getItem('domainpulse_admin_token')).toBe('super-admin-token');
   });
 });

@@ -303,20 +303,45 @@ export class MobileAdminService {
     const cols = this.databaseService.collections;
     if (!cols) throw new Error('MongoDB collections not available');
 
+    const defaults = [
+      { sectionKey: 'hero', title: 'Greeting & Status', sortOrder: 1, enabled: true, configJson: null },
+      { sectionKey: 'banner', title: 'Announcements', sortOrder: 2, enabled: true, configJson: null },
+      { sectionKey: 'stats', title: 'Overview Metrics', sortOrder: 3, enabled: true, configJson: null },
+      { sectionKey: 'quickActions', title: 'Quick Actions', sortOrder: 4, enabled: true, configJson: null },
+      { sectionKey: 'alerts', title: 'Urgent Alerts', sortOrder: 5, enabled: true, configJson: null },
+      { sectionKey: 'domains', title: 'Expiring Domains', sortOrder: 6, enabled: true, configJson: null },
+      { sectionKey: 'servers', title: 'Monitored Infrastructure', sortOrder: 7, enabled: true, configJson: null },
+    ];
+
     const rows = await cols.mobileHomeConfig.find({}).sort({ sortOrder: 1 }).toArray();
     if (rows.length === 0) {
       const now = new Date();
-      const defaults = [
-        { id: randomUUID(), sectionKey: 'banner', title: 'Announcements', sortOrder: 1, enabled: true, configJson: null, createdAt: now, updatedAt: now },
-        { id: randomUUID(), sectionKey: 'stats', title: 'Overview Metrics', sortOrder: 2, enabled: true, configJson: null, createdAt: now, updatedAt: now },
-        { id: randomUUID(), sectionKey: 'quickActions', title: 'Quick Actions', sortOrder: 3, enabled: true, configJson: null, createdAt: now, updatedAt: now },
-        { id: randomUUID(), sectionKey: 'alerts', title: 'Urgent Alerts', sortOrder: 4, enabled: true, configJson: null, createdAt: now, updatedAt: now },
-        { id: randomUUID(), sectionKey: 'domains', title: 'Expiring Domains', sortOrder: 5, enabled: true, configJson: null, createdAt: now, updatedAt: now },
-        { id: randomUUID(), sectionKey: 'servers', title: 'Monitored Infrastructure', sortOrder: 6, enabled: true, configJson: null, createdAt: now, updatedAt: now },
-      ];
-      await cols.mobileHomeConfig.insertMany(defaults as any);
-      return defaults;
+      const initial = defaults.map((d) => ({
+        ...d,
+        id: randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      }));
+      await cols.mobileHomeConfig.insertMany(initial as any);
+      return initial;
     }
+
+    // Auto-migrate missing default sections (e.g. hero, domains, servers) if not present in existing DB
+    const existingKeys = new Set(rows.map((r: any) => r.sectionKey));
+    const missing = defaults
+      .filter((d) => !existingKeys.has(d.sectionKey))
+      .map((d) => ({
+        ...d,
+        id: randomUUID(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+
+    if (missing.length > 0) {
+      await cols.mobileHomeConfig.insertMany(missing as any);
+      return [...rows, ...missing].sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+
     return rows;
   }
 

@@ -1699,6 +1699,7 @@ export default function ApplicationsScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
+            disableFullscreenUI={true}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -2352,7 +2353,7 @@ export default function ApplicationsScreen() {
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                maxHeight: keyboardHeight > 0 ? '94%' : '88%',
+                maxHeight: '85%',
               },
             ]}
           >
@@ -2382,7 +2383,7 @@ export default function ApplicationsScreen() {
 
             <ScrollView
               contentContainerStyle={{
-                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 30 : Math.max(insets.bottom, 24),
+                paddingBottom: Math.max(insets.bottom, 24),
               }}
               showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
@@ -2418,6 +2419,7 @@ export default function ApplicationsScreen() {
                     if (appFormError) setAppFormError(null);
                   }}
                   autoCapitalize="words"
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -2470,6 +2472,7 @@ export default function ApplicationsScreen() {
                   }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -2495,6 +2498,7 @@ export default function ApplicationsScreen() {
                   }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -2564,7 +2568,7 @@ export default function ApplicationsScreen() {
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                maxHeight: keyboardHeight > 0 ? '94%' : '88%',
+                maxHeight: '85%',
               },
             ]}
           >
@@ -2594,7 +2598,7 @@ export default function ApplicationsScreen() {
 
             <ScrollView
               contentContainerStyle={{
-                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 30 : Math.max(insets.bottom, 24),
+                paddingBottom: Math.max(insets.bottom, 24),
               }}
               showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
@@ -2624,6 +2628,7 @@ export default function ApplicationsScreen() {
                   selectionColor="rgba(2, 132, 199, 0.4)"
                   value={webFormName}
                   onChangeText={setWebFormName}
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -2651,6 +2656,7 @@ export default function ApplicationsScreen() {
                   }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -2700,6 +2706,7 @@ export default function ApplicationsScreen() {
                   selectionColor="rgba(2, 132, 199, 0.4)"
                   value={webFormNotes}
                   onChangeText={setWebFormNotes}
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -2764,7 +2771,7 @@ export default function ApplicationsScreen() {
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                maxHeight: keyboardHeight > 0 ? '94%' : '88%',
+                maxHeight: '85%',
               },
             ]}
           >
@@ -2797,7 +2804,7 @@ export default function ApplicationsScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{
-                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 30 : Math.max(insets.bottom, 24),
+                paddingBottom: Math.max(insets.bottom, 24),
               }}
             >
               {/* Quick Suggestion Chips */}
@@ -2847,6 +2854,7 @@ export default function ApplicationsScreen() {
                   placeholderTextColor={colors.textMuted}
                   value={consoleDevName}
                   onChangeText={setConsoleDevName}
+                  disableFullscreenUI={true}
                 />
                 <Text style={[styles.modalHint, { color: colors.textMuted }]}>
                   Enter the developer name exactly as registered in your Google Play Console.
@@ -2876,6 +2884,7 @@ export default function ApplicationsScreen() {
                   multiline={true}
                   numberOfLines={3}
                   autoCapitalize="none"
+                  disableFullscreenUI={true}
                 />
                 <Text style={[styles.modalHint, { color: colors.textMuted }]}>
                   Optional: If you have specific Android app package IDs, enter them separated by commas or lines.

@@ -96,7 +96,7 @@ export default function LoginScreen() {
             styles.scrollContent,
             {
               paddingTop: Math.max(insets.top + 4, 16),
-              paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : Math.max(insets.bottom + 16, 28),
+              paddingBottom: Math.max(insets.bottom + 16, 28),
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -148,6 +148,7 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"
+                  disableFullscreenUI={true}
                 />
               </View>
             </View>
@@ -175,6 +176,7 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  disableFullscreenUI={true}
                 />
                 <TouchableOpacity
                   style={styles.eyeToggleBtn}

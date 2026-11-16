@@ -34,12 +34,13 @@ const DEFAULT_NAVIGATION_ITEMS = [
 ];
 
 const DEFAULT_HOME_SECTIONS = [
-  { sectionKey: 'banner', title: 'Announcements', sortOrder: 1, enabled: true, configJson: null },
-  { sectionKey: 'stats', title: 'Overview Metrics', sortOrder: 2, enabled: true, configJson: null },
-  { sectionKey: 'quickActions', title: 'Quick Actions', sortOrder: 3, enabled: true, configJson: null },
-  { sectionKey: 'alerts', title: 'Urgent Alerts', sortOrder: 4, enabled: true, configJson: null },
-  { sectionKey: 'domains', title: 'Expiring Domains', sortOrder: 5, enabled: true, configJson: null },
-  { sectionKey: 'servers', title: 'Monitored Infrastructure', sortOrder: 6, enabled: true, configJson: null },
+  { sectionKey: 'hero', title: 'Greeting & Status', sortOrder: 1, enabled: true, configJson: null },
+  { sectionKey: 'banner', title: 'Announcements', sortOrder: 2, enabled: true, configJson: null },
+  { sectionKey: 'stats', title: 'Overview Metrics', sortOrder: 3, enabled: true, configJson: null },
+  { sectionKey: 'quickActions', title: 'Quick Actions', sortOrder: 4, enabled: true, configJson: null },
+  { sectionKey: 'alerts', title: 'Urgent Alerts', sortOrder: 5, enabled: true, configJson: null },
+  { sectionKey: 'domains', title: 'Expiring Domains', sortOrder: 6, enabled: true, configJson: null },
+  { sectionKey: 'servers', title: 'Monitored Infrastructure', sortOrder: 7, enabled: true, configJson: null },
 ];
 
 const DEFAULT_APP_VERSION = {
@@ -117,7 +118,7 @@ export class MobileClientService {
           .find({})
           .sort({ sortOrder: 1 })
           .toArray()) || [];
-      const homeSections =
+      const rawSections =
         homeRows.length > 0
           ? homeRows.map((h: any) => ({
               sectionKey: h.sectionKey,
@@ -127,6 +128,10 @@ export class MobileClientService {
               configJson: (h.configJson as Record<string, unknown> | null) ?? null,
             }))
           : DEFAULT_HOME_SECTIONS;
+
+      const existingKeys = new Set(rawSections.map((s: any) => s.sectionKey));
+      const missingDefaults = DEFAULT_HOME_SECTIONS.filter((def) => !existingKeys.has(def.sectionKey));
+      const homeSections = [...rawSections, ...missingDefaults].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
       const versionRow = await cols?.mobileAppVersions.findOne({});
       const version = versionRow

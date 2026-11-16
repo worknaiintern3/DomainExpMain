@@ -267,6 +267,7 @@ export default function ServersScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
+            disableFullscreenUI={true}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -568,7 +569,7 @@ export default function ServersScreen() {
               styles.modalSheet,
               {
                 backgroundColor: colors.surface,
-                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : Math.max(insets.bottom, 24),
+                paddingBottom: Math.max(insets.bottom, 24),
               },
             ]}
           >
@@ -623,6 +624,7 @@ export default function ServersScreen() {
                   }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -649,6 +651,7 @@ export default function ServersScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -693,6 +696,7 @@ export default function ServersScreen() {
                   placeholderTextColor={colors.textMuted}
                   value={region}
                   onChangeText={setRegion}
+                  disableFullscreenUI={true}
                 />
               </View>
 
@@ -1045,7 +1049,7 @@ const styles = StyleSheet.create({
   modalSheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
+    maxHeight: '82%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1089,7 +1093,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    height: 48,
     fontSize: 14,
   },
   pillsScroll: {

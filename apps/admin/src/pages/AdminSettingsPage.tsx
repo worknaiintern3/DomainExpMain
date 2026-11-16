@@ -40,7 +40,7 @@ export const AdminSettingsPage: React.FC = () => {
           Admin Center Preferences & System Settings
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Customize UI aesthetics, dark/light theme, API endpoints, and sandbox development states.
+          Customize UI aesthetics, dark/light theme, API endpoints, and system preferences.
         </p>
       </div>
 
@@ -148,7 +148,7 @@ export const AdminSettingsPage: React.FC = () => {
               ) : (
                 <span className="text-amber-500 font-bold flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                  Dev Sandbox Mode (LocalStorage Persisted)
+                  Not Connected (Authentication Required)
                 </span>
               )}
             </span>

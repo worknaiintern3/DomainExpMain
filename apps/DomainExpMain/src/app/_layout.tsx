@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { Platform, AppState, type AppStateStatus } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,6 +21,10 @@ import {
 
 import { RemoteConfigProvider, useRemoteConfig } from '../store/remote-config-context';
 import { MaintenanceBarrier, UpdateRequiredBarrier } from '../components/AdminBarriers';
+import { AppReviewModal } from '../components/AppReviewModal';
+import { AppTourModal } from '../components/AppTourModal';
+import { addAppUsageSeconds, getAppReviewState, shouldShowReviewPrompt } from '../services/appReview';
+import { isAppTourCompleted } from '../services/appTour';
 
 // Configure foreground notification behavior at root level
 Notifications.setNotificationHandler({
@@ -39,7 +43,7 @@ Notifications.setNotificationHandler({
 
 // Configure initial route anchoring for Expo Router
 export const unstable_settings = {
-  initialRouteName: 'index',
+  anchor: 'index',
 };
 
 // Keep splash screen visible while fonts are loading
@@ -50,6 +54,59 @@ function NavigationRoot() {
   const { isAuthenticated } = useAuth();
   const { maintenanceMode, isUpdateRequired } = useRemoteConfig();
   const router = useRouter();
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showTourModal, setShowTourModal] = useState(false);
+  const appStateRef = useRef<AppStateStatus>((AppState.currentState as AppStateStatus) || 'active');
+
+  // Check on initial load if user has not yet completed the app feature tour
+  useEffect(() => {
+    let isMounted = true;
+    if (isAuthenticated) {
+      isAppTourCompleted().then((completed) => {
+        if (isMounted && !completed) {
+          // Short delay so the home screen renders cleanly first
+          setTimeout(() => {
+            if (isMounted) setShowTourModal(true);
+          }, 800);
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
+  // Track 2 minutes (120 seconds) of active app usage for In-App Review popup
+  useEffect(() => {
+    let isMounted = true;
+
+    // Check on initial load if user already reached 2 minutes of usage
+    getAppReviewState().then((state) => {
+      if (isMounted && shouldShowReviewPrompt(state)) {
+        setShowReviewModal(true);
+      }
+    });
+
+    // Increment active foreground usage every 5 seconds
+    const usageTimer = setInterval(async () => {
+      if (appStateRef.current === 'active') {
+        const { shouldPrompt } = await addAppUsageSeconds(5);
+        if (isMounted && shouldPrompt) {
+          setShowReviewModal(true);
+        }
+      }
+    }, 5000);
+
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      appStateRef.current = nextState;
+    });
+
+    return () => {
+      isMounted = false;
+      clearInterval(usageTimer);
+      appStateSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     // Sync root System UI window background color
@@ -208,6 +265,18 @@ function NavigationRoot() {
 
       {/* Admin Controlled Forced Version Update Overlay */}
       {isUpdateRequired && <UpdateRequiredBarrier />}
+
+      {/* 2-Minute In-App Review Popup Modal */}
+      <AppReviewModal
+        visible={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+      />
+
+      {/* Interactive App Feature Tour / Walkthrough Modal */}
+      <AppTourModal
+        visible={showTourModal}
+        onClose={() => setShowTourModal(false)}
+      />
     </>
   );
 }

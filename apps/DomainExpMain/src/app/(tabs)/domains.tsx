@@ -256,6 +256,7 @@ export default function DomainsScreen() {
             onChangeText={setSearchQuery}
             autoCapitalize="none"
             returnKeyType="search"
+            disableFullscreenUI={true}
             onSubmitEditing={() => {
               if (searchQuery.trim() && filteredDomains.length === 0) {
                 router.push({ pathname: '/finder', params: { q: searchQuery.trim() } } as any);
@@ -451,7 +452,7 @@ export default function DomainsScreen() {
                 {
                   backgroundColor: isDark ? '#111827' : '#ffffff',
                   borderColor: isDark ? '#1f2937' : '#e2e8f0',
-                  paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : Math.max(insets.bottom, 24),
+                  paddingBottom: Math.max(insets.bottom, 24),
                 },
               ]}
             >
@@ -496,6 +497,7 @@ export default function DomainsScreen() {
                     }}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    disableFullscreenUI={true}
                   />
 
                   <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 12 }]}>
@@ -515,6 +517,7 @@ export default function DomainsScreen() {
                     value={newRegistrar}
                     onChangeText={setNewRegistrar}
                     autoCapitalize="words"
+                    disableFullscreenUI={true}
                   />
 
                   <TouchableOpacity
@@ -716,6 +719,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     padding: Spacing.xl,
+    maxHeight: '82%',
     borderWidth: 1,
   },
   modalHeader: {
@@ -738,7 +742,8 @@ const styles = StyleSheet.create({
   modalInput: {
     borderWidth: 1,
     borderRadius: Radius.md,
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    height: 48,
     fontSize: 15,
   },
   submitButton: {

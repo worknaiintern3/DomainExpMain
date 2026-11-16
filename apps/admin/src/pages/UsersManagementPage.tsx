@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { adminClient } from '../api/admin.client';
 import {
   IconAlertTriangle,
@@ -22,6 +22,8 @@ import { UserDetailModal } from '../components/UserDetailModal';
 import type { PlatformUser } from '../types/admin.types';
 
 export const UsersManagementPage: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Tab: 'all' | 'web' | 'mobile'
@@ -45,6 +47,10 @@ export const UsersManagementPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchUsers = async () => {
+    if (!adminClient.hasToken()) {
+      navigate('/login', { replace: true, state: { from: location } });
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -53,6 +59,10 @@ export const UsersManagementPage: React.FC = () => {
       });
       setUsers(data);
     } catch (err: any) {
+      if (err?.message?.includes('Authentication required') || !adminClient.hasToken()) {
+        navigate('/login', { replace: true, state: { from: location } });
+        return;
+      }
       setError(err?.message || 'Failed to load users');
     } finally {
       setLoading(false);

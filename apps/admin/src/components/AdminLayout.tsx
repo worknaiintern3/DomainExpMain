@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { adminClient, ADMIN_SESSION_CHANGED_EVENT } from '../api/admin.client';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -30,13 +30,14 @@ interface Props {
 
 export const AdminLayout: React.FC<Props> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { toggleTheme, actualTheme } = useTheme();
 
   const [hasToken, setHasToken] = useState(adminClient.hasToken());
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showSessionModal, setShowSessionModal] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [manualToken, setManualToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -49,6 +50,13 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
       window.removeEventListener('storage', updateSession);
     };
   }, []);
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, target: string) => {
+    if (!hasToken) {
+      e.preventDefault();
+      navigate('/login', { state: { from: target } });
+    }
+  };
 
   // Global search modal (Ctrl+K)
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -74,7 +82,11 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
       await adminClient.login(email.trim(), password);
       setHasToken(true);
       setShowAuthModal(false);
-      window.location.reload();
+      if (location.pathname === '/login') {
+        navigate('/', { replace: true });
+      } else {
+        window.location.reload();
+      }
     } catch (err: any) {
       setAuthError(err?.message || 'Authentication failed. Please verify credentials.');
     } finally {
@@ -82,18 +94,10 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
     }
   };
 
-  const handleApplyToken = () => {
-    if (!manualToken.trim()) return;
-    adminClient.setToken(manualToken.trim());
-    setHasToken(true);
-    setShowAuthModal(false);
-    window.location.reload();
-  };
-
   const handleSignOut = () => {
     adminClient.clearToken();
     setHasToken(false);
-    window.location.reload();
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -131,6 +135,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/"
+              onClick={(e) => handleNavClick(e, '/')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -143,6 +148,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/users?tab=all"
+              onClick={(e) => handleNavClick(e, '/users?tab=all')}
               className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/users' && (!location.search || location.search.includes('tab=all'))
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -172,6 +178,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/users?tab=web"
+              onClick={(e) => handleNavClick(e, '/users?tab=web')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/users' && location.search.includes('tab=web')
                   ? 'bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30'
@@ -184,6 +191,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/domains"
+              onClick={(e) => handleNavClick(e, '/domains')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/domains'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -196,6 +204,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/servers"
+              onClick={(e) => handleNavClick(e, '/servers')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/servers'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -216,6 +225,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/users?tab=mobile"
+              onClick={(e) => handleNavClick(e, '/users?tab=mobile')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/users' && location.search.includes('tab=mobile')
                   ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30'
@@ -228,6 +238,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/mobile-fleet"
+              onClick={(e) => handleNavClick(e, '/mobile-fleet')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/mobile-fleet'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -240,6 +251,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/appearance"
+              onClick={(e) => handleNavClick(e, '/appearance')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/appearance'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -252,6 +264,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/features"
+              onClick={(e) => handleNavClick(e, '/features')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/features'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -264,6 +277,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/home-layout"
+              onClick={(e) => handleNavClick(e, '/home-layout')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/home-layout'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -276,6 +290,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/navigation"
+              onClick={(e) => handleNavClick(e, '/navigation')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/navigation'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -288,6 +303,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/announcements"
+              onClick={(e) => handleNavClick(e, '/announcements')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/announcements'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -300,6 +316,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/versions"
+              onClick={(e) => handleNavClick(e, '/versions')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/versions'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -319,6 +336,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/audit-logs"
+              onClick={(e) => handleNavClick(e, '/audit-logs')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/audit-logs'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -331,6 +349,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             <Link
               to="/settings"
+              onClick={(e) => handleNavClick(e, '/settings')}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 location.pathname === '/settings'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
@@ -386,7 +405,15 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
 
             {/* Auth / Manage Token Button */}
             <button
-              onClick={() => setShowAuthModal(true)}
+              onClick={() => {
+                if (hasToken) {
+                  setShowSessionModal(true);
+                } else if (location.pathname !== '/login') {
+                  navigate('/login');
+                } else {
+                  setShowAuthModal(true);
+                }
+              }}
               className={`text-xs px-3.5 py-1.5 rounded-xl border font-semibold transition-all flex items-center gap-1.5 ${
                 hasToken
                   ? 'bg-slate-100 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
@@ -394,7 +421,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
               }`}
             >
               <IconKey size={13} />
-              <span>{hasToken ? 'Super Admin (Connected)' : '🔑 Sign In / Live Token'}</span>
+              <span>{hasToken ? 'Super Admin (Connected)' : '🔑 Sign In'}</span>
             </button>
 
             {hasToken ? (
@@ -424,7 +451,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
         {/* MAIN BODY */}
         <main className="flex-1 p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
-            {hasToken ? children : (
+            {hasToken || location.pathname === '/login' ? children : (
               <section className="mx-auto my-12 max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4" aria-labelledby="admin-sign-in-heading">
                 <IconShield size={28} className="text-blue-500" />
                 <h1 id="admin-sign-in-heading" className="text-xl font-bold text-slate-900 dark:text-white">Sign in to Admin Center</h1>
@@ -496,39 +523,58 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
 
-            <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-slate-200 dark:border-slate-800" />
-              <span className="flex-shrink mx-3 text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-                OR PASTE JWT TOKEN
-              </span>
-              <div className="flex-grow border-t border-slate-200 dark:border-slate-800" />
-            </div>
-
-            <div className="space-y-2">
-              <textarea
-                value={manualToken}
-                onChange={(e) => setManualToken(e.target.value)}
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                rows={2}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-200 font-mono focus:outline-none focus:border-blue-500"
-              />
+      {/* ACTIVE SESSION STATUS MODAL */}
+      {showSessionModal ? (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-5 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <IconShield size={18} className="text-emerald-500" />
+                Super Admin Session
+              </h2>
               <button
-                type="button"
-                onClick={handleApplyToken}
-                className="w-full py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold"
+                onClick={() => setShowSessionModal(false)}
+                className="text-slate-400 hover:text-slate-900 dark:hover:text-white"
               >
-                Set Custom Token
+                ✕
               </button>
             </div>
 
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Status</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 border border-emerald-300 dark:border-emerald-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Connected & Active
+                </span>
+              </div>
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                Your administrator session is active. You have full administrative access to all website users, domain portfolio, and mobile fleet features.
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
+              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-medium">Assigned Role:</span>
+                <span className="font-bold text-slate-900 dark:text-white">SUPER_ADMIN</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-medium">Backend Sync:</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">Operational</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowAuthModal(false)}
-                className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 font-medium"
+                onClick={() => setShowSessionModal(false)}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
               >
-                Cancel
+                Maintain Current Session
               </button>
             </div>
           </div>
@@ -621,3 +667,7 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
     </div>
   );
 };
+
+
+
+

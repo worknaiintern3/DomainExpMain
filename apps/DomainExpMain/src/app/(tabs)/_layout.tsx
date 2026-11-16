@@ -17,7 +17,7 @@ import { useAuth } from '../../store/auth-context';
 import { useRemoteConfig, type RemoteNavigationItem } from '../../store/remote-config-context';
 
 export const unstable_settings = {
-  initialRouteName: 'dashboard',
+  anchor: 'dashboard',
 };
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -465,6 +465,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      backBehavior="initialRoute"
       tabBar={(props) => <CustomAnimatedTabBar {...props} />}
       screenOptions={{
         headerShown: false,
