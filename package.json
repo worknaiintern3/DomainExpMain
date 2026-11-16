@@ -4,7 +4,11 @@
   "private": true,
   "description": "DomainPulse - Infrastructure & Domain Portfolio Management Platform",
   "workspaces": [
-    "apps/*",
+    "apps/admin",
+    "apps/api",
+    "apps/landing",
+    "apps/web",
+    "apps/worker",
     "packages/*"
   ],
   "scripts": {
