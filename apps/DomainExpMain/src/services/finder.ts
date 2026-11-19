@@ -106,7 +106,7 @@ export async function searchDomainAvailability(domainQuery: string): Promise<Dom
 
   // 2. Direct WhoisFreaks Live Availability API fallback
   try {
-    const wfKey = process.env.EXPO_PUBLIC_WHOISFREAKS_API_KEY || '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
+    const wfKey = process.env.EXPO_PUBLIC_WHOISFREAKS_API_KEY || '48a45b76bafe466c89bdb66923c39d14';
     const wfRes = await fetch(
       `https://api.whoisfreaks.com/v1.0/domain/availability?apiKey=${encodeURIComponent(wfKey)}&domain=${encodeURIComponent(cleanName)}`,
       { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(2000) }

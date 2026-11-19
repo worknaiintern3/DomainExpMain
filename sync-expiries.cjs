@@ -4,7 +4,7 @@ const pool = new Pool({
   connectionString: 'postgresql://domainpulse_app:Admin%401234@127.0.0.1:5432/domainpulse_dev',
 });
 
-const API_KEY = process.env.WHOISFREAKS_API_KEY || '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
+const API_KEY = process.env.WHOISFREAKS_API_KEY || '48a45b76bafe466c89bdb66923c39d14';
 
 async function fetchWhoisWithRetry(domainName, retries = 3) {
   // First try Verisign RDAP if it's .com

@@ -562,7 +562,7 @@ export async function fetchLiveDomainDetails(rawDomain: string): Promise<LiveDom
 
   // 1. Authoritative WhoisFreaks live queries (Direct API & Backend)
   try {
-    const wfKey = process.env.EXPO_PUBLIC_WHOISFREAKS_API_KEY || '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
+    const wfKey = process.env.EXPO_PUBLIC_WHOISFREAKS_API_KEY || '48a45b76bafe466c89bdb66923c39d14';
     const directWhoisUrl = `https://api.whoisfreaks.com/v1.0/whois?apiKey=${encodeURIComponent(wfKey)}&whois=live&domainName=${encodeURIComponent(domain)}`;
     const directDnsUrl = `https://api.whoisfreaks.com/v1.0/dns/live?apiKey=${encodeURIComponent(wfKey)}&type=all&domainName=${encodeURIComponent(domain)}`;
     const directSslUrl = `https://api.whoisfreaks.com/v1.0/ssl/live?apiKey=${encodeURIComponent(wfKey)}&domainName=${encodeURIComponent(domain)}`;

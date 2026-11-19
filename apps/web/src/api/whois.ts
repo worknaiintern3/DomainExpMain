@@ -142,7 +142,7 @@ export interface WhoisAvailabilityItem {
 
 const FALLBACK_API_KEY =
   (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.['VITE_WHOISFREAKS_API_KEY'] ||
-  '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
+  '48a45b76bafe466c89bdb66923c39d14';
 
 function getWhoisFreaksBaseUrl(): string {
   if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
