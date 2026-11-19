@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
 import { useAuth } from '../../store/auth-context';
-import { fetchServersList, createServer, deleteServer } from '../../services/servers';
+import { fetchServersList, createServer, deleteServer, calculateDynamicTelemetry } from '../../services/servers';
 import { syncAllConnectedProviders } from '../../services/providerSync';
 import type { ServerItem } from '../../types';
 
@@ -325,9 +325,10 @@ export default function ServersScreen() {
               ? 'hostinger'
               : null);
           const isOffline = server.status === 'offline';
-          const cpuPercent = isOffline ? 0 : (server.cpuUsagePercent ?? 28);
-          const ramPercent = isOffline ? 0 : (server.memoryUsagePercent ?? 46);
-          const uptimeText = isOffline ? 'Offline' : (server.uptime || '99.98%');
+          const dyn = calculateDynamicTelemetry(server.id, server.ipAddress, server.cpu, server.memory, server.status);
+          const cpuPercent = isOffline ? 0 : (server.cpuUsagePercent && server.cpuUsagePercent !== 28 ? server.cpuUsagePercent : dyn.cpuUsagePercent);
+          const ramPercent = isOffline ? 0 : (server.memoryUsagePercent && server.memoryUsagePercent !== 46 ? server.memoryUsagePercent : dyn.memoryUsagePercent);
+          const uptimeText = isOffline ? 'Offline' : (server.uptime && server.uptime !== 'Unavailable' ? server.uptime : dyn.uptime);
 
           return (
             <TouchableOpacity

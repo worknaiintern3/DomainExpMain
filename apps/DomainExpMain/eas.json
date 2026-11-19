@@ -18,6 +18,15 @@
         "EXPO_PUBLIC_WHOISFREAKS_API_KEY": "4f9a91ff1ccb4ebfb2cd35d06becc1c1"
       }
     },
+    "production-apk": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://app.domainexprt.com/api/v1",
+        "EXPO_PUBLIC_WHOISFREAKS_API_KEY": "4f9a91ff1ccb4ebfb2cd35d06becc1c1"
+      }
+    },
     "preview-lan": {
       "distribution": "internal",
       "android": {

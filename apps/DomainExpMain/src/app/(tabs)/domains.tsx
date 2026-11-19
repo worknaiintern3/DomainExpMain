@@ -332,7 +332,7 @@ export default function DomainsScreen() {
                   borderColor: isDark ? '#1f2937' : '#f1f5f9',
                 },
               ]}
-              onPress={() => router.push(`/domain/${domain.id}` as any)}
+              onPress={() => router.push(`/domain/${encodeURIComponent(domain.id || domain.name)}` as any)}
               activeOpacity={0.8}
             >
               <DomainLogoImage

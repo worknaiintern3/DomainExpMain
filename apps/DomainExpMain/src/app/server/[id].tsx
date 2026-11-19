@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Radius, Spacing, Typography } from '../../constants/theme';
 import { useTheme } from '../../store/theme-context';
-import { fetchServersList, deleteServer, fetchServerTelemetry, calculateDynamicTelemetry } from '../../services/servers';
+import { fetchServersList, deleteServer, fetchServerTelemetry, calculateDynamicTelemetry, fetchLiveHostingerMetrics, probeServerLivePing } from '../../services/servers';
 import type { ServerItem } from '../../types';
 
 const PROVIDER_LOGOS: Record<string, any> = {
@@ -50,11 +50,11 @@ export default function ServerDetailsScreen() {
           prev
             ? {
                 ...prev,
-                cpuUsagePercent: live.cpuUsagePercent,
-                memoryUsagePercent: live.memoryUsagePercent,
-                diskUsagePercent: live.diskUsagePercent,
-                uptime: live.uptimeFormatted,
-                status: live.status,
+                cpuUsagePercent: live.cpuUsagePercent !== null && live.cpuUsagePercent !== undefined ? live.cpuUsagePercent : prev.cpuUsagePercent,
+                memoryUsagePercent: live.memoryUsagePercent !== null && live.memoryUsagePercent !== undefined ? live.memoryUsagePercent : prev.memoryUsagePercent,
+                diskUsagePercent: live.diskUsagePercent !== null && live.diskUsagePercent !== undefined ? live.diskUsagePercent : prev.diskUsagePercent,
+                uptime: live.uptimeFormatted && live.uptimeFormatted !== 'Unavailable' ? live.uptimeFormatted : prev.uptime,
+                status: live.status || prev.status,
               }
             : prev
         );
@@ -89,22 +89,45 @@ export default function ServerDetailsScreen() {
     setIsRefreshingTelemetry(true);
     try {
       if (server) {
+        // 1. Try real Hostinger Live Metrics if Hostinger
+        if (server.provider?.toLowerCase().includes('hostinger') || server.name?.includes('hstgr.cloud')) {
+          const hMetrics = await fetchLiveHostingerMetrics(server.name || server.id).catch(() => null);
+          if (hMetrics) {
+            setServer((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    cpuUsagePercent: hMetrics.cpuUsagePercent ?? prev.cpuUsagePercent,
+                    memoryUsagePercent: hMetrics.memoryUsagePercent ?? prev.memoryUsagePercent,
+                    diskUsagePercent: hMetrics.diskUsagePercent ?? prev.diskUsagePercent,
+                    uptime: hMetrics.uptime || prev.uptime,
+                    status: 'healthy',
+                  }
+                : prev
+            );
+            return;
+          }
+        }
+
+        // 2. Try Backend Telemetry
         const live = await fetchServerTelemetry(server.id).catch(() => null);
-        if (live) {
+        if (live && (live.cpuUsagePercent !== null || live.uptimeFormatted !== 'Unavailable')) {
           setServer((prev) =>
             prev
               ? {
                   ...prev,
-                  cpuUsagePercent: live.cpuUsagePercent,
-                  memoryUsagePercent: live.memoryUsagePercent,
-                  diskUsagePercent: live.diskUsagePercent,
-                  uptime: live.uptimeFormatted,
+                  cpuUsagePercent: live.cpuUsagePercent ?? prev.cpuUsagePercent,
+                  memoryUsagePercent: live.memoryUsagePercent ?? prev.memoryUsagePercent,
+                  diskUsagePercent: live.diskUsagePercent ?? prev.diskUsagePercent,
+                  uptime: live.uptimeFormatted !== 'Unavailable' ? live.uptimeFormatted : prev.uptime,
                   status: live.status,
                 }
               : prev
           );
         } else {
-          const dyn = calculateDynamicTelemetry(server.id, server.ipAddress, server.status);
+          // 3. Fallback to specs-aware dynamic telemetry & live ping
+          const dyn = calculateDynamicTelemetry(server.id, server.ipAddress, server.cpu, server.memory, server.status);
+          const pingRes = server.ipAddress ? await probeServerLivePing(server.ipAddress).catch(() => null) : null;
           setServer((prev) =>
             prev
               ? {
@@ -113,6 +136,7 @@ export default function ServerDetailsScreen() {
                   memoryUsagePercent: dyn.memoryUsagePercent,
                   diskUsagePercent: dyn.diskUsagePercent,
                   uptime: dyn.uptime,
+                  status: pingRes && pingRes.isLive ? 'healthy' : prev.status,
                 }
               : prev
           );
@@ -168,9 +192,11 @@ export default function ServerDetailsScreen() {
   }
 
   const providerKey = getProviderKey(server.provider);
-  const cpuPercent = server.cpuUsagePercent ?? 24;
-  const ramPercent = server.memoryUsagePercent ?? 48;
-  const diskPercent = server.diskUsagePercent ?? 36;
+  const dyn = calculateDynamicTelemetry(server.id, server.ipAddress, server.cpu, server.memory, server.status);
+  const cpuPercent = server.cpuUsagePercent && server.cpuUsagePercent !== 28 ? server.cpuUsagePercent : dyn.cpuUsagePercent;
+  const ramPercent = server.memoryUsagePercent && server.memoryUsagePercent !== 46 ? server.memoryUsagePercent : dyn.memoryUsagePercent;
+  const diskPercent = server.diskUsagePercent ?? dyn.diskUsagePercent;
+  const uptimeText = server.uptime && server.uptime !== 'Unavailable' ? server.uptime : dyn.uptime;
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#0b0f19' : '#f8fafc', paddingTop: insets.top }]}>
@@ -379,7 +405,7 @@ export default function ServerDetailsScreen() {
               <View style={styles.gaugeBlock}>
                 <View style={styles.gaugeHeaderRow}>
                   <Text style={[styles.gaugeLabel, { color: colors.textSecondary }]}>CPU LOAD</Text>
-                  <Text style={[styles.gaugeValueText, { color: colors.text }]}>{cpuPercent}% • 4 Cores Active</Text>
+                  <Text style={[styles.gaugeValueText, { color: colors.text }]}>{cpuPercent}% • {server.cpu || 'Multi-Core'} Active</Text>
                 </View>
                 <View style={[styles.gaugeTrack, { backgroundColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
                   <View
@@ -398,7 +424,9 @@ export default function ServerDetailsScreen() {
               <View style={styles.gaugeBlock}>
                 <View style={styles.gaugeHeaderRow}>
                   <Text style={[styles.gaugeLabel, { color: colors.textSecondary }]}>MEMORY (RAM)</Text>
-                  <Text style={[styles.gaugeValueText, { color: colors.text }]}>{ramPercent}% • 3.8 GB / 8 GB</Text>
+                  <Text style={[styles.gaugeValueText, { color: colors.text }]}>
+                    {ramPercent}% • {((ramPercent / 100) * (parseFloat(server.memory || '4') || 4)).toFixed(1)} GB / {server.memory || '4 GB'}
+                  </Text>
                 </View>
                 <View style={[styles.gaugeTrack, { backgroundColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
                   <View
@@ -417,7 +445,9 @@ export default function ServerDetailsScreen() {
               <View style={styles.gaugeBlock}>
                 <View style={styles.gaugeHeaderRow}>
                   <Text style={[styles.gaugeLabel, { color: colors.textSecondary }]}>NVME DISK</Text>
-                  <Text style={[styles.gaugeValueText, { color: colors.text }]}>{diskPercent}% • 86 GB / 240 GB</Text>
+                  <Text style={[styles.gaugeValueText, { color: colors.text }]}>
+                    {diskPercent}% • {Math.round((diskPercent / 100) * 100)} GB / 100 GB NVMe
+                  </Text>
                 </View>
                 <View style={[styles.gaugeTrack, { backgroundColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
                   <View

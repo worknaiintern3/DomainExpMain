@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -403,6 +403,7 @@ export default function DomainDetailsScreen() {
   const [matchedServer, setMatchedServer] = useState<ServerItem | null>(null);
   const [serverMatchReason, setServerMatchReason] = useState<string>('');
   const [copiedServerIp, setCopiedServerIp] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   // Modals for linking / changing provider and server
   const [isLinkProviderModalOpen, setIsLinkProviderModalOpen] = useState(false);
@@ -634,65 +635,75 @@ export default function DomainDetailsScreen() {
 
   useEffect(() => {
     async function loadDomain() {
-      const [list, accList, srvList] = await Promise.all([
-        fetchDomainsList(),
-        fetchProviderAccountsList(),
-        fetchServersList(),
-      ]);
-      setProviderAccounts(accList);
-      setServers(srvList);
-
-      const domainNameFromId = decodeURIComponent(id || '').trim().toLowerCase();
-      const found = list.find((d) => d.id === id || d.name.toLowerCase() === domainNameFromId);
-
-      setLastCheckedDate(
-        new Date().toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })
-      );
-
-      let activeDomainName = domainNameFromId;
-      if (found) {
-        setDomain(found);
-        activeDomainName = found.name;
-        populateEditState(found, null);
-        resolveMatchedInfrastructure(found, null, accList, srvList);
-        queryLiveTelemetry(found.name, accList, srvList);
-      } else {
-        const dynamicDomain: DomainItem = {
-          id: domainNameFromId,
-          name: domainNameFromId,
-          tld: `.${domainNameFromId.split('.').pop() || 'com'}`,
-          registrar: 'Checking WHOIS...',
-          autoRenew: true,
-          expiresAt: '',
-          daysRemaining: 0,
-          renewalPrice: domainNameFromId.endsWith('.ai') ? 5800 : domainNameFromId.endsWith('.io') ? 3200 : domainNameFromId.endsWith('.in') ? 499 : 899,
-          currency: '₹',
-          status: 'safe',
-          dnsProvider: 'Authoritative DNS',
-          sslStatus: 'active',
-          httpStatus: '200 OK',
-          rdapStatus: 'Synchronizing',
-          tags: ['Personal'],
-          logoUrl: getDomainLogoUrl(domainNameFromId),
-        };
-        setDomain(dynamicDomain);
-        populateEditState(dynamicDomain, null);
-        resolveMatchedInfrastructure(dynamicDomain, null, accList, srvList);
-        queryLiveTelemetry(domainNameFromId, accList, srvList);
-      }
-
-      // Resolve associated mobile & web endpoints reliably
       try {
-        const allApps = await fetchApplicationsList();
-        const matched = getAppForDomain(activeDomainName, allApps);
-        setMatchedApp(matched);
-      } catch {
-        const fallback = getAppForDomain(activeDomainName, []);
-        setMatchedApp(fallback);
+        const [list, accList, srvList] = await Promise.all([
+          fetchDomainsList(),
+          fetchProviderAccountsList(),
+          fetchServersList(),
+        ]);
+        setProviderAccounts(accList);
+        setServers(srvList);
+
+        let safeDecodedId = '';
+        try {
+          safeDecodedId = decodeURIComponent(id || '').trim().toLowerCase();
+        } catch {
+          safeDecodedId = (id || '').trim().toLowerCase();
+        }
+
+        const found = list.find((d) => d.id === id || d.name.toLowerCase() === safeDecodedId);
+
+        setLastCheckedDate(
+          new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })
+        );
+
+        let activeDomainName = safeDecodedId;
+        if (found) {
+          setDomain(found);
+          activeDomainName = found.name;
+          populateEditState(found, null);
+          resolveMatchedInfrastructure(found, null, accList, srvList);
+          queryLiveTelemetry(found.name, accList, srvList);
+        } else {
+          const dynamicDomain: DomainItem = {
+            id: safeDecodedId || 'unknown-domain',
+            name: safeDecodedId || 'unknown.com',
+            tld: `.${(safeDecodedId.split('.').pop() || 'com')}`,
+            registrar: 'Checking WHOIS...',
+            autoRenew: true,
+            expiresAt: '',
+            daysRemaining: 0,
+            renewalPrice: safeDecodedId.endsWith('.ai') ? 5800 : safeDecodedId.endsWith('.io') ? 3200 : safeDecodedId.endsWith('.in') ? 499 : 899,
+            currency: '₹',
+            status: 'safe',
+            dnsProvider: 'Authoritative DNS',
+            sslStatus: 'active',
+            httpStatus: '200 OK',
+            rdapStatus: 'Synchronizing',
+            tags: ['Personal'],
+            logoUrl: getDomainLogoUrl(safeDecodedId),
+          };
+          setDomain(dynamicDomain);
+          populateEditState(dynamicDomain, null);
+          resolveMatchedInfrastructure(dynamicDomain, null, accList, srvList);
+          queryLiveTelemetry(safeDecodedId, accList, srvList);
+        }
+
+        // Resolve associated mobile & web endpoints reliably
+        try {
+          const allApps = await fetchApplicationsList();
+          const matched = getAppForDomain(activeDomainName, allApps);
+          setMatchedApp(matched);
+        } catch {
+          const fallback = getAppForDomain(activeDomainName, []);
+          setMatchedApp(fallback);
+        }
+      } catch (err) {
+        console.error('Failed to load domain details:', err);
       }
     }
     loadDomain();
@@ -785,8 +796,6 @@ export default function DomainDetailsScreen() {
     setServerMatchReason('Directly Assigned');
     await updateDomainRecord(domain.id, updatedDomain);
   };
-
-  const [copiedUrl, setCopiedUrl] = useState(false);
 
   const handleOpenWebsite = async () => {
     if (!domain) return;
@@ -981,24 +990,22 @@ export default function DomainDetailsScreen() {
   const effectiveCreated = liveInfo?.registrationDate || domain.registrationDate || '';
   const effectiveUpdated = liveInfo?.lastUpdatedDate || '';
   const effectiveExpires = liveInfo?.expirationDate || (domain.expiresAt ? domain.expiresAt.split('T')[0] : '');
-  const effectiveDaysRemaining = useMemo(() => {
-    if (liveInfo?.daysRemaining !== undefined) {
-      return liveInfo.daysRemaining;
-    }
-    if (effectiveExpires) {
-      const days = calculateDaysRemaining(effectiveExpires);
-      if (days !== undefined) return days;
-    }
-    if (domain.expiresAt) {
-      const days = calculateDaysRemaining(domain.expiresAt);
-      if (days !== undefined) return days;
-    }
-    return domain.daysRemaining;
-  }, [liveInfo?.daysRemaining, effectiveExpires, domain.expiresAt, domain.daysRemaining]);
+  const effectiveDaysRemaining =
+    liveInfo?.daysRemaining !== undefined
+      ? liveInfo.daysRemaining
+      : effectiveExpires
+      ? (calculateDaysRemaining(effectiveExpires) ?? domain.daysRemaining)
+      : domain.expiresAt
+      ? (calculateDaysRemaining(domain.expiresAt) ?? domain.daysRemaining)
+      : domain.daysRemaining;
 
-  const effectiveDomainAge =
-    liveInfo?.domainAgeDays ??
-    (effectiveCreated ? Math.max(0, Math.floor((Date.now() - (parseSafeDate(effectiveCreated) ?? new Date(effectiveCreated).getTime())) / 86400000)) : undefined);
+  const effectiveDomainAge = (() => {
+    if (liveInfo?.domainAgeDays !== undefined) return liveInfo.domainAgeDays;
+    if (!effectiveCreated) return undefined;
+    const ts = parseSafeDate(effectiveCreated) ?? new Date(effectiveCreated).getTime();
+    if (isNaN(ts)) return undefined;
+    return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
+  })();
   const effectiveNameservers =
     liveInfo?.nameservers && liveInfo.nameservers.length > 0
       ? liveInfo.nameservers

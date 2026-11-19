@@ -8,7 +8,7 @@ import { fetchLiveDomainDetails, getDomainLogoUrl } from './liveDomainLookup';
 import { syncDiscoveredWebsites } from './websites';
 import { invalidateCache } from './dataCache';
 import { fetchAwsRoute53Domains, fetchAwsEc2Instances, type AwsCredentials } from './awsSigV4';
-import { calculateDynamicTelemetry } from './servers';
+import { calculateDynamicTelemetry, parseHostingerMetricsPayload } from './servers';
 import type { ApplicationItem, BackendApplication, BackendDomain, BackendServer, CursorPage, DomainItem, ServerItem } from '../types';
 
 export interface DiscoveredDomainInfo {
@@ -361,6 +361,21 @@ async function fetchHostingerResources(apiKey: string): Promise<{
           ? vps.ipv4
           : null;
         const ptr = Array.isArray(vps.ipv4) && vps.ipv4[0] ? vps.ipv4[0].ptr : null;
+        const cpu = vps.cpus ? `${vps.cpus} vCPU` : '2 vCPU';
+        const memory = vps.memory ? (vps.memory >= 1024 ? `${Math.round(vps.memory / 1024)} GB` : `${vps.memory} MB`) : '4 GB';
+        const region = vps.data_center_id === 21 ? 'Mumbai (DC-21)' : (vps.data_center_id ? `Data Center ${vps.data_center_id}` : 'Vilnius, Europe');
+
+        let liveMetrics: any = null;
+        if (vps.id) {
+          try {
+            const mRes = await fetch(`https://developers.hostinger.com/api/vps/v1/virtual-machines/${vps.id}/metrics`, { headers });
+            if (mRes.ok) {
+              const mJson = await mRes.json();
+              liveMetrics = parseHostingerMetricsPayload(mJson);
+            }
+          } catch {}
+        }
+
         servers.push({
           name: hostname || `Hostinger VPS ${vps.id || ''}`.trim(),
           hostname,
@@ -368,7 +383,14 @@ async function fetchHostingerResources(apiKey: string): Promise<{
           os: vps.template?.name || 'Ubuntu 24.04 LTS',
           status: vps.state === 'running' ? 'healthy' : (vps.state || 'healthy'),
           ptr: ptr || undefined,
-        });
+          cpu,
+          memory,
+          region,
+          cpuUsagePercent: liveMetrics?.cpuUsagePercent,
+          memoryUsagePercent: liveMetrics?.memoryUsagePercent,
+          diskUsagePercent: liveMetrics?.diskUsagePercent,
+          uptime: liveMetrics?.uptime,
+        } as any);
 
         const domFromHost = extractDomainFromHostname(hostname);
         if (domFromHost && !isInfrastructureDomain(domFromHost) && !domains.some((d) => d.domain === domFromHost)) {
@@ -1199,21 +1221,24 @@ export async function syncProviderAccount(params: {
 
     if (!serverMap.has(key)) {
       const isOff = s.status === 'offline';
-      const dyn = calculateDynamicTelemetry(s.name, s.ip, isOff ? 'offline' : 'healthy');
+      const cpu = (s as any).cpu || '2 vCPU';
+      const memory = (s as any).memory || '4 GB';
+      const region = (s as any).region || 'Vilnius, Europe';
+      const dyn = calculateDynamicTelemetry(s.name, s.ip, cpu, memory, isOff ? 'offline' : 'healthy');
       const newServer: ServerItem = {
         id: `srv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: s.name,
         provider: label,
-        region: (s as any).region || 'us-east-1',
+        region,
         ipAddress: s.ip || '103.21.58.112',
-        cpu: '4 vCPU',
-        memory: '8 GB',
-        os: s.os || 'Linux/UNIX (AWS EC2)',
+        cpu,
+        memory,
+        os: s.os || 'Ubuntu 24.04 LTS',
         status: isOff ? 'offline' : 'healthy',
-        uptime: dyn.uptime,
-        cpuUsagePercent: dyn.cpuUsagePercent,
-        memoryUsagePercent: dyn.memoryUsagePercent,
-        diskUsagePercent: dyn.diskUsagePercent,
+        uptime: (s as any).uptime || dyn.uptime,
+        cpuUsagePercent: (s as any).cpuUsagePercent ?? dyn.cpuUsagePercent,
+        memoryUsagePercent: (s as any).memoryUsagePercent ?? dyn.memoryUsagePercent,
+        diskUsagePercent: (s as any).diskUsagePercent ?? dyn.diskUsagePercent,
         connectedDomains: mappedDoms.length > 0 ? mappedDoms : [],
         providerAccountId: effectiveAccountId || params.providerAccountId,
       };
@@ -1228,7 +1253,7 @@ export async function syncProviderAccount(params: {
         primaryIp: s.ip || null,
         operatingSystem: s.os || 'Ubuntu 24.04 LTS',
         serverKind: cleanKey,
-        region: (s as any).region || null,
+        region,
         providerAccountId: serverAccId,
         notes: `Synced from ${label}`,
       }).catch(() => {});
@@ -1236,7 +1261,13 @@ export async function syncProviderAccount(params: {
       const existing = serverMap.get(key)!;
       existing.ipAddress = s.ip || existing.ipAddress;
       if ((s as any).region) existing.region = (s as any).region;
+      if ((s as any).cpu) existing.cpu = (s as any).cpu;
+      if ((s as any).memory) existing.memory = (s as any).memory;
       if (s.os) existing.os = s.os;
+      if ((s as any).cpuUsagePercent !== undefined) existing.cpuUsagePercent = (s as any).cpuUsagePercent;
+      if ((s as any).memoryUsagePercent !== undefined) existing.memoryUsagePercent = (s as any).memoryUsagePercent;
+      if ((s as any).diskUsagePercent !== undefined) existing.diskUsagePercent = (s as any).diskUsagePercent;
+      if ((s as any).uptime && (s as any).uptime !== 'Unavailable') existing.uptime = (s as any).uptime;
       existing.status = s.status === 'offline' ? 'offline' : 'healthy';
       if (mappedDoms.length > 0 && (!existing.connectedDomains || existing.connectedDomains.length === 0)) {
         existing.connectedDomains = mappedDoms;

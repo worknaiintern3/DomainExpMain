@@ -102,7 +102,7 @@ export default function RecentActivitiesScreen() {
 
   const handleNavigateAsset = (item: AlertItem) => {
     if (item.domainId) {
-      router.push(`/domain/${item.domainId}` as any);
+      router.push(`/domain/${encodeURIComponent(item.domainId)}` as any);
     } else if (item.id.includes('app') || item.title.toLowerCase().includes('play store') || item.title.toLowerCase().includes('app')) {
       router.push('/(tabs)/applications' as any);
     } else if (item.id.includes('srv') || item.title.toLowerCase().includes('server') || item.title.toLowerCase().includes('vps')) {
