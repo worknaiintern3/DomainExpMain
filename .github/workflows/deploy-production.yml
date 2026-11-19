@@ -84,18 +84,38 @@ jobs:
         if: env.PROD_ENV_FILE != ''
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/domainexp_key -p "$VPS_PORT" \
-            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-            "$VPS_USER@$VPS_HOST" \
-            "umask 077; mkdir -p '$DEPLOY_PATH/apps/api/deploy' && cat > '$DEPLOY_PATH/apps/api/deploy/.env' && sed -i -E '/^(CORS_ORIGINS|GOOGLE_OAUTH_REDIRECT_URI|JWT_ACCESS_TOKEN_ISSUER)=/s|app[.]domainexp[.]info|app.domainexprt.com|g' '$DEPLOY_PATH/apps/api/deploy/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/apps/api/.env'" <<< "$PROD_ENV_FILE"
+          ssh_flags=(-i ~/.ssh/domainexp_key -p "$VPS_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+          for attempt in 1 2 3 4; do
+            echo "Attempt $attempt: connecting to production VPS..."
+            if ssh "${ssh_flags[@]}" "$VPS_USER@$VPS_HOST" "umask 077; mkdir -p '$DEPLOY_PATH/apps/api/deploy' && cat > '$DEPLOY_PATH/apps/api/deploy/.env' && sed -i -E '/^(CORS_ORIGINS|GOOGLE_OAUTH_REDIRECT_URI|JWT_ACCESS_TOKEN_ISSUER)=/s|app[.]domainexp[.]info|app.domainexprt.com|g' '$DEPLOY_PATH/apps/api/deploy/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/.env' && cp '$DEPLOY_PATH/apps/api/deploy/.env' '$DEPLOY_PATH/apps/api/.env'" <<< "$PROD_ENV_FILE"; then
+              echo "Configuration synced successfully."
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "SSH connection failed after 4 attempts." >&2
+              exit 255
+            fi
+            echo "Connection attempt $attempt timed out or failed; retrying in 5s..."
+            sleep 5
+          done
 
       - name: Deploy exact pushed revision and verify HTTPS
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/domainexp_key -p "$VPS_PORT" \
-            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-            "$VPS_USER@$VPS_HOST" \
-            "set -eu; umask 077; script=\$(mktemp); trap 'rm -f -- \"\$script\"' EXIT; cat > \"\$script\"; bash \"\$script\" '$GITHUB_SHA' '$DEPLOY_PATH'" < apps/api/deploy/deploy.sh
+          ssh_flags=(-i ~/.ssh/domainexp_key -p "$VPS_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+          for attempt in 1 2 3 4; do
+            echo "Attempt $attempt: connecting to production VPS for deployment..."
+            if ssh "${ssh_flags[@]}" "$VPS_USER@$VPS_HOST" "set -eu; umask 077; script=\$(mktemp); trap 'rm -f -- \"\$script\"' EXIT; cat > \"\$script\"; bash \"\$script\" '$GITHUB_SHA' '$DEPLOY_PATH'" < apps/api/deploy/deploy.sh; then
+              echo "Deployment succeeded."
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "SSH deployment failed after 4 attempts." >&2
+              exit 255
+            fi
+            echo "Deployment attempt $attempt timed out or failed; retrying in 5s..."
+            sleep 5
+          done
 
       - name: Clean up private key
         if: always()
