@@ -540,7 +540,7 @@ export default function GooglePlayConsoleScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* =================================================================== */}
         {/* TAB 1: UNIVERSAL DEVELOPER SEARCH                                   */}

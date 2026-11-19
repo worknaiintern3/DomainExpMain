@@ -2335,7 +2335,7 @@ export default function ApplicationsScreen() {
         }}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           style={styles.modalOverlay}
         >
           <TouchableOpacity
@@ -2550,7 +2550,7 @@ export default function ApplicationsScreen() {
         }}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           style={styles.modalOverlay}
         >
           <TouchableOpacity
@@ -2755,7 +2755,7 @@ export default function ApplicationsScreen() {
         }}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           style={styles.modalOverlay}
         >
           <TouchableOpacity

@@ -2,7 +2,7 @@
   "expo": {
     "name": "DomainExpert",
     "slug": "domainpulse-mobile",
-    "version": "1.0.5",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "domainpulse",
@@ -27,6 +27,7 @@
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -42,7 +43,7 @@
         }
       },
       "package": "com.domainpulse.mobile",
-      "versionCode": 6
+      "versionCode": 9
     },
     "web": {
       "bundler": "metro",
@@ -50,6 +51,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withOptionalScreenFeatures",
       "expo-router",
       [
         "expo-splash-screen",

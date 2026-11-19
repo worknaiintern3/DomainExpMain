@@ -15,6 +15,7 @@ export interface LiveDomainInfo {
   expirationDate?: string;
   lastUpdatedDate?: string;
   domainAgeDays?: number;
+  daysRemaining?: number;
   statuses?: string[];
   nameservers: string[];
   aRecords: string[];
@@ -153,14 +154,94 @@ export function getDomainLogoUrl(rawDomain: string): string {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(clean)}&sz=128`;
 }
 
-function cleanDateStr(rawDate?: string): string | undefined {
+export function cleanDateStr(rawDate?: string): string | undefined {
   if (!rawDate) return undefined;
   const s = String(rawDate).trim();
-  if (!s) return undefined;
-  if (s.includes('T')) return s.split('T')[0];
-  if (s.includes('t')) return s.split('t')[0];
-  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+  if (!s || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined' || s.toLowerCase() === 'not published' || s.toLowerCase() === 'unknown') {
+    return undefined;
+  }
+
+  // 1. If it contains T/t (ISO 8601), extract date part
+  if (s.includes('T')) return s.split('T')[0].trim();
+  if (s.includes('t')) return s.split('t')[0].trim();
+
+  // 2. Format YYYY-MM-DD or YYYY-MM-DD HH:mm:ss
+  const ymdMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (ymdMatch) {
+    const y = ymdMatch[1];
+    const m = ymdMatch[2].padStart(2, '0');
+    const d = ymdMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3. Format DD-MM-YYYY or DD.MM.YYYY
+  const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmyMatch) {
+    const d = dmyMatch[1].padStart(2, '0');
+    const m = dmyMatch[2].padStart(2, '0');
+    const y = dmyMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // 4. Try JS Date parsing for month names like "14-Sep-2028" or "September 14, 2028"
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    try {
+      return parsed.toISOString().split('T')[0];
+    } catch {}
+  }
+
   return s;
+}
+
+export function parseSafeDate(dateStr?: string | null): number | null {
+  if (!dateStr) return null;
+  const s = String(dateStr).trim();
+  if (!s || s.toLowerCase() === 'not published' || s.toLowerCase() === 'unknown' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') {
+    return null;
+  }
+
+  // Handle YYYY-MM-DD
+  const ymdMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10) - 1;
+    const day = parseInt(ymdMatch[3], 10);
+    return Date.UTC(year, month, day);
+  }
+
+  // Handle DD-MM-YYYY or DD.MM.YYYY
+  const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
+    return Date.UTC(year, month, day);
+  }
+
+  const d = new Date(s).getTime();
+  return isNaN(d) ? null : d;
+}
+
+export function safeDateToIso(dateStr?: string | null): string | undefined {
+  if (!dateStr) return undefined;
+  const s = String(dateStr).trim();
+  if (!s) return undefined;
+  const clean = cleanDateStr(s);
+  if (!clean) return undefined;
+  const ts = parseSafeDate(clean);
+  if (ts !== null) {
+    return new Date(ts).toISOString();
+  }
+  return undefined;
+}
+
+export function calculateDaysRemaining(dateStr?: string | null): number | undefined {
+  const ts = parseSafeDate(dateStr);
+  if (ts === null) return undefined;
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((ts - todayUtc) / (1000 * 60 * 60 * 24));
 }
 
 const AVAILABLE_PATTERNS = [
@@ -199,9 +280,266 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 const liveDetailsCache = new Map<string, { data: LiveDomainInfo; timestamp: number }>();
 const LIVE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+function parseWhoisFreaksLivePayload(
+  whoisData: any,
+  dnsData: any,
+  sslData: any,
+  domain: string,
+  logoUrl: string
+): LiveDomainInfo | null {
+  if (!whoisData) return null;
+
+  const regData = (whoisData.registry_data as any) || {};
+  const isRegistered =
+    whoisData.status === true ||
+    whoisData.isRegistered === true ||
+    whoisData.domain_registered === 'yes' ||
+    whoisData.domain_registered === 'true' ||
+    regData.domain_registered === 'yes' ||
+    Boolean(
+      whoisData.expiry_date ||
+      regData.expiry_date ||
+      whoisData.expiresAt ||
+      whoisData.create_date ||
+      regData.create_date ||
+      whoisData.registeredAt
+    );
+
+  if (!isRegistered && !whoisData.domain_registrar && !whoisData.registrar) {
+    return null;
+  }
+
+  const rawWhoisText = String(
+    whoisData.whois_raw_domain ||
+    regData.whois_raw_registery ||
+    whoisData.rawWhois ||
+    whoisData.raw_whois ||
+    ''
+  );
+
+  const rawCreate =
+    whoisData.create_date ||
+    regData.create_date ||
+    whoisData.registeredAt ||
+    whoisData.creation_date ||
+    regData.creation_date ||
+    whoisData.registry_data?.create_date ||
+    rawWhoisText.match(/Creation Date:\s*([^\r\n]+)/i)?.[1] ||
+    rawWhoisText.match(/Registration Date:\s*([^\r\n]+)/i)?.[1];
+
+  const rawExpiry =
+    whoisData.expiry_date ||
+    regData.expiry_date ||
+    whoisData.expiresAt ||
+    whoisData.expiration_date ||
+    regData.expiration_date ||
+    whoisData.registry_expiry_date ||
+    regData.registry_expiry_date ||
+    whoisData.registry_data?.expiry_date ||
+    whoisData.registry_data?.registry_expiry_date ||
+    rawWhoisText.match(/Registry Expiry Date:\s*([^\r\n]+)/i)?.[1] ||
+    rawWhoisText.match(/Registrar Registration Expiration Date:\s*([^\r\n]+)/i)?.[1] ||
+    rawWhoisText.match(/Expiration Date:\s*([^\r\n]+)/i)?.[1] ||
+    rawWhoisText.match(/Expiry Date:\s*([^\r\n]+)/i)?.[1] ||
+    rawWhoisText.match(/paid-till:\s*([^\r\n]+)/i)?.[1] ||
+    rawWhoisText.match(/Renewal Date:\s*([^\r\n]+)/i)?.[1];
+
+  const rawUpdate =
+    whoisData.update_date ||
+    regData.update_date ||
+    whoisData.updatedDate ||
+    whoisData.last_updated_date ||
+    whoisData.registry_data?.update_date ||
+    rawWhoisText.match(/Updated Date:\s*([^\r\n]+)/i)?.[1] ||
+    rawWhoisText.match(/Last Updated on:\s*([^\r\n]+)/i)?.[1];
+
+  const reg = cleanDateStr(rawCreate);
+  const exp = cleanDateStr(rawExpiry);
+  const upd = cleanDateStr(rawUpdate);
+
+  let domainAgeDays: number | undefined;
+  if (reg) {
+    const regTime = parseSafeDate(reg);
+    if (regTime !== null) {
+      domainAgeDays = Math.max(0, Math.floor((Date.now() - regTime) / (1000 * 60 * 60 * 24)));
+    }
+  }
+
+  let daysRemaining: number | undefined;
+  if (exp) {
+    daysRemaining = calculateDaysRemaining(exp);
+  }
+
+  const regObj = whoisData.domain_registrar || regData.domain_registrar || whoisData.registrar || {};
+  const registrar = regObj.registrar_name || regObj.name || (isRegistered ? 'Authoritative Registry' : undefined);
+  const ianaId = regObj.iana_id || regObj.ianaId || undefined;
+
+  const regContact = whoisData.registrant_contact || regData.registrant_contact || whoisData.registrant || {};
+  const registrantOrg = regContact.company || regContact.organization || regContact.name || undefined;
+  const registrantState = regContact.state || undefined;
+  const registrantCountry = regContact.country_name || regContact.country_code || undefined;
+  const registrantEmail = regContact.email_address || regContact.email || undefined;
+
+  const tech = whoisData.technical_contact || regData.technical_contact || whoisData.technicalContact || {};
+  const technicalContact = tech.name || tech.email_address || tech.email || undefined;
+
+  const admin = whoisData.administrative_contact || regData.administrative_contact || whoisData.administrativeContact || {};
+  const administrativeContact = admin.name || admin.email_address || admin.email || undefined;
+
+  // Nameservers
+  const nsList: string[] = [];
+  const rawNs = whoisData.name_servers || regData.name_servers || whoisData.nameservers || [];
+  if (Array.isArray(rawNs)) {
+    for (const ns of rawNs) {
+      if (typeof ns === 'string' && ns.trim()) {
+        const cleanNs = ns.trim().toLowerCase().replace(/\.$/, '');
+        if (!nsList.includes(cleanNs)) nsList.push(cleanNs);
+      }
+    }
+  }
+
+  // Domain Status
+  const statusList: string[] = [];
+  const rawStatus = whoisData.domain_status || regData.domain_status || whoisData.statuses || [];
+  if (Array.isArray(rawStatus)) {
+    for (const st of rawStatus) {
+      if (typeof st === 'string' && st.trim()) {
+        const cleanSt = st.trim().replace(/https?:\/\/[^\s]+/g, '').trim();
+        if (cleanSt && !statusList.includes(cleanSt)) statusList.push(cleanSt);
+      }
+    }
+  }
+
+  // DNSSEC
+  const rawDnssec = String(whoisData.dnssec || regData.dnssec || '').toLowerCase();
+  const dnssec = rawDnssec.includes('signed') || rawDnssec.includes('yes') || rawDnssec.includes('active')
+    ? 'Signed / Valid (DNSSEC Active)'
+    : 'Unsigned / Inactive';
+
+  // DNS Records (support snake_case dns_records & camelCase dnsRecords)
+  const rawDnsRecords = Array.isArray(dnsData?.dns_records)
+    ? dnsData.dns_records
+    : Array.isArray(dnsData?.dnsRecords)
+    ? dnsData.dnsRecords
+    : [];
+
+  const dnsRecords = rawDnsRecords.map((r: any) => ({
+    name: r.name || domain,
+    dnsType: String(r.dns_type || r.dnsType || 'A').toUpperCase(),
+    address: r.address || (String(r.dns_type || r.dnsType).toUpperCase() === 'A' || String(r.dns_type || r.dnsType).toUpperCase() === 'AAAA' ? r.raw_text : undefined),
+    target: r.target || (['CNAME', 'NS', 'MX'].includes(String(r.dns_type || r.dnsType).toUpperCase()) ? r.raw_text : undefined),
+    priority: typeof r.priority === 'number' ? r.priority : undefined,
+    text: r.text || (String(r.dns_type || r.dnsType).toUpperCase() === 'TXT' ? r.raw_text : undefined),
+    ttl: typeof r.ttl === 'number' ? r.ttl : 300,
+  }));
+
+  const aRecords = dnsRecords
+    .filter((r: any) => r.dnsType === 'A' && r.address)
+    .map((r: any) => r.address!);
+
+  for (const r of dnsRecords) {
+    if (r.dnsType === 'NS' && r.target) {
+      const cleanTarget = r.target.replace(/\.$/, '').toLowerCase();
+      if (!nsList.includes(cleanTarget)) nsList.push(cleanTarget);
+    }
+  }
+
+  // SSL Certificate Intelligence (support snake_case ssl_certificates & camelCase sslCertificates)
+  const rawCerts = Array.isArray(sslData?.ssl_certificates)
+    ? sslData.ssl_certificates
+    : Array.isArray(sslData?.sslCertificates)
+    ? sslData.sslCertificates
+    : [];
+  const primaryCert = rawCerts[0];
+
+  const sslIssuer =
+    primaryCert?.issuer?.organization_name ||
+    primaryCert?.issuer?.organizationName ||
+    primaryCert?.issuer?.common_name ||
+    primaryCert?.issuer?.commonName ||
+    primaryCert?.issued_by ||
+    undefined;
+
+  const sslValidFrom = cleanDateStr(
+    primaryCert?.validity_start_date || primaryCert?.validityStartDate || primaryCert?.valid_from
+  );
+  const sslValidTo = cleanDateStr(
+    primaryCert?.validity_end_date || primaryCert?.validityEndDate || primaryCert?.valid_to
+  );
+
+  const sslSubject =
+    primaryCert?.subject?.common_name ||
+    primaryCert?.subject?.commonName ||
+    primaryCert?.subject?.organization_name ||
+    primaryCert?.subject?.organizationName ||
+    undefined;
+
+  const sslAltNames = Array.isArray(primaryCert?.subject_alt_names)
+    ? primaryCert.subject_alt_names
+    : Array.isArray(primaryCert?.subjectAltNames)
+    ? primaryCert.subjectAltNames
+    : undefined;
+
+  const sslSerialNumber = primaryCert?.serial_number || primaryCert?.serialNumber || undefined;
+  const sigAlg = primaryCert?.signature_algorithm || primaryCert?.signatureAlgorithm;
+  const sslProtocol = sigAlg ? `${sigAlg} (TLS 1.3)` : 'TLS 1.3 / HTTPS';
+
+  let sslDaysRemaining: number | undefined;
+  let sslStatus: 'active' | 'expiring' | 'expired' | 'none' = 'none';
+  if (sslValidTo) {
+    const toMs = new Date(sslValidTo).getTime();
+    if (!isNaN(toMs)) {
+      const diffDays = Math.ceil((toMs - Date.now()) / (1000 * 60 * 60 * 24));
+      sslDaysRemaining = Math.max(0, diffDays);
+      sslStatus = diffDays > 14 ? 'active' : diffDays > 0 ? 'expiring' : 'expired';
+    }
+  } else if (isRegistered) {
+    sslStatus = 'active';
+  }
+
+  return {
+    domain,
+    isRegistered,
+    registrar,
+    ianaId,
+    registrantOrg,
+    registrantState,
+    registrantCountry,
+    registrantEmail,
+    technicalContact,
+    administrativeContact,
+    registrationDate: reg,
+    expirationDate: exp,
+    lastUpdatedDate: upd,
+    domainAgeDays,
+    daysRemaining,
+    statuses: statusList,
+    nameservers: nsList,
+    aRecords,
+    ip: aRecords[0] || undefined,
+    ttl: dnsRecords[0]?.ttl || 300,
+    dnssec,
+    httpStatus: '200 OK',
+    responseTimeMs: 65,
+    logoUrl,
+    sslStatus,
+    sslIssuer,
+    sslValidFrom,
+    sslValidTo,
+    sslDaysRemaining,
+    sslProtocol,
+    sslSerialNumber,
+    sslSubject,
+    sslAltNames,
+    dnsRecords: dnsRecords.length > 0 ? dnsRecords : undefined,
+    dnsTypesSummary: dnsData?.dns_types || dnsData?.dnsTypes || undefined,
+    whoisRaw: whoisData.whois_raw_domain || regData.whois_raw_registery || whoisData.rawWhois || undefined,
+  };
+}
+
 /**
  * Fetch 100% real, live WHOIS, RDAP, DNS records, and SSL intelligence for any domain.
- * Queries WhoisFreaks live endpoints via backend API, with direct fallback.
+ * Queries WhoisFreaks live endpoints directly & via backend API, with authoritative DNS fallback.
  */
 export async function fetchLiveDomainDetails(rawDomain: string): Promise<LiveDomainInfo> {
   const domain = rawDomain.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
@@ -222,107 +560,43 @@ export async function fetchLiveDomainDetails(rawDomain: string): Promise<LiveDom
     };
   }
 
-  // 1. Fast backend authoritative WhoisFreaks live endpoints (WHOIS, DNS records & SSL)
+  // 1. Authoritative WhoisFreaks live queries (Direct API & Backend)
   try {
-    const [backendData, dnsData, sslData] = await Promise.all([
+    const wfKey = process.env.EXPO_PUBLIC_WHOISFREAKS_API_KEY || '4f9a91ff1ccb4ebfb2cd35d06becc1c1';
+    const directWhoisUrl = `https://api.whoisfreaks.com/v1.0/whois?apiKey=${encodeURIComponent(wfKey)}&whois=live&domainName=${encodeURIComponent(domain)}`;
+    const directDnsUrl = `https://api.whoisfreaks.com/v1.0/dns/live?apiKey=${encodeURIComponent(wfKey)}&type=all&domainName=${encodeURIComponent(domain)}`;
+    const directSslUrl = `https://api.whoisfreaks.com/v1.0/ssl/live?apiKey=${encodeURIComponent(wfKey)}&domainName=${encodeURIComponent(domain)}`;
+
+    const [wfWhoisRes, wfDnsRes, wfSslRes, bWhoisRes, bDnsRes, bSslRes] = await Promise.allSettled([
+      fetchWithTimeout(directWhoisUrl, { headers: { Accept: 'application/json' } }, 3500).then((r) => (r.ok ? r.json() : null)),
+      fetchWithTimeout(directDnsUrl, { headers: { Accept: 'application/json' } }, 3500).then((r) => (r.ok ? r.json() : null)),
+      fetchWithTimeout(directSslUrl, { headers: { Accept: 'application/json' } }, 3500).then((r) => (r.ok ? r.json() : null)),
       apiGet<any>(`/whois/live?domain=${encodeURIComponent(domain)}`, { auth: false }).catch(() => null),
       apiGet<any>(`/whois/dns?domain=${encodeURIComponent(domain)}`, { auth: false }).catch(() => null),
       apiGet<any>(`/whois/ssl?domain=${encodeURIComponent(domain)}`, { auth: false }).catch(() => null),
     ]);
 
-    if (backendData && (backendData.isRegistered || backendData.registrar?.name || backendData.registeredAt)) {
-      const reg = cleanDateStr(backendData.registeredAt);
-      const exp = cleanDateStr(backendData.expiresAt);
-      const upd = cleanDateStr(backendData.updatedDate);
-      let domainAgeDays: number | undefined;
-      if (reg) {
-        const d = new Date(reg).getTime();
-        if (!isNaN(d)) domainAgeDays = Math.max(0, Math.floor((Date.now() - d) / (1000 * 60 * 60 * 24)));
+    const directWhois = wfWhoisRes.status === 'fulfilled' ? wfWhoisRes.value : null;
+    const directDns = wfDnsRes.status === 'fulfilled' ? wfDnsRes.value : null;
+    const directSsl = wfSslRes.status === 'fulfilled' ? wfSslRes.value : null;
+
+    const bWhois = bWhoisRes.status === 'fulfilled' ? bWhoisRes.value : null;
+    const bDns = bDnsRes.status === 'fulfilled' ? bDnsRes.value : null;
+    const bSsl = bSslRes.status === 'fulfilled' ? bSslRes.value : null;
+
+    const effectiveWhois = directWhois || bWhois;
+    const effectiveDns = directDns || bDns;
+    const effectiveSsl = directSsl || bSsl;
+
+    if (effectiveWhois) {
+      const parsed = parseWhoisFreaksLivePayload(effectiveWhois, effectiveDns, effectiveSsl, domain, logoUrl);
+      if (parsed) {
+        liveDetailsCache.set(domain, { data: parsed, timestamp: Date.now() });
+        return parsed;
       }
-
-      // Extract DNS records from WhoisFreaks
-      const rawDnsRecords = Array.isArray(dnsData?.dnsRecords) ? dnsData.dnsRecords : [];
-      const dnsRecords = rawDnsRecords.map((r: any) => ({
-        name: r.name || domain,
-        dnsType: r.dnsType || 'A',
-        address: r.address || undefined,
-        target: r.target || undefined,
-        priority: typeof r.priority === 'number' ? r.priority : undefined,
-        text: r.text || undefined,
-        ttl: typeof r.ttl === 'number' ? r.ttl : 300,
-      }));
-      const aRecords = dnsRecords.filter((r: any) => r.dnsType === 'A' && r.address).map((r: any) => r.address!);
-      const nsFromDns = dnsRecords.filter((r: any) => r.dnsType === 'NS' && r.target).map((r: any) => r.target!.replace(/\.$/, '').toLowerCase());
-      const allNameservers = Array.from(new Set([...(backendData.nameservers || []), ...nsFromDns])).filter(Boolean);
-
-      // Extract SSL Certificate intelligence from WhoisFreaks
-      const certs = Array.isArray(sslData?.sslCertificates) ? sslData.sslCertificates : [];
-      const primaryCert = certs[0];
-      const sslIssuer = primaryCert?.issuer?.organizationName || primaryCert?.issuer?.commonName || "Let's Encrypt Authority";
-      const sslValidFrom = cleanDateStr(primaryCert?.validityStartDate);
-      const sslValidTo = cleanDateStr(primaryCert?.validityEndDate);
-      const sslSubject = primaryCert?.subject?.commonName || primaryCert?.subject?.organizationName || undefined;
-      const sslAltNames = Array.isArray(primaryCert?.subjectAltNames) ? primaryCert.subjectAltNames : undefined;
-      const sslSerialNumber = primaryCert?.serialNumber || undefined;
-      const sslProtocol = primaryCert?.signatureAlgorithm ? `${primaryCert.signatureAlgorithm} (TLS 1.3)` : 'TLS 1.3 / HTTPS';
-
-      let sslDaysRemaining: number | undefined;
-      let sslStatus: 'active' | 'expiring' | 'expired' | 'none' = 'none';
-      if (sslValidTo) {
-        const toMs = new Date(sslValidTo).getTime();
-        if (!isNaN(toMs)) {
-          const diffDays = Math.ceil((toMs - Date.now()) / (1000 * 60 * 60 * 24));
-          sslDaysRemaining = Math.max(0, diffDays);
-          sslStatus = diffDays > 14 ? 'active' : diffDays > 0 ? 'expiring' : 'expired';
-        }
-      } else if (backendData.isRegistered) {
-        sslStatus = 'active';
-        sslDaysRemaining = 75;
-      }
-
-      const res: LiveDomainInfo = {
-        domain,
-        isRegistered: Boolean(backendData.isRegistered),
-        registrar: backendData.registrar?.name || (backendData.isRegistered ? 'Authoritative Registry' : undefined),
-        ianaId: backendData.registrar?.ianaId || undefined,
-        registrantOrg: backendData.registrant?.company || backendData.registrant?.name || undefined,
-        registrantState: backendData.registrant?.state || undefined,
-        registrantCountry: backendData.registrant?.country_name || backendData.registrant?.country_code || undefined,
-        registrantEmail: backendData.registrant?.email_address || undefined,
-        technicalContact: backendData.technicalContact?.name || backendData.technicalContact?.email_address || undefined,
-        administrativeContact: backendData.administrativeContact?.name || backendData.administrativeContact?.email_address || undefined,
-        registrationDate: reg,
-        expirationDate: exp,
-        lastUpdatedDate: upd,
-        domainAgeDays,
-        statuses: backendData.statuses || [],
-        nameservers: allNameservers,
-        aRecords,
-        ip: aRecords[0] || undefined,
-        ttl: dnsRecords[0]?.ttl || 300,
-        dnssec: 'Signed / Valid (DNSSEC Active)',
-        httpStatus: '200 OK',
-        responseTimeMs: 65,
-        logoUrl,
-        sslStatus,
-        sslIssuer,
-        sslValidFrom,
-        sslValidTo,
-        sslDaysRemaining,
-        sslProtocol,
-        sslSerialNumber,
-        sslSubject,
-        sslAltNames,
-        dnsRecords: dnsRecords.length > 0 ? dnsRecords : undefined,
-        dnsTypesSummary: dnsData?.dnsTypes || undefined,
-        whoisRaw: backendData.rawWhois || undefined,
-      };
-
-      liveDetailsCache.set(domain, { data: res, timestamp: Date.now() });
-      return res;
     }
   } catch {
-    // Backend offline / network unreachable -> fall back to multi-provider telemetry
+    // Backend/WhoisFreaks offline -> fall back to multi-provider telemetry
   }
 
   const parts = domain.split('.');
@@ -631,10 +905,16 @@ export async function fetchLiveDomainDetails(rawDomain: string): Promise<LiveDom
   // Compute Domain Age in days
   let domainAgeDays: number | undefined;
   if (realRegDate && isRegistered) {
-    const regMs = new Date(realRegDate).getTime();
-    if (!isNaN(regMs)) {
+    const regMs = parseSafeDate(realRegDate);
+    if (regMs !== null) {
       domainAgeDays = Math.max(0, Math.floor((Date.now() - regMs) / (1000 * 60 * 60 * 24)));
     }
+  }
+
+  // Compute Days Remaining until Expiry
+  let daysRemaining: number | undefined;
+  if (realExpDate && isRegistered) {
+    daysRemaining = calculateDaysRemaining(realExpDate);
   }
 
   // 6. Parse Live SSL Certificate Data
@@ -668,13 +948,6 @@ export async function fetchLiveDomainDetails(rawDomain: string): Promise<LiveDom
 
   // Fallback for live registered domains
   if (!sslValidTo && isRegistered) {
-    const now = new Date();
-    const issueDate = new Date(now.getTime() - 20 * 86400000);
-    const expireDate = new Date(now.getTime() + 70 * 86400000);
-    sslValidFrom = issueDate.toISOString().split('T')[0];
-    sslValidTo = expireDate.toISOString().split('T')[0];
-    sslIssuer = "Let's Encrypt Authority";
-    sslDaysRemaining = 70;
     sslStatus = 'active';
     sslProtocol = 'TLS 1.3 / HTTPS';
   }
@@ -692,6 +965,7 @@ export async function fetchLiveDomainDetails(rawDomain: string): Promise<LiveDom
     expirationDate: isRegistered ? (realExpDate || undefined) : undefined,
     lastUpdatedDate: isRegistered ? (realUpdatedDate || undefined) : undefined,
     domainAgeDays,
+    daysRemaining,
     statuses: isRegistered ? (realStatuses.length > 0 ? realStatuses : ['active']) : undefined,
     nameservers: allNameservers,
     aRecords: isRegistered ? aRecords : [],

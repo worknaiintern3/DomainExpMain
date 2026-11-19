@@ -22,19 +22,20 @@ import { useAuth } from '../../store/auth-context';
 import { fetchDomainsList, createDomain, deleteDomain } from '../../services/domains';
 import { fetchServersList } from '../../services/servers';
 import { syncAllConnectedProviders, isInfrastructureDomain } from '../../services/providerSync';
-import { getDomainLogoUrl } from '../../services/liveDomainLookup';
+import { getDomainLogoUrl, calculateDaysRemaining, cleanDateStr, parseSafeDate } from '../../services/liveDomainLookup';
 import { DomainLogoImage } from '../../components/ui/DomainLogoImage';
 import type { DomainItem } from '../../types';
 
 function formatExpiryDate(dateStr?: string): string {
-  if (!dateStr) return 'Active';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return `Expires ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-  } catch {
-    return dateStr;
+  if (!dateStr) return 'Active Domain';
+  const clean = cleanDateStr(dateStr);
+  if (!clean || clean.toLowerCase() === 'not published' || clean.toLowerCase() === 'unknown') return 'Active Domain';
+  const ts = parseSafeDate(clean);
+  if (ts !== null) {
+    const d = new Date(ts);
+    return `Expires ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`;
   }
+  return dateStr;
 }
 
 export default function DomainsScreen() {
@@ -314,10 +315,12 @@ export default function DomainsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item: domain }) => {
           const logoUri = domain.logoUrl || getDomainLogoUrl(domain.name);
-          const expTime = domain.expiresAt ? new Date(domain.expiresAt).getTime() : NaN;
-          const daysCount = !isNaN(expTime)
-            ? Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)))
-            : domain.daysRemaining ?? 365;
+          const expDays = calculateDaysRemaining(domain.expiresAt);
+          const daysCount = expDays !== undefined
+            ? expDays
+            : domain.daysRemaining !== undefined
+            ? domain.daysRemaining
+            : undefined;
 
           return (
             <TouchableOpacity
@@ -375,8 +378,34 @@ export default function DomainsScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.daysBadgePill}>
-                  <View style={styles.daysBadgeDot} />
-                  <Text style={styles.daysBadgePillText}>{daysCount}d</Text>
+                  <View
+                    style={[
+                      styles.daysBadgeDot,
+                      daysCount !== undefined && daysCount <= 14
+                        ? { backgroundColor: '#ef4444' }
+                        : daysCount !== undefined && daysCount <= 30
+                        ? { backgroundColor: '#f59e0b' }
+                        : { backgroundColor: '#10b981' },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.daysBadgePillText,
+                      daysCount !== undefined && daysCount <= 14
+                        ? { color: '#dc2626' }
+                        : daysCount !== undefined && daysCount <= 30
+                        ? { color: '#d97706' }
+                        : { color: '#059669' },
+                    ]}
+                  >
+                    {daysCount !== undefined
+                      ? daysCount > 0
+                        ? `${daysCount}d`
+                        : daysCount === 0
+                        ? 'Today'
+                        : 'Expired'
+                      : 'Active'}
+                  </Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -437,17 +466,16 @@ export default function DomainsScreen() {
         onRequestClose={handleCloseAddModal}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1 }}
+          behavior="padding"
+          style={styles.modalOverlay}
         >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={handleCloseAddModal}
-            />
-            <View
-              style={[
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={handleCloseAddModal}
+          />
+          <View
+            style={[
                 styles.modalContent,
                 {
                   backgroundColor: isDark ? '#111827' : '#ffffff',
@@ -539,7 +567,6 @@ export default function DomainsScreen() {
                 </View>
               </ScrollView>
             </View>
-          </View>
         </KeyboardAvoidingView>
       </Modal>
     </View>

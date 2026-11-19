@@ -19,6 +19,7 @@ import { useAuth } from '../../store/auth-context';
 import { useRemoteConfig } from '../../store/remote-config-context';
 import { fetchInventorySummary } from '../../services/monitoring';
 import { fetchDomainsList } from '../../services/domains';
+import { calculateDaysRemaining } from '../../services/liveDomainLookup';
 import { fetchServersList } from '../../services/servers';
 import { fetchApplicationsList } from '../../services/applications';
 import { fetchWebsitesList } from '../../services/websites';
@@ -753,13 +754,14 @@ export default function DashboardScreen() {
 
     const expiringSoon = domains
       .filter((d) => {
-        const expTime = d.expiresAt ? new Date(d.expiresAt).getTime() : NaN;
-        const days = !isNaN(expTime)
-          ? Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)))
-          : d.daysRemaining ?? 365;
-        return days <= 30;
+        const days = calculateDaysRemaining(d.expiresAt) ?? d.daysRemaining;
+        return days !== undefined && days <= 30;
       })
-      .sort((a, b) => (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999));
+      .sort((a, b) => {
+        const daysA = calculateDaysRemaining(a.expiresAt) ?? a.daysRemaining ?? 9999;
+        const daysB = calculateDaysRemaining(b.expiresAt) ?? b.daysRemaining ?? 9999;
+        return daysA - daysB;
+      });
 
     const displayList = expiringSoon.length > 0 ? expiringSoon.slice(0, 4) : domains.slice(0, 4);
 
@@ -793,11 +795,8 @@ export default function DashboardScreen() {
         ) : (
           <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {displayList.map((domain, idx) => {
-              const expTime = domain.expiresAt ? new Date(domain.expiresAt).getTime() : NaN;
-              const days = !isNaN(expTime)
-                ? Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)))
-                : domain.daysRemaining ?? 0;
-              const isUrgent = days <= 10;
+              const days = calculateDaysRemaining(domain.expiresAt) ?? domain.daysRemaining;
+              const isUrgent = days !== undefined && days <= 10;
 
               return (
                 <React.Fragment key={domain.id}>

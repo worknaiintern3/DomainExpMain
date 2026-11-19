@@ -1,6 +1,6 @@
 import { getUserItem, setUserItem, STORAGE_KEYS } from './storage';
 import { apiGet, apiPost, apiPatch, apiDelete } from './api';
-import { fetchLiveDomainDetails, getDomainLogoUrl } from './liveDomainLookup';
+import { fetchLiveDomainDetails, getDomainLogoUrl, calculateDaysRemaining } from './liveDomainLookup';
 import { isInfrastructureDomain } from './providerSync';
 import { fetchWithCache, invalidateCache } from './dataCache';
 import type { BackendDomain, CursorPage, DomainItem, DomainMetadataResponse } from '../types';
@@ -56,11 +56,15 @@ export function mapBackendDomainToDomainItem(d: BackendDomain): DomainItem {
   const ext = cleanName.includes('.') ? `.${cleanName.split('.').pop()}` : '.com';
   const logoUrl = getDomainLogoUrl(cleanName);
 
-  const expDate = d.expiresAt || new Date(Date.now() + 365 * 86400000).toISOString();
-  const expTime = new Date(expDate).getTime();
-  const daysRemaining = isNaN(expTime) ? 365 : Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)));
+  const expDate = d.expiresAt || '';
+  const calculatedDays = expDate ? calculateDaysRemaining(expDate) : undefined;
+  const daysRemaining = calculatedDays !== undefined ? calculatedDays : 0;
   const status: 'critical' | 'warning' | 'safe' =
-    daysRemaining <= 14 ? 'critical' : daysRemaining <= 30 ? 'warning' : 'safe';
+    calculatedDays !== undefined && calculatedDays <= 14
+      ? 'critical'
+      : calculatedDays !== undefined && calculatedDays <= 30
+      ? 'warning'
+      : 'safe';
 
   let providerLabel: string | undefined;
   if (d.notes && d.notes.startsWith('Discovered from ')) {
@@ -278,8 +282,8 @@ export async function createDomain(data: {
   const ext = cleanName.includes('.') ? `.${cleanName.split('.').pop()}` : '.com';
   const logoUrl = getDomainLogoUrl(cleanName);
   const realRegistrar = data.registrar?.trim() || 'Authoritative Registry';
-  const realExpDate = new Date(Date.now() + 365 * 86400000).toISOString();
-  const daysRemaining = 365;
+  const realExpDate = '';
+  const daysRemaining = 0;
 
   let backendId = `dom-${Date.now()}`;
 

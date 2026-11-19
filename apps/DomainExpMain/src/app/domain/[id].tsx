@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,15 @@ import { useTheme } from '../../store/theme-context';
 import { fetchDomainsList, deleteDomain, updateDomainRecord } from '../../services/domains';
 import { fetchProviderAccountsList } from '../../services/accounts';
 import { fetchServersList, updateServer } from '../../services/servers';
-import { fetchLiveDomainDetails, getDomainLogoUrl, type LiveDomainInfo } from '../../services/liveDomainLookup';
+import {
+  fetchLiveDomainDetails,
+  getDomainLogoUrl,
+  cleanDateStr,
+  parseSafeDate,
+  safeDateToIso,
+  calculateDaysRemaining,
+  type LiveDomainInfo,
+} from '../../services/liveDomainLookup';
 import { openWebsiteInBrowser } from '../../services/websites';
 import { fetchApplicationsList } from '../../services/applications';
 import { DomainLogoImage } from '../../components/ui/DomainLogoImage';
@@ -108,21 +116,21 @@ function getServerProviderKey(
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'Not Published';
-  const clean = dateStr.trim();
+  const clean = cleanDateStr(dateStr);
   if (!clean || clean.toLowerCase() === 'not published' || clean.toLowerCase() === 'unknown') {
     return 'Not Published';
   }
-  try {
-    const d = new Date(clean);
-    if (isNaN(d.getTime())) return clean;
+  const ts = parseSafeDate(clean);
+  if (ts !== null) {
+    const d = new Date(ts);
     return d.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      timeZone: 'UTC',
     });
-  } catch {
-    return clean;
   }
+  return clean;
 }
 
 const BRAND_APP_CATALOG: Record<string, { name: string; packageId: string; playStoreUrl: string; url?: string }> = {
@@ -444,9 +452,9 @@ export default function DomainDetailsScreen() {
         ? info.statuses.join(', ').replace(/([A-Z])/g, ' $1').toLowerCase()
         : 'Active / Registered'
     );
-    setEditSslIssuer(info?.sslIssuer || "Let's Encrypt Authority");
-    setEditSslValidFrom(formatDate(info?.sslValidFrom || '2026-09-21'));
-    setEditSslValidTo(formatDate(info?.sslValidTo || '2026-12-20'));
+    setEditSslIssuer(info?.sslIssuer || (info?.isRegistered ? 'Authoritative CA' : 'N/A'));
+    setEditSslValidFrom(info?.sslValidFrom ? formatDate(info.sslValidFrom) : 'Not Available');
+    setEditSslValidTo(info?.sslValidTo ? formatDate(info.sslValidTo) : 'Not Available');
     setEditTags(currentDomain.tags && currentDomain.tags.length > 0 ? currentDomain.tags : ['Personal']);
     setEditNotes(currentDomain.notes || '');
   };
@@ -590,19 +598,17 @@ export default function DomainDetailsScreen() {
 
         const exp = details.expirationDate || '';
         const reg = details.registrationDate || '';
+        const liveDays = details.daysRemaining ?? (exp ? calculateDaysRemaining(exp) : undefined);
 
         setDomain((prev) => {
           if (!prev) return null;
-          const expTime = exp ? new Date(exp).getTime() : NaN;
-          const daysRemaining = isNaN(expTime)
-            ? prev.daysRemaining
-            : Math.max(0, Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24)));
+          const daysRemaining = liveDays !== undefined ? liveDays : prev.daysRemaining;
 
           const updatedDomain: DomainItem = {
             ...prev,
             registrar: details.registrar || prev.registrar,
             registrationDate: reg || prev.registrationDate,
-            expiresAt: exp ? new Date(exp).toISOString() : prev.expiresAt,
+            expiresAt: exp ? (safeDateToIso(exp) || exp) : prev.expiresAt,
             daysRemaining,
             logoUrl: details.logoUrl,
             nameservers: details.nameservers.length > 0 ? details.nameservers : prev.nameservers,
@@ -659,10 +665,10 @@ export default function DomainDetailsScreen() {
           id: domainNameFromId,
           name: domainNameFromId,
           tld: `.${domainNameFromId.split('.').pop() || 'com'}`,
-          registrar: 'Authoritative Registry',
+          registrar: 'Checking WHOIS...',
           autoRenew: true,
-          expiresAt: new Date(Date.now() + 365 * 86400000).toISOString(),
-          daysRemaining: 365,
+          expiresAt: '',
+          daysRemaining: 0,
           renewalPrice: domainNameFromId.endsWith('.ai') ? 5800 : domainNameFromId.endsWith('.io') ? 3200 : domainNameFromId.endsWith('.in') ? 499 : 899,
           currency: '₹',
           status: 'safe',
@@ -899,10 +905,23 @@ export default function DomainDetailsScreen() {
       .map((s) => s.trim())
       .filter(Boolean);
 
+    let updatedExpiresAt = domain.expiresAt;
+    let updatedDays = domain.daysRemaining;
+    const cleanedExp = cleanDateStr(editExpires);
+    if (cleanedExp) {
+      const days = calculateDaysRemaining(cleanedExp);
+      if (days !== undefined) {
+        updatedDays = days;
+        updatedExpiresAt = safeDateToIso(cleanedExp) || cleanedExp;
+      }
+    }
+
     const updated: DomainItem = {
       ...domain,
       registrar: editRegistrarName.trim() || domain.registrar,
-      registrationDate: editCreated.trim() || domain.registrationDate,
+      registrationDate: cleanDateStr(editCreated) || editCreated.trim() || domain.registrationDate,
+      expiresAt: updatedExpiresAt,
+      daysRemaining: updatedDays,
       tags: editTags,
       notes: editNotes.trim(),
       nameservers: nsArray.length > 0 ? nsArray : domain.nameservers,
@@ -917,6 +936,8 @@ export default function DomainDetailsScreen() {
         registrantOrg: editRegistrantOrg.trim() || liveInfo.registrantOrg,
         registrantState: editRegistrantState.trim() || liveInfo.registrantState,
         registrantEmail: editRegistrantEmail.trim() || liveInfo.registrantEmail,
+        expirationDate: cleanedExp || liveInfo.expirationDate,
+        daysRemaining: updatedDays ?? liveInfo.daysRemaining,
         nameservers: nsArray.length > 0 ? nsArray : liveInfo.nameservers,
         statuses: [editStatus.trim() || 'active'],
       });
@@ -960,9 +981,24 @@ export default function DomainDetailsScreen() {
   const effectiveCreated = liveInfo?.registrationDate || domain.registrationDate || '';
   const effectiveUpdated = liveInfo?.lastUpdatedDate || '';
   const effectiveExpires = liveInfo?.expirationDate || (domain.expiresAt ? domain.expiresAt.split('T')[0] : '');
+  const effectiveDaysRemaining = useMemo(() => {
+    if (liveInfo?.daysRemaining !== undefined) {
+      return liveInfo.daysRemaining;
+    }
+    if (effectiveExpires) {
+      const days = calculateDaysRemaining(effectiveExpires);
+      if (days !== undefined) return days;
+    }
+    if (domain.expiresAt) {
+      const days = calculateDaysRemaining(domain.expiresAt);
+      if (days !== undefined) return days;
+    }
+    return domain.daysRemaining;
+  }, [liveInfo?.daysRemaining, effectiveExpires, domain.expiresAt, domain.daysRemaining]);
+
   const effectiveDomainAge =
     liveInfo?.domainAgeDays ??
-    (effectiveCreated ? Math.max(0, Math.floor((Date.now() - new Date(effectiveCreated).getTime()) / 86400000)) : undefined);
+    (effectiveCreated ? Math.max(0, Math.floor((Date.now() - (parseSafeDate(effectiveCreated) ?? new Date(effectiveCreated).getTime())) / 86400000)) : undefined);
   const effectiveNameservers =
     liveInfo?.nameservers && liveInfo.nameservers.length > 0
       ? liveInfo.nameservers
@@ -973,11 +1009,11 @@ export default function DomainDetailsScreen() {
     liveInfo?.statuses && liveInfo.statuses.length > 0
       ? liveInfo.statuses.join(', ').replace(/([A-Z])/g, ' $1').toLowerCase()
       : 'active';
-  const effectiveSslValidFrom = liveInfo?.sslValidFrom || '2026-09-21';
-  const effectiveSslValidTo = liveInfo?.sslValidTo || '2026-12-20';
-  const effectiveSslIssuer = liveInfo?.sslIssuer || "Let's Encrypt Authority";
-  const effectiveSslDays = liveInfo?.sslDaysRemaining !== undefined ? liveInfo.sslDaysRemaining : 79;
-  const effectiveSslProtocol = liveInfo?.sslProtocol || 'TLS 1.3 / HTTPS (256-bit ECC)';
+  const effectiveSslValidFrom = liveInfo?.sslValidFrom || '';
+  const effectiveSslValidTo = liveInfo?.sslValidTo || '';
+  const effectiveSslIssuer = liveInfo?.sslIssuer || (liveInfo?.isRegistered ? 'Authoritative CA' : 'N/A');
+  const effectiveSslDays = liveInfo?.sslDaysRemaining;
+  const effectiveSslProtocol = liveInfo?.sslProtocol || 'TLS 1.3 / HTTPS';
 
   const detectedProviderKey = detectProviderKey(
     effectiveRegistrar,
@@ -1050,9 +1086,30 @@ export default function DomainDetailsScreen() {
           <Text style={[styles.heroDomainName, { color: colors.text, marginTop: 10 }]}>{domain.name}</Text>
 
           <View style={styles.heroStatusPill}>
-            <View style={styles.heroStatusDot} />
+            <View
+              style={[
+                styles.heroStatusDot,
+                effectiveDaysRemaining !== undefined && effectiveDaysRemaining <= 14
+                  ? { backgroundColor: '#ef4444' }
+                  : effectiveDaysRemaining !== undefined && effectiveDaysRemaining <= 30
+                  ? { backgroundColor: '#f59e0b' }
+                  : { backgroundColor: '#10b981' },
+              ]}
+            />
             <Text style={styles.heroStatusPillText}>
-              Expires in {domain.daysRemaining || 94} days
+              {effectiveDaysRemaining !== undefined
+                ? effectiveDaysRemaining > 1
+                  ? `Expires in ${effectiveDaysRemaining} days`
+                  : effectiveDaysRemaining === 1
+                  ? 'Expires tomorrow'
+                  : effectiveDaysRemaining === 0
+                  ? 'Expires today'
+                  : `Expired ${Math.abs(effectiveDaysRemaining)} day${Math.abs(effectiveDaysRemaining) === 1 ? '' : 's'} ago`
+                : domain.expiresAt || effectiveExpires
+                ? `Expires ${formatDate(effectiveExpires || domain.expiresAt)}`
+                : domain.registrar && domain.registrar !== 'Checking WHOIS...'
+                ? 'Active Domain'
+                : 'Resolving Domain...'}
             </Text>
           </View>
         </View>
@@ -1501,10 +1558,39 @@ export default function DomainDetailsScreen() {
           </View>
 
           {effectiveExpires ? (
-            <View style={styles.dataRow}>
-              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Expires</Text>
-              <Text style={[styles.dataValue, { color: colors.text }]}>{formatDate(effectiveExpires)}</Text>
-            </View>
+            <>
+              <View style={styles.dataRow}>
+                <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Expires</Text>
+                <Text style={[styles.dataValue, { color: colors.text }]}>{formatDate(effectiveExpires)}</Text>
+              </View>
+              {effectiveDaysRemaining !== undefined ? (
+                <View style={styles.dataRow}>
+                  <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Expires In</Text>
+                  <Text
+                    style={[
+                      styles.dataValue,
+                      {
+                        color:
+                          effectiveDaysRemaining <= 14
+                            ? '#ef4444'
+                            : effectiveDaysRemaining <= 30
+                            ? '#f59e0b'
+                            : '#10b981',
+                        fontWeight: '700',
+                      },
+                    ]}
+                  >
+                    {effectiveDaysRemaining > 1
+                      ? `${effectiveDaysRemaining} days`
+                      : effectiveDaysRemaining === 1
+                      ? 'Tomorrow (1 day)'
+                      : effectiveDaysRemaining === 0
+                      ? 'Today'
+                      : `Expired (${Math.abs(effectiveDaysRemaining)} days ago)`}
+                  </Text>
+                </View>
+              ) : null}
+            </>
           ) : null}
 
           <View style={styles.dataRow}>
@@ -1780,26 +1866,32 @@ export default function DomainDetailsScreen() {
           </View>
           <View style={[styles.sectionDivider, { backgroundColor: isDark ? '#1f2937' : '#f1f5f9' }]} />
 
-          <View style={styles.dataRow}>
-            <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Valid From (Issued)</Text>
-            <Text style={[styles.dataValue, { color: colors.text }]}>
-              {formatDate(effectiveSslValidFrom)}
-            </Text>
-          </View>
+          {effectiveSslValidFrom ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Valid From (Issued)</Text>
+              <Text style={[styles.dataValue, { color: colors.text }]}>
+                {formatDate(effectiveSslValidFrom)}
+              </Text>
+            </View>
+          ) : null}
 
-          <View style={styles.dataRow}>
-            <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Expires On (Valid Until)</Text>
-            <Text style={[styles.dataValue, { color: '#10b981', fontWeight: '700' }]}>
-              {formatDate(effectiveSslValidTo)}
-            </Text>
-          </View>
+          {effectiveSslValidTo ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Expires On (Valid Until)</Text>
+              <Text style={[styles.dataValue, { color: '#10b981', fontWeight: '700' }]}>
+                {formatDate(effectiveSslValidTo)}
+              </Text>
+            </View>
+          ) : null}
 
-          <View style={styles.dataRow}>
-            <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Days Remaining</Text>
-            <Text style={[styles.dataValue, { color: colors.text }]}>
-              {effectiveSslDays} days
-            </Text>
-          </View>
+          {effectiveSslDays !== undefined ? (
+            <View style={styles.dataRow}>
+              <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Days Remaining</Text>
+              <Text style={[styles.dataValue, { color: colors.text }]}>
+                {effectiveSslDays} days
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.dataRow}>
             <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>Issued By (CA)</Text>
@@ -1880,7 +1972,7 @@ export default function DomainDetailsScreen() {
         onRequestClose={() => setIsEditModalOpen(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1, backgroundColor: isDark ? '#0b0f19' : '#f8fafc' }}
         >
           <View style={[styles.container, { backgroundColor: isDark ? '#0b0f19' : '#f8fafc', paddingTop: insets.top }]}>

@@ -1637,7 +1637,7 @@ export default function MoreScreen() {
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
         >
           <TouchableOpacity
             style={styles.backdropTouchable}
@@ -3708,7 +3708,7 @@ export default function MoreScreen() {
         onRequestClose={() => setIsAddAccountModalOpen(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           style={styles.providerModalOverlay}
         >
           <TouchableOpacity
@@ -4267,7 +4267,7 @@ export default function MoreScreen() {
         onRequestClose={() => setEditingTokenAccount(null)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           style={styles.providerModalOverlay}
         >
           <TouchableOpacity
@@ -4746,7 +4746,7 @@ export default function MoreScreen() {
         onRequestClose={() => setSelectedAccountForDomains(null)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           style={styles.providerModalOverlay}
         >
           <TouchableOpacity
