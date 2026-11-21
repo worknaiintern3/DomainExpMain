@@ -464,23 +464,21 @@ export default function MoreScreen() {
 
   const availableSheetHeight = useMemo(() => {
     if (keyboardHeight > 0) {
-      return Math.max(windowHeight - keyboardHeight - insets.top - 24, 260);
+      return Math.max(windowHeight - keyboardHeight - insets.top - 16, 260);
     }
-    return '88%';
+    return Math.min(windowHeight * 0.94, 820);
   }, [keyboardHeight, windowHeight, insets.top]);
 
   useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => setKeyboardHeight(e.endCoordinates.height)
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0)
-    );
+    const showSub1 = Keyboard.addListener('keyboardWillShow', (e) => setKeyboardHeight(e.endCoordinates.height));
+    const showSub2 = Keyboard.addListener('keyboardDidShow', (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub1 = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+    const hideSub2 = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
     return () => {
-      showSub.remove();
-      hideSub.remove();
+      showSub1.remove();
+      showSub2.remove();
+      hideSub1.remove();
+      hideSub2.remove();
     };
   }, []);
 
@@ -1635,9 +1633,11 @@ export default function MoreScreen() {
           setActiveModal(null);
         }}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior="padding"
+        <View
+          style={[
+            styles.modalOverlay,
+            { paddingBottom: keyboardHeight },
+          ]}
         >
           <TouchableOpacity
             style={styles.backdropTouchable}
@@ -1650,16 +1650,11 @@ export default function MoreScreen() {
           <View
             style={[
               styles.modalSheet,
-              activeModal && MODAL_CONFIG[activeModal]
-                ? {
-                    height: keyboardHeight > 0 ? availableSheetHeight : MODAL_CONFIG[activeModal].heightPercentage,
-                    maxHeight: availableSheetHeight,
-                  }
-                : { maxHeight: availableSheetHeight },
               {
                 backgroundColor: colors.surface,
-                marginBottom: Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight : 0,
-                paddingBottom: Math.max(insets.bottom, 24),
+                height: keyboardHeight > 0 ? availableSheetHeight : (activeModal && MODAL_CONFIG[activeModal] ? MODAL_CONFIG[activeModal].heightPercentage : '88%'),
+                maxHeight: availableSheetHeight,
+                paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 24),
               },
             ]}
           >
@@ -1743,11 +1738,12 @@ export default function MoreScreen() {
                 contentContainerStyle={[
                   styles.sheetBody,
                   {
-                    paddingBottom: (activeModal === 'providers' ? Math.max(insets.bottom + 48, 64) : Spacing.xxl),
+                    paddingBottom: keyboardHeight > 0 ? 90 : (activeModal === 'providers' ? Math.max(insets.bottom + 48, 64) : 48),
                   },
                 ]}
                 showsVerticalScrollIndicator={true}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="none"
               >
                 {/* 1. PROFILE */}
                 {activeModal === 'profile' && (
@@ -3696,7 +3692,7 @@ export default function MoreScreen() {
                 )}
               </ScrollView>
             </View>
-          </KeyboardAvoidingView>
+          </View>
       </Modal>
 
       {/* Add Account Modal (Provider or Email) */}
@@ -3707,9 +3703,11 @@ export default function MoreScreen() {
         statusBarTranslucent
         onRequestClose={() => setIsAddAccountModalOpen(false)}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.providerModalOverlay}
+        <View
+          style={[
+            styles.providerModalOverlay,
+            { paddingBottom: keyboardHeight },
+          ]}
         >
           <TouchableOpacity
             style={styles.modalDismissArea}
@@ -3721,9 +3719,9 @@ export default function MoreScreen() {
               styles.modalSheet,
               {
                 backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                height: keyboardHeight > 0 ? availableSheetHeight : '90%',
                 maxHeight: availableSheetHeight,
-                marginBottom: Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight : 0,
-                paddingBottom: Math.max(insets.bottom, 16),
+                paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 16),
               },
             ]}
           >
@@ -3745,11 +3743,13 @@ export default function MoreScreen() {
 
             <ScrollView
               ref={addAccountScrollRef}
+              style={{ flex: 1 }}
               contentContainerStyle={[
                 styles.sheetBody,
-                { paddingBottom: keyboardHeight > 0 ? 48 : Math.max(insets.bottom, 24) },
+                { paddingBottom: keyboardHeight > 0 ? 90 : Math.max(insets.bottom, 24) + 20 },
               ]}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="none"
               showsVerticalScrollIndicator={true}
             >
               {/* Type Switcher */}
@@ -4253,7 +4253,7 @@ export default function MoreScreen() {
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ========================================================================= */}
@@ -4266,9 +4266,11 @@ export default function MoreScreen() {
         statusBarTranslucent
         onRequestClose={() => setEditingTokenAccount(null)}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.providerModalOverlay}
+        <View
+          style={[
+            styles.providerModalOverlay,
+            { paddingBottom: keyboardHeight },
+          ]}
         >
           <TouchableOpacity
             style={styles.modalDismissArea}
@@ -4280,9 +4282,9 @@ export default function MoreScreen() {
               styles.modalSheet,
               {
                 backgroundColor: isDark ? colors.surfaceElevated : '#ffffff',
+                height: keyboardHeight > 0 ? availableSheetHeight : '90%',
                 maxHeight: availableSheetHeight,
-                marginBottom: Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight : 0,
-                paddingBottom: Math.max(insets.bottom, 16),
+                paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 16),
               },
             ]}
           >
@@ -4304,11 +4306,13 @@ export default function MoreScreen() {
 
             <ScrollView
               ref={editTokenScrollRef}
+              style={{ flex: 1 }}
               contentContainerStyle={[
                 styles.sheetBody,
-                { paddingBottom: keyboardHeight > 0 ? 48 : Math.max(insets.bottom, 24) },
+                { paddingBottom: keyboardHeight > 0 ? 90 : Math.max(insets.bottom, 24) + 20 },
               ]}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="none"
               showsVerticalScrollIndicator={true}
             >
               {editingTokenAccount?.providerKey === 'aws' ? (
@@ -4654,7 +4658,7 @@ export default function MoreScreen() {
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ========================================================================= */}
@@ -4745,9 +4749,11 @@ export default function MoreScreen() {
         statusBarTranslucent
         onRequestClose={() => setSelectedAccountForDomains(null)}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.providerModalOverlay}
+        <View
+          style={[
+            styles.providerModalOverlay,
+            { paddingBottom: keyboardHeight },
+          ]}
         >
           <TouchableOpacity
             style={styles.modalDismissArea}
@@ -4759,9 +4765,9 @@ export default function MoreScreen() {
               styles.modalSheet,
               {
                 backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                height: '92%',
-                maxHeight: '96%',
-                paddingBottom: Math.max(insets.bottom, 20),
+                height: keyboardHeight > 0 ? availableSheetHeight : '92%',
+                maxHeight: availableSheetHeight,
+                paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 20),
               },
             ]}
           >
@@ -5071,7 +5077,7 @@ export default function MoreScreen() {
               );
             })()}
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Delete Account Confirmation Modal */}
@@ -5814,7 +5820,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdropTouchable: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   modalSheet: {
     borderTopLeftRadius: 28,

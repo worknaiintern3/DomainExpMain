@@ -645,7 +645,7 @@ export default function DashboardScreen() {
             {alerts.slice(0, 5).map((item, idx) => {
               const handleActivityPress = () => {
                 if (item.domainId) {
-                  router.push(`/domain/${item.domainId}` as any);
+                  router.push({ pathname: '/domain/[id]', params: { id: item.domainId } });
                 } else if (item.id.includes('app')) {
                   router.push('/(tabs)/applications');
                 } else if (item.id.includes('srv')) {
@@ -803,7 +803,12 @@ export default function DashboardScreen() {
                   {idx > 0 && <View style={[styles.activityDivider, { backgroundColor: colors.borderSubtle }]} />}
                   <TouchableOpacity
                     style={styles.activityItem}
-                    onPress={() => router.push(`/domain/${encodeURIComponent(domain.id || domain.name)}` as any)}
+                    onPress={() => {
+                      const target = domain.id || domain.name;
+                      if (target) {
+                        router.push({ pathname: '/domain/[id]', params: { id: target } });
+                      }
+                    }}
                     activeOpacity={0.7}
                   >
                     <View style={[styles.activityIconBox, { backgroundColor: isUrgent ? 'rgba(239, 68, 68, 0.12)' : isDark ? 'rgba(56, 189, 248, 0.12)' : '#e0f2fe' }]}>

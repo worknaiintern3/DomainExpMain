@@ -599,7 +599,7 @@ export default function ApplicationsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: windowHeight } = useWindowDimensions();
   const isSmall = screenWidth < 380;
   const isTablet = screenWidth >= 768;
 
@@ -660,6 +660,13 @@ export default function ApplicationsScreen() {
   const [appFormError, setAppFormError] = useState<string | null>(null);
   const [webFormError, setWebFormError] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const availableSheetHeight = useMemo(() => {
+    if (keyboardHeight > 0) {
+      return Math.max(windowHeight - keyboardHeight - insets.top - 16, 260);
+    }
+    return Math.min(windowHeight * 0.88, 720);
+  }, [keyboardHeight, windowHeight, insets.top]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -2334,9 +2341,11 @@ export default function ApplicationsScreen() {
           setEditingApp(null);
         }}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.modalOverlay}
+        <View
+          style={[
+            styles.modalOverlay,
+            { paddingBottom: keyboardHeight },
+          ]}
         >
           <TouchableOpacity
             style={styles.modalDismissArea}
@@ -2353,7 +2362,9 @@ export default function ApplicationsScreen() {
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                maxHeight: '85%',
+                height: keyboardHeight > 0 ? availableSheetHeight : '85%',
+                maxHeight: availableSheetHeight,
+                paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 20),
               },
             ]}
           >
@@ -2382,12 +2393,13 @@ export default function ApplicationsScreen() {
             </View>
 
             <ScrollView
+              style={{ flex: 1 }}
               contentContainerStyle={{
-                paddingBottom: Math.max(insets.bottom, 24),
+                paddingBottom: keyboardHeight > 0 ? 80 : Math.max(insets.bottom, 24) + 20,
               }}
               showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="interactive"
+              keyboardDismissMode="none"
             >
               {appFormError ? (
                 <View style={styles.inlineErrorBanner}>
@@ -2531,7 +2543,7 @@ export default function ApplicationsScreen() {
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ========================================================================= */}
@@ -2549,9 +2561,11 @@ export default function ApplicationsScreen() {
           setEditingWebsite(null);
         }}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.modalOverlay}
+        <View
+          style={[
+            styles.modalOverlay,
+            { paddingBottom: keyboardHeight },
+          ]}
         >
           <TouchableOpacity
             style={styles.modalDismissArea}
@@ -2568,7 +2582,9 @@ export default function ApplicationsScreen() {
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                maxHeight: '85%',
+                height: keyboardHeight > 0 ? availableSheetHeight : '85%',
+                maxHeight: availableSheetHeight,
+                paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 20),
               },
             ]}
           >
@@ -2597,12 +2613,13 @@ export default function ApplicationsScreen() {
             </View>
 
             <ScrollView
+              style={{ flex: 1 }}
               contentContainerStyle={{
-                paddingBottom: Math.max(insets.bottom, 24),
+                paddingBottom: keyboardHeight > 0 ? 80 : Math.max(insets.bottom, 24) + 20,
               }}
               showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="interactive"
+              keyboardDismissMode="none"
             >
               {webFormError ? (
                 <View style={styles.inlineErrorBanner}>
@@ -2739,7 +2756,7 @@ export default function ApplicationsScreen() {
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ========================================================================= */}
@@ -2754,9 +2771,11 @@ export default function ApplicationsScreen() {
           setIsConsoleModalOpen(false);
         }}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.modalOverlay}
+        <View
+          style={[
+            styles.modalOverlay,
+            { paddingBottom: keyboardHeight },
+          ]}
         >
           <TouchableOpacity
             style={styles.modalDismissArea}
@@ -2771,7 +2790,9 @@ export default function ApplicationsScreen() {
               styles.sheetModalContainer,
               {
                 backgroundColor: isDark ? '#0b132b' : '#ffffff',
-                maxHeight: '85%',
+                height: keyboardHeight > 0 ? availableSheetHeight : '85%',
+                maxHeight: availableSheetHeight,
+                paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 20),
               },
             ]}
           >
@@ -2801,10 +2822,12 @@ export default function ApplicationsScreen() {
             </View>
 
             <ScrollView
-              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="none"
               contentContainerStyle={{
-                paddingBottom: Math.max(insets.bottom, 24),
+                paddingBottom: keyboardHeight > 0 ? 80 : Math.max(insets.bottom, 24) + 20,
               }}
             >
               {/* Quick Suggestion Chips */}
@@ -2921,7 +2944,7 @@ export default function ApplicationsScreen() {
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ========================================================================= */}

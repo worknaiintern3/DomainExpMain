@@ -540,7 +540,7 @@ export default function GooglePlayConsoleScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {/* =================================================================== */}
         {/* TAB 1: UNIVERSAL DEVELOPER SEARCH                                   */}
@@ -551,13 +551,14 @@ export default function GooglePlayConsoleScreen() {
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingBottom: Math.max(insets.bottom, 24) + 24,
+                paddingBottom: Math.max(insets.bottom, 24) + 60,
                 maxWidth: 960,
                 width: '100%',
                 alignSelf: 'center',
               },
             ]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
           >
             {/* VIEW B: SELECTED DEVELOPER APPS */}
             {selectedDeveloper ? (
@@ -1025,12 +1026,14 @@ export default function GooglePlayConsoleScreen() {
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingBottom: Math.max(insets.bottom, 24) + 24,
+                paddingBottom: Math.max(insets.bottom, 24) + 60,
                 maxWidth: 960,
                 width: '100%',
                 alignSelf: 'center',
               },
             ]}
+            keyboardDismissMode="none"
+            keyboardShouldPersistTaps="handled"
             refreshControl={
               <RefreshControl
                 refreshing={isRefreshingConsole}

@@ -12,6 +12,7 @@ import {
   Platform,
   Linking,
   Share,
+  Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -73,11 +74,13 @@ function detectProviderKey(
   nameservers?: string[] | null,
   tags?: string[] | null
 ): string | null {
+  const nsStr = Array.isArray(nameservers) ? nameservers.join(' ') : typeof nameservers === 'string' ? nameservers : '';
+  const tagStr = Array.isArray(tags) ? tags.join(' ') : typeof tags === 'string' ? tags : '';
   const combined = [
     registrar || '',
     dnsProvider || '',
-    (nameservers || []).join(' '),
-    (tags || []).join(' '),
+    nsStr,
+    tagStr,
   ].join(' ').toLowerCase();
 
   if (combined.includes('hostinger') || combined.includes('hstgr')) return 'hostinger';
@@ -410,6 +413,22 @@ export default function DomainDetailsScreen() {
   const [isLinkServerModalOpen, setIsLinkServerModalOpen] = useState(false);
   const [accountSearchText, setAccountSearchText] = useState('');
   const [serverSearchText, setServerSearchText] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Edit Domain Draft State
   const [editCreated, setEditCreated] = useState('');
@@ -517,21 +536,21 @@ export default function DomainDetailsScreen() {
       let foundServer: ServerItem | null = null;
       let matchType = '';
 
-      const cleanDomainName = currentDomain.name.trim().toLowerCase();
+      const cleanDomainName = (currentDomain?.name || '').trim().toLowerCase();
 
       // Check explicit serverId on domain
-      if (currentDomain.serverId) {
-        foundServer = serverList.find((s) => s.id === currentDomain.serverId) || null;
+      if (currentDomain?.serverId) {
+        foundServer = (serverList || []).find((s) => s.id === currentDomain.serverId) || null;
         if (foundServer) matchType = 'Directly Assigned';
       }
 
       // Check server connectedDomains list
-      if (!foundServer) {
-        for (const s of serverList) {
+      if (!foundServer && cleanDomainName) {
+        for (const s of (serverList || [])) {
           if (Array.isArray(s.connectedDomains)) {
             const hasDom = s.connectedDomains.some((cd) => {
               const cdClean = (cd || '').trim().toLowerCase();
-              return cdClean === cleanDomainName || cleanDomainName.endsWith(`.${cdClean}`);
+              return cdClean && (cdClean === cleanDomainName || cleanDomainName.endsWith(`.${cdClean}`));
             });
             if (hasDom) {
               foundServer = s;
@@ -553,10 +572,10 @@ export default function DomainDetailsScreen() {
             }
           }
         }
-        if (currentDomain.serverIp) candidateIps.push(currentDomain.serverIp.trim());
+        if (currentDomain?.serverIp) candidateIps.push(currentDomain.serverIp.trim());
 
         for (const ip of candidateIps) {
-          const s = serverList.find((srv) => srv.ipAddress && srv.ipAddress.trim() === ip);
+          const s = (serverList || []).find((srv) => srv.ipAddress && srv.ipAddress.trim() === ip);
           if (s) {
             foundServer = s;
             matchType = `Live DNS A-Record (${ip})`;
@@ -566,10 +585,10 @@ export default function DomainDetailsScreen() {
       }
 
       // Check server name or hostname matches domain name
-      if (!foundServer) {
-        for (const s of serverList) {
+      if (!foundServer && cleanDomainName) {
+        for (const s of (serverList || [])) {
           const sName = (s.name || '').trim().toLowerCase();
-          if (sName === cleanDomainName || sName.includes(cleanDomainName)) {
+          if (sName && (sName === cleanDomainName || sName.includes(cleanDomainName))) {
             foundServer = s;
             matchType = 'Hostname Match';
             break;
@@ -601,29 +620,32 @@ export default function DomainDetailsScreen() {
         const reg = details.registrationDate || '';
         const liveDays = details.daysRemaining ?? (exp ? calculateDaysRemaining(exp) : undefined);
 
+        let finalDomain: DomainItem | null = null;
         setDomain((prev) => {
           if (!prev) return null;
           const daysRemaining = liveDays !== undefined ? liveDays : prev.daysRemaining;
 
-          const updatedDomain: DomainItem = {
+          finalDomain = {
             ...prev,
             registrar: details.registrar || prev.registrar,
             registrationDate: reg || prev.registrationDate,
             expiresAt: exp ? (safeDateToIso(exp) || exp) : prev.expiresAt,
             daysRemaining,
             logoUrl: details.logoUrl,
-            nameservers: details.nameservers.length > 0 ? details.nameservers : prev.nameservers,
+            nameservers: Array.isArray(details.nameservers) && details.nameservers.length > 0 ? details.nameservers : prev.nameservers,
           };
+          return finalDomain;
+        });
 
-          updateDomainRecord(prev.id, updatedDomain).catch(() => {});
+        if (finalDomain) {
+          updateDomainRecord((finalDomain as DomainItem).id, finalDomain).catch(() => {});
           resolveMatchedInfrastructure(
-            updatedDomain,
+            finalDomain,
             details,
             currentAccounts || providerAccounts,
             currentServers || servers
           );
-          return updatedDomain;
-        });
+        }
       } catch {
         // Gracefully handle network failures
       } finally {
@@ -644,14 +666,27 @@ export default function DomainDetailsScreen() {
         setProviderAccounts(accList);
         setServers(srvList);
 
+        const rawParam = Array.isArray(id) ? id[0] : id;
+        const safeParam = typeof rawParam === 'string' ? rawParam : '';
         let safeDecodedId = '';
-        try {
-          safeDecodedId = decodeURIComponent(id || '').trim().toLowerCase();
-        } catch {
-          safeDecodedId = (id || '').trim().toLowerCase();
+        if (safeParam) {
+          try {
+            safeDecodedId = decodeURIComponent(safeParam).trim().toLowerCase();
+          } catch {
+            safeDecodedId = safeParam.trim().toLowerCase();
+          }
+        }
+        if (!safeDecodedId) {
+          safeDecodedId = 'unknown.com';
         }
 
-        const found = list.find((d) => d.id === id || d.name.toLowerCase() === safeDecodedId);
+        const safeList = Array.isArray(list) ? list : [];
+        const found = safeList.find((d) => {
+          if (!d) return false;
+          const dId = d.id ? String(d.id) : '';
+          const dName = (d.name || '').trim().toLowerCase();
+          return (safeParam && dId === safeParam) || (dName && dName === safeDecodedId);
+        });
 
         setLastCheckedDate(
           new Date().toLocaleDateString('en-US', {
@@ -670,7 +705,7 @@ export default function DomainDetailsScreen() {
           queryLiveTelemetry(found.name, accList, srvList);
         } else {
           const dynamicDomain: DomainItem = {
-            id: safeDecodedId || 'unknown-domain',
+            id: safeParam || safeDecodedId || 'unknown-domain',
             name: safeDecodedId || 'unknown.com',
             tld: `.${(safeDecodedId.split('.').pop() || 'com')}`,
             registrar: 'Checking WHOIS...',
@@ -1007,13 +1042,13 @@ export default function DomainDetailsScreen() {
     return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
   })();
   const effectiveNameservers =
-    liveInfo?.nameservers && liveInfo.nameservers.length > 0
+    liveInfo?.nameservers && Array.isArray(liveInfo.nameservers) && liveInfo.nameservers.length > 0
       ? liveInfo.nameservers
-      : domain.nameservers && domain.nameservers.length > 0
+      : domain.nameservers && Array.isArray(domain.nameservers) && domain.nameservers.length > 0
       ? domain.nameservers
       : [];
   const effectiveStatus =
-    liveInfo?.statuses && liveInfo.statuses.length > 0
+    liveInfo?.statuses && Array.isArray(liveInfo.statuses) && liveInfo.statuses.length > 0
       ? liveInfo.statuses.join(', ').replace(/([A-Z])/g, ' $1').toLowerCase()
       : 'active';
   const effectiveSslValidFrom = liveInfo?.sslValidFrom || '';
@@ -1754,7 +1789,7 @@ export default function DomainDetailsScreen() {
               LIVE DNS RECORDS (WHOISFREAKS)
             </Text>
             <View style={{ flex: 1 }} />
-            {liveInfo?.dnsRecords && liveInfo.dnsRecords.length > 0 ? (
+            {liveInfo?.dnsRecords && Array.isArray(liveInfo.dnsRecords) && liveInfo.dnsRecords.length > 0 ? (
               <View
                 style={{
                   backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
@@ -1771,7 +1806,7 @@ export default function DomainDetailsScreen() {
           </View>
           <View style={[styles.sectionDivider, { backgroundColor: isDark ? '#1f2937' : '#f1f5f9' }]} />
 
-          {liveInfo?.dnsRecords && liveInfo.dnsRecords.length > 0 ? (
+          {liveInfo?.dnsRecords && Array.isArray(liveInfo.dnsRecords) && liveInfo.dnsRecords.length > 0 ? (
             <View style={{ gap: 8 }}>
               {liveInfo.dnsRecords.slice(0, 10).map((rec, idx) => {
                 const badgeColor =
@@ -1925,7 +1960,7 @@ export default function DomainDetailsScreen() {
             </View>
           ) : null}
 
-          {liveInfo?.sslAltNames && liveInfo.sslAltNames.length > 0 ? (
+          {liveInfo?.sslAltNames && Array.isArray(liveInfo.sslAltNames) && liveInfo.sslAltNames.length > 0 ? (
             <View style={styles.dataRow}>
               <Text style={[styles.dataLabel, { color: colors.textSecondary }]}>SANs</Text>
               <Text style={[styles.dataValue, { color: colors.text }]} numberOfLines={1}>
@@ -1979,7 +2014,7 @@ export default function DomainDetailsScreen() {
         onRequestClose={() => setIsEditModalOpen(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1, backgroundColor: isDark ? '#0b0f19' : '#f8fafc' }}
         >
           <View style={[styles.container, { backgroundColor: isDark ? '#0b0f19' : '#f8fafc', paddingTop: insets.top }]}>
@@ -2005,9 +2040,13 @@ export default function DomainDetailsScreen() {
             </View>
 
             <ScrollView
-              contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 24) + 40 }]}
+              contentContainerStyle={[
+                styles.scrollContent,
+                { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : Math.max(insets.bottom, 24) + 40 },
+              ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="none"
             >
               {/* Domain Name Hero Preview */}
               <View
@@ -2458,9 +2497,10 @@ export default function DomainDetailsScreen() {
         visible={isLinkProviderModalOpen}
         transparent
         animationType="slide"
+        statusBarTranslucent
         onRequestClose={() => setIsLinkProviderModalOpen(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingBottom: keyboardHeight, justifyContent: keyboardHeight > 0 ? 'flex-end' : 'center' }]}>
           <View
             style={[
               styles.pickerModalBox,
@@ -2629,9 +2669,10 @@ export default function DomainDetailsScreen() {
         visible={isLinkServerModalOpen}
         transparent
         animationType="slide"
+        statusBarTranslucent
         onRequestClose={() => setIsLinkServerModalOpen(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingBottom: keyboardHeight, justifyContent: keyboardHeight > 0 ? 'flex-end' : 'center' }]}>
           <View
             style={[
               styles.pickerModalBox,

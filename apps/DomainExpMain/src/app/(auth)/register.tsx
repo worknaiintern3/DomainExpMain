@@ -121,10 +121,11 @@ export default function RegisterScreen() {
             styles.scrollContent,
             {
               paddingTop: Math.max(insets.top + 4, 16),
-              paddingBottom: Math.max(insets.bottom + 16, 28),
+              paddingBottom: Math.max(insets.bottom + 20, 56),
             },
           ]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
           showsVerticalScrollIndicator={false}
         >
           {/* Top Brand Logo - positioned above the globe */}

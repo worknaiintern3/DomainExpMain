@@ -12,6 +12,7 @@ import {
   Platform,
   Keyboard,
   KeyboardAvoidingView,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,6 +58,14 @@ export default function DomainsScreen() {
   const [isAdding, setIsAdding] = useState(false);
   const [domainError, setDomainError] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const { height: windowHeight } = useWindowDimensions();
+
+  const availableSheetHeight = useMemo(() => {
+    if (keyboardHeight > 0) {
+      return Math.max(windowHeight - keyboardHeight - insets.top - 16, 260);
+    }
+    return Math.min(windowHeight * 0.85, 540);
+  }, [keyboardHeight, windowHeight, insets.top]);
 
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -123,15 +132,19 @@ export default function DomainsScreen() {
   };
 
   const filteredDomains = useMemo(() => {
+    const query = (searchQuery || '').trim().toLowerCase();
     return domains.filter((d) => {
-      if (!d?.name || isInfrastructureDomain(d.name)) return false;
-      const matchesSearch =
-        d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.registrar.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!d || !d.name || isInfrastructureDomain(d.name)) return false;
+      const domName = (d.name || '').toLowerCase();
+      const domRegistrar = (d.registrar || '').toLowerCase();
+      const matchesSearch = !query || domName.includes(query) || domRegistrar.includes(query);
 
-      if (selectedFilter === 'Expiring') return matchesSearch && (d.daysRemaining || 99) <= 10;
-      if (selectedFilter === 'Healthy') return matchesSearch && (d.daysRemaining || 99) > 10;
-      if (selectedFilter === 'Issues') return matchesSearch && (d.status === 'critical' || (d.daysRemaining || 99) <= 10);
+      const days = d.daysRemaining !== undefined ? d.daysRemaining : calculateDaysRemaining(d.expiresAt);
+      const effectiveDays = days !== undefined ? days : 99;
+
+      if (selectedFilter === 'Expiring') return matchesSearch && effectiveDays <= 10;
+      if (selectedFilter === 'Healthy') return matchesSearch && effectiveDays > 10;
+      if (selectedFilter === 'Issues') return matchesSearch && (d.status === 'critical' || effectiveDays <= 10);
       return matchesSearch;
     });
   }, [domains, searchQuery, selectedFilter]);
@@ -332,7 +345,12 @@ export default function DomainsScreen() {
                   borderColor: isDark ? '#1f2937' : '#f1f5f9',
                 },
               ]}
-              onPress={() => router.push(`/domain/${encodeURIComponent(domain.id || domain.name)}` as any)}
+              onPress={() => {
+                const targetId = domain.id || domain.name;
+                if (targetId) {
+                  router.push({ pathname: '/domain/[id]', params: { id: targetId } });
+                }
+              }}
               activeOpacity={0.8}
             >
               <DomainLogoImage
@@ -347,7 +365,7 @@ export default function DomainsScreen() {
                   {domain.name}
                 </Text>
                 <Text style={[styles.registrarLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-                  ● {domain.registrar}
+                  ● {domain.registrar || 'Authoritative Registry'}
                 </Text>
                 <View style={styles.expiryRow}>
                   <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
@@ -463,11 +481,14 @@ export default function DomainsScreen() {
         visible={isAddModalOpen}
         transparent
         animationType="slide"
+        statusBarTranslucent
         onRequestClose={handleCloseAddModal}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.modalOverlay}
+        <View
+          style={[
+            styles.modalOverlay,
+            { paddingBottom: keyboardHeight },
+          ]}
         >
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
@@ -476,19 +497,23 @@ export default function DomainsScreen() {
           />
           <View
             style={[
-                styles.modalContent,
-                {
-                  backgroundColor: isDark ? '#111827' : '#ffffff',
-                  borderColor: isDark ? '#1f2937' : '#e2e8f0',
-                  paddingBottom: Math.max(insets.bottom, 24),
-                },
-              ]}
+              styles.modalContent,
+              {
+                backgroundColor: isDark ? '#111827' : '#ffffff',
+                borderColor: isDark ? '#1f2937' : '#e2e8f0',
+                maxHeight: availableSheetHeight,
+                paddingBottom: keyboardHeight > 0 ? 16 : Math.max(insets.bottom, 24),
+              },
+            ]}
+          >
+            <ScrollView
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{ paddingBottom: keyboardHeight > 0 ? 20 : 8 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="none"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
             >
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                bounces={false}
-              >
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Domain</Text>
                   <TouchableOpacity onPress={handleCloseAddModal} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -567,7 +592,7 @@ export default function DomainsScreen() {
                 </View>
               </ScrollView>
             </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
@@ -743,11 +768,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
+    width: '100%',
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     padding: Spacing.xl,
-    maxHeight: '82%',
     borderWidth: 1,
+    zIndex: 10,
+    elevation: 20,
   },
   modalHeader: {
     flexDirection: 'row',

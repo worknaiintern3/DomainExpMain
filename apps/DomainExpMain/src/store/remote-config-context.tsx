@@ -11,7 +11,7 @@ import { getItem, setItem } from '../services/storage';
 import { getEffectiveApiUrl } from '../services/api';
 
 const REMOTE_CONFIG_CACHE_KEY = '@domainpulse_mobile_remote_config';
-const CURRENT_APP_VERSION = '1.0.9';
+const CURRENT_APP_VERSION = '1.0.10';
 
 export interface RemoteAppConfig {
   appName: string;
@@ -127,10 +127,10 @@ const DEFAULT_CONFIG: RemoteBootstrapConfig = {
   version: {
     platform: 'all',
     minimumVersion: '1.0.0',
-    latestVersion: '1.0.9',
+    latestVersion: '1.0.10',
     forceUpdate: false,
     updateUrl: 'https://play.google.com/store/apps/details?id=com.domainpulse.mobile',
-    releaseNotes: 'Welcome to DomainExpert Mobile v1.0.9.',
+    releaseNotes: 'Welcome to DomainExpert Mobile v1.0.10.',
   },
   announcements: [],
 };
